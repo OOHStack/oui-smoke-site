@@ -633,7 +633,7 @@ code {
   position: relative;
   margin-top: 0;
   width: 100%;
-  min-height: 16rem;
+  min-height: clamp(22rem, 52vh, 28rem);
   overflow: hidden;
   border-radius: 12px;
   background: #121212;
@@ -656,7 +656,7 @@ code {
   }
 
   .playlist__embed {
-    min-height: 100%;
+    min-height: clamp(24rem, 48vh, 32rem);
     height: 100%;
   }
 }
