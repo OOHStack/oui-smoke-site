@@ -3,5 +3,10 @@
   "buildCommand": null,
   "outputDirectory": ".",
   "framework": null,
-  "rewrites": [{ "source": "/promo", "destination": "/promo.html" }]
+  "rewrites": [
+    { "source": "/promo", "destination": "/promo.html" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/accessibility", "destination": "/accessibility.html" }
+  ]
 }

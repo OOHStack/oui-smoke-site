@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <title>Accessibility — Oui Smoke</title>
+    <meta
+      name="description"
+      content="Accessibility commitment for Oui Smoke Catering Inc. under Ontario’s AODA and WCAG guidelines."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./legal.css" />
+  </head>
+  <body>
+    <header class="legal-top">
+      <a href="./"><img src="./public/logo-white.png" alt="Oui Smoke" width="1355" height="364" /></a>
+      <a href="./">Back to site</a>
+    </header>
+
+    <main class="legal">
+      <p class="legal__eyebrow">Legal</p>
+      <h1>Accessibility</h1>
+      <p class="legal__updated">Last updated: July 11, 2026</p>
+
+      <p>
+        Oui Smoke Catering Inc. is committed to providing an inclusive experience for customers
+        and website visitors in Ontario, consistent with the Accessibility for Ontarians with
+        Disabilities Act, 2005 (AODA) and the Integrated Accessibility Standards Regulation.
+      </p>
+
+      <h2>1. Our commitment</h2>
+      <p>
+        We aim to provide websites and customer communications that are accessible to people
+        with disabilities, and to communicate with customers in a manner that takes into account
+        their accessibility needs.
+      </p>
+
+      <h2>2. Website accessibility</h2>
+      <p>
+        We design this website with the goal of conforming to the Web Content Accessibility
+        Guidelines (WCAG) 2.0 Level AA where practicable, including:
+      </p>
+      <ul>
+        <li>Text alternatives for meaningful images where appropriate</li>
+        <li>Keyboard-accessible controls for interactive features such as the cost calculator</li>
+        <li>Sufficient colour contrast for primary text</li>
+        <li>Support for reduced-motion preferences where animations are used</li>
+        <li>Clear page structure with headings and labels</li>
+      </ul>
+      <p>
+        Some third-party content, older media, or decorative motion may not yet fully meet every
+        guideline. We continue to improve accessibility over time.
+      </p>
+
+      <h2>3. Accessible customer service</h2>
+      <p>When you contact or book with us, we will:</p>
+      <ul>
+        <li>Communicate in a respectful manner that considers accessibility needs you identify</li>
+        <li>Welcome feedback about barriers you encounter</li>
+        <li>
+          Make reasonable efforts to provide information and booking support in accessible
+          formats upon request
+        </li>
+      </ul>
+
+      <h2>4. Assistive technologies</h2>
+      <p>
+        Our site is intended to work with common modern browsers and assistive technologies.
+        If you use a screen reader, magnification, voice control, or other assistive tools and
+        encounter a barrier, please tell us so we can help.
+      </p>
+
+      <h2>5. Feedback and requests</h2>
+      <p>
+        We welcome accessibility feedback and requests for alternate formats.
+      </p>
+      <ul>
+        <li>Email: <a href="mailto:contact@ouismoke.co">contact@ouismoke.co</a></li>
+        <li>Subject line suggestion: “Accessibility feedback”</li>
+      </ul>
+      <p>
+        Please describe the page or feature, the barrier you experienced, and your preferred
+        contact method. We will review feedback and respond within a reasonable time.
+      </p>
+
+      <h2>6. Service animals and support persons</h2>
+      <p>
+        Where we control a service environment for an event we are staffing, we welcome
+        customers accompanied by service animals or support persons in accordance with
+        applicable law and venue rules. Venue policies may also apply; we will help coordinate
+        where possible.
+      </p>
+
+      <h2>7. Updates</h2>
+      <p>
+        This statement may be updated as our website and practices evolve. The “Last updated”
+        date will change when revisions are made.
+      </p>
+
+      <nav class="legal__nav" aria-label="Legal pages">
+        <a href="./privacy.html">Privacy</a>
+        <a href="./terms.html">Terms</a>
+        <a href="./accessibility.html" aria-current="page">Accessibility</a>
+      </nav>
+    </main>
+
+    <footer class="legal-footer">
+      <p>© <span id="y"></span> Oui Smoke Catering Inc. · Ontario, Canada</p>
+    </footer>
+    <script>
+      document.getElementById("y").textContent = new Date().getFullYear();
+    </script>
+  </body>
+</html>
