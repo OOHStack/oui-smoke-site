@@ -1,0 +1,15 @@
+.DS_Store
+node_modules/
+*.log
+/[0-9].png
+/1[0-2].png
+Ouismoke logo.pdf
+.vercel
+public/bcard*.png
+public/logo.png
+public/logo-hires.png
+public/qr.svg
+public/images/5.png
+public/images/flower.jpg
+public/images/hero-palms.png
+public/images/model-[1-5].jpg
