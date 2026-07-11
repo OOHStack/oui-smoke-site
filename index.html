@@ -2,122 +2,202 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0a0a0a" />
+    <meta
+      name="description"
+      content="Oui Smoke — private & corporate premium hookah catering in Toronto and beyond the GTA."
+    />
     <title>Oui Smoke — Premium Hookah Catering</title>
+    <script src="./config.js"></script>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var promo =
+          (window.OUI_CONFIG && window.OUI_CONFIG.promoMode) ||
+          params.get("promo") === "1";
+        if (promo) {
+          var q = params.toString();
+          window.location.replace("./promo.html" + (q ? "?" + q : ""));
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./site.css" />
   </head>
   <body>
-    <main class="stage" aria-label="Oui Smoke brand showcase">
-      <div class="stage__media" aria-hidden="true">
-        <div class="bg-slide is-active">
-          <div class="bg-slide__img" style="background-image: url('./public/images/model-2-web.jpg')"></div>
+    <header class="topbar">
+      <a class="topbar__brand" href="#top" aria-label="Oui Smoke home">
+        <img src="./public/logo-white.png" alt="Oui Smoke" width="1355" height="364" />
+      </a>
+      <nav class="topbar__nav" aria-label="Primary">
+        <a href="#experience">Experience</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#addons">Add-ons</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <a class="topbar__cta" href="mailto:contact@ouismoke.co">Book an event</a>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero__media" aria-hidden="true">
+          <div class="hero__slide is-active" style="background-image: url('./public/images/model-2-web.jpg')"></div>
+          <div class="hero__slide" style="background-image: url('./public/images/model-4-web.jpg')"></div>
+          <div class="hero__slide" style="background-image: url('./public/images/model-5-web.jpg')"></div>
         </div>
-        <div class="bg-slide">
-          <div class="bg-slide__img" style="background-image: url('./public/images/model-4-web.jpg')"></div>
+        <div class="hero__veil" aria-hidden="true"></div>
+        <div class="hero__content">
+          <img
+            class="hero__logo"
+            src="./public/logo-white.png"
+            alt="Oui Smoke"
+            width="1355"
+            height="364"
+          />
+          <h1 class="hero__title">Not your average hookah catering</h1>
+          <p class="hero__lede">
+            Personalized hookah experiences for private &amp; corporate events —
+            crafted to feel unforgettable.
+          </p>
+          <div class="hero__actions">
+            <a class="btn btn--solid" href="#pricing">View pricing</a>
+            <a class="btn btn--ghost" href="mailto:contact@ouismoke.co">Request a quote</a>
+          </div>
         </div>
-        <div class="bg-slide">
-          <div class="bg-slide__img" style="background-image: url('./public/images/model-5-web.jpg')"></div>
+      </section>
+
+      <section class="section experience" id="experience">
+        <div class="section__inner">
+          <p class="eyebrow">The experience</p>
+          <h2 class="section__title">Concierge-level service, every booking</h2>
+          <p class="section__lede">
+            We bring premium hookahs, attentive staff, and fully customizable packages
+            to birthdays, weddings, corporate gatherings, and private functions.
+          </p>
+
+          <ul class="pillars">
+            <li>
+              <h3>Private events</h3>
+              <p>Birthdays, stag parties, weddings, and intimate celebrations — themed and tailored.</p>
+            </li>
+            <li>
+              <h3>Corporate events</h3>
+              <p>Talk-worthy entertainment with branding opportunities that amplify your company.</p>
+            </li>
+            <li>
+              <h3>Full production</h3>
+              <p>Hookahs, bartenders, DJs, photographers, themed setups, and custom branding.</p>
+            </li>
+          </ul>
         </div>
-        <div class="bg-slide">
-          <div class="bg-slide__img" style="background-image: url('./public/images/model-1-web.jpg')"></div>
+      </section>
+
+      <section class="section pricing" id="pricing">
+        <div class="section__inner">
+          <p class="eyebrow">Within the GTA</p>
+          <h2 class="section__title">4-hour pricing</h2>
+          <p class="section__lede">
+            Clear per-hookah rates based on how many units you need. Travel outside the GTA available on request.
+          </p>
+
+          <div class="rate-table" role="table" aria-label="GTA hookah pricing">
+            <div class="rate-row rate-row--head" role="row">
+              <span role="columnheader">Package</span>
+              <span role="columnheader">Per hookah</span>
+              <span role="columnheader">Refills</span>
+            </div>
+            <div class="rate-row" role="row">
+              <div role="cell">
+                <strong>1 – 4 hookahs</strong>
+                <span>1 refill included</span>
+              </div>
+              <div role="cell" class="rate-row__price">$80</div>
+              <div role="cell">$25 each after</div>
+            </div>
+            <div class="rate-row" role="row">
+              <div role="cell">
+                <strong>5 – 8 hookahs</strong>
+                <span>Unlimited refills</span>
+              </div>
+              <div role="cell" class="rate-row__price">$75</div>
+              <div role="cell">Unlimited</div>
+            </div>
+            <div class="rate-row" role="row">
+              <div role="cell">
+                <strong>9+ hookahs</strong>
+                <span>Unlimited refills</span>
+              </div>
+              <div role="cell" class="rate-row__price">$65</div>
+              <div role="cell">Unlimited</div>
+            </div>
+          </div>
+
+          <p class="fineprint">All packages include up to 4 hours of service within the GTA. Modifications quoted on request.</p>
         </div>
-      </div>
+      </section>
 
-      <div class="stage__veil" aria-hidden="true"></div>
-      <div class="stage__grain" aria-hidden="true"></div>
+      <section class="section addons" id="addons">
+        <div class="section__inner">
+          <p class="eyebrow">Enhance the night</p>
+          <h2 class="section__title">Add-ons</h2>
 
-      <div class="stage__content">
-        <img
-          class="brand-logo"
-          src="./public/logo-white.png"
-          alt="Oui Smoke"
-          width="1355"
-          height="364"
-        />
-
-        <div class="deck" aria-live="polite">
-          <article class="panel is-active" data-panel="0">
-            <img
-              class="panel__event"
-              src="./public/event-logo.png"
-              alt="Caribbean Link Up TV"
-              width="240"
-              height="128"
-            />
-            <p class="panel__label">Showcase exclusive</p>
-            <h2 class="panel__title">25% off packages</h2>
-            <p class="panel__accent">with a $50 deposit</p>
-          </article>
-
-          <article class="panel" data-panel="1">
-            <p class="panel__label">This summer</p>
-            <h2 class="panel__title">
-              Summer party packages
-              <span class="panel__title-line">starting at $399</span>
-            </h2>
-            <p class="panel__accent">Perfect for intimate celebrations</p>
-          </article>
-
-          <article class="panel" data-panel="2">
-            <h2 class="panel__title package-title">
-              Oui <span class="accent">Gather</span> Package
-            </h2>
-            <p class="panel__label">Perfect for small private gatherings</p>
-            <ul class="package-list">
-              <li>Within Toronto &amp; GTA</li>
-              <li>Up to 4 Hours of Service</li>
-              <li>4 Premium Hookahs</li>
-              <li>Unlimited Flavour Changes (Custom Blend Options)</li>
-              <li>Setup / Takedown / Maintenance</li>
-              <li>2 Oui Smoke Staff</li>
-            </ul>
-            <p class="package-price">$1,000 <span>+ HST</span></p>
-            <p class="package-value">Value: $1,360 + HST</p>
-          </article>
+          <ul class="addon-list">
+            <li>
+              <span class="addon-list__name">Additional time</span>
+              <span class="addon-list__price">$120 / hour</span>
+            </li>
+            <li>
+              <span class="addon-list__name">LED base</span>
+              <span class="addon-list__price">$10 / hookah</span>
+            </li>
+            <li>
+              <span class="addon-list__name">Water enhancers</span>
+              <span class="addon-list__price">$5 / hookah</span>
+            </li>
+            <li>
+              <span class="addon-list__name">Unit branding</span>
+              <span class="addon-list__price">$12 – $15 / hookah <em>Min. 4</em></span>
+            </li>
+            <li>
+              <span class="addon-list__name">Custom flavour blends</span>
+              <span class="addon-list__price">Available on 5+ hookah packages</span>
+            </li>
+          </ul>
         </div>
+      </section>
 
-        <div class="deck-dots" role="tablist" aria-label="Package slides">
-          <button class="deck-dot is-active" type="button" aria-label="Showcase offer" aria-selected="true"></button>
-          <button class="deck-dot" type="button" aria-label="Summer packages" aria-selected="false"></button>
-          <button class="deck-dot" type="button" aria-label="Gather package" aria-selected="false"></button>
+      <section class="section contact" id="contact">
+        <div class="contact__media" aria-hidden="true" style="background-image: url('./public/images/model-1-web.jpg')"></div>
+        <div class="contact__veil" aria-hidden="true"></div>
+        <div class="section__inner contact__inner">
+          <p class="eyebrow">Let’s build your event</p>
+          <h2 class="section__title">Ready when you are</h2>
+          <p class="section__lede">
+            Tell us the date, guest count, and vibe — we’ll craft a package around it.
+          </p>
+          <div class="contact__links">
+            <a href="mailto:contact@ouismoke.co">contact@ouismoke.co</a>
+            <a href="https://instagram.com/ouismoke" target="_blank" rel="noopener">@ouismoke</a>
+            <a href="https://www.ouismoke.co" target="_blank" rel="noopener">ouismoke.co</a>
+          </div>
+          <p class="locale">Toronto · Available beyond the GTA</p>
         </div>
-
-        <div class="cta">
-          <a class="cta__link" href="https://www.ouismoke.co" target="_blank" rel="noopener">
-            ouismoke.co
-          </a>
-          <span class="cta__sep" aria-hidden="true"></span>
-          <a
-            class="cta__link"
-            href="https://instagram.com/ouismoke"
-            target="_blank"
-            rel="noopener"
-          >
-            @ouismoke
-          </a>
-          <span class="cta__sep" aria-hidden="true"></span>
-          <a class="cta__link" href="mailto:contact@ouismoke.co">
-            contact@ouismoke.co
-          </a>
-        </div>
-
-        <p class="locale">Toronto · Available beyond the GTA</p>
-      </div>
+      </section>
     </main>
 
+    <footer class="footer">
+      <img src="./public/logo-white.png" alt="" width="1355" height="364" />
+      <p>Private &amp; corporate premium hookah catering</p>
+      <p class="footer__note">Promo mode: set <code>promoMode</code> in <code>config.js</code>, or visit <a href="./promo.html">/promo</a></p>
+    </footer>
+
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
-    <script src="./app.js"></script>
+    <script src="./site.js"></script>
   </body>
 </html>

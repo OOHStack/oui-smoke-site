@@ -2,7 +2,7 @@
   "name": "oui-smoke-site",
   "private": true,
   "version": "1.0.0",
-  "description": "Oui Smoke vendor showcase landing page",
+  "description": "Oui Smoke website with switchable promo mode",
   "scripts": {
     "dev": "npx --yes serve -l 5173 .",
     "start": "npx --yes serve -l 5173 ."
