@@ -143,6 +143,7 @@
     reveal(".rate-row", { trigger: ".rate-table", y: 18, stagger: 0.07 });
     reveal(".fineprint", { trigger: ".fineprint", y: 12 });
     reveal(".addon-list li", { trigger: ".addon-list", y: 18, stagger: 0.06 });
+    reveal(".playlist__embed", { trigger: ".playlist__embed", y: 20 });
     reveal(".contact__inner > *", { trigger: ".contact__inner", start: "top 78%", y: 22, stagger: 0.08 });
     reveal(".footer > *", { trigger: ".footer", start: "top 95%", y: 14, stagger: 0.05 });
 

@@ -603,6 +603,26 @@ code {
   color: var(--ink-mute);
 }
 
+.playlist {
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+.playlist__embed {
+  margin-top: clamp(1.75rem, 4vh, 2.75rem);
+  max-width: 40rem;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #121212;
+  line-height: 0;
+}
+
+.playlist__embed iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+}
+
 .contact {
   position: relative;
   isolation: isolate;
