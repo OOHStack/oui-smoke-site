@@ -58,7 +58,13 @@ code {
   gap: 1rem;
   padding: 1rem var(--pad);
   background: linear-gradient(180deg, rgba(10, 9, 8, 0.82), rgba(10, 9, 8, 0));
-  mix-blend-mode: normal;
+  transition: background 320ms var(--ease), backdrop-filter 320ms var(--ease);
+}
+
+.topbar.is-solid {
+  background: rgba(10, 9, 8, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .topbar__brand img {
@@ -121,12 +127,11 @@ code {
 
 .hero__slide {
   position: absolute;
-  inset: 0;
+  inset: -8%;
   background-size: cover;
   background-position: center;
   opacity: 0;
-  transform: scale(1.06);
-  transition: opacity 1.4s ease;
+  will-change: transform, opacity;
 }
 
 .hero__slide.is-active {
@@ -432,6 +437,7 @@ code {
   z-index: 0;
   background-size: cover;
   background-position: center;
+  will-change: transform;
 }
 
 .contact__veil {
