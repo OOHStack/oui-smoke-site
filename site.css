@@ -664,6 +664,45 @@ body.modal-open {
   color: var(--ink-soft);
 }
 
+.calc-nudge {
+  margin-top: 0.85rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(228, 87, 77, 0.35);
+  background: rgba(228, 87, 77, 0.1);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.calc-nudge[hidden] {
+  display: none !important;
+}
+
+.calc-nudge__text {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.calc-nudge__text strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.calc-nudge__btn {
+  justify-self: start;
+  min-height: 2.4rem;
+  padding: 0.55rem 0.95rem;
+  border: 1px solid rgba(247, 244, 239, 0.28);
+  background: var(--ink);
+  color: #111;
+  font-family: "Outfit", system-ui, sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .calc-addons {
   margin: 1.25rem 0 0;
   padding: 1rem 0 0;
@@ -679,11 +718,68 @@ body.modal-open {
   color: var(--ink-mute);
 }
 
+.calc-addons legend span {
+  margin-left: 0.45rem;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  opacity: 0.75;
+}
+
+.calc-addon-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.85rem;
+}
+
+.calc-addon-row__copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.calc-addon-row__copy strong {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.calc-addon-row__copy span {
+  font-size: 0.82rem;
+  color: var(--ink-mute);
+}
+
+.calc-stepper input {
+  width: 4.5rem;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink);
+  font-family: "Outfit", system-ui, sans-serif;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .calc-check {
   display: flex;
   gap: 0.75rem;
   align-items: flex-start;
-  margin-top: 0.85rem;
+  margin-top: 0.95rem;
   cursor: pointer;
   font-size: 0.95rem;
   color: var(--ink-soft);

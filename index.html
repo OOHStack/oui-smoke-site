@@ -255,24 +255,46 @@
           </div>
 
           <p class="calc-tier" id="calc-tier" aria-live="polite"></p>
+          <div class="calc-nudge" id="calc-nudge" hidden>
+            <p class="calc-nudge__text" id="calc-nudge-text"></p>
+            <button class="calc-nudge__btn" type="button" id="calc-nudge-btn"></button>
+          </div>
 
           <fieldset class="calc-addons">
-            <legend>Add-ons</legend>
+            <legend>Add-ons <span>per hookah</span></legend>
 
-            <label class="calc-check">
-              <input id="calc-led" name="led" type="checkbox" />
-              <span>LED base <strong>$10 / hookah</strong></span>
-            </label>
+            <div class="calc-addon-row">
+              <div class="calc-addon-row__copy">
+                <strong>LED base</strong>
+                <span>$10 each</span>
+              </div>
+              <label class="calc-stepper">
+                <span class="visually-hidden">LED bases</span>
+                <input id="calc-led" name="ledQty" type="number" min="0" max="40" value="0" inputmode="numeric" />
+              </label>
+            </div>
 
-            <label class="calc-check">
-              <input id="calc-water" name="water" type="checkbox" />
-              <span>Water enhancers <strong>$5 / hookah</strong></span>
-            </label>
+            <div class="calc-addon-row">
+              <div class="calc-addon-row__copy">
+                <strong>Water enhancers</strong>
+                <span>$5 each</span>
+              </div>
+              <label class="calc-stepper">
+                <span class="visually-hidden">Water enhancers</span>
+                <input id="calc-water" name="waterQty" type="number" min="0" max="40" value="0" inputmode="numeric" />
+              </label>
+            </div>
 
-            <label class="calc-check">
-              <input id="calc-branding" name="branding" type="checkbox" />
-              <span>Unit branding <strong>min. 4</strong></span>
-            </label>
+            <div class="calc-addon-row">
+              <div class="calc-addon-row__copy">
+                <strong>Unit branding</strong>
+                <span>$12–$15 · min. 4</span>
+              </div>
+              <label class="calc-stepper">
+                <span class="visually-hidden">Branded units</span>
+                <input id="calc-branding" name="brandingQty" type="number" min="0" max="40" value="0" inputmode="numeric" />
+              </label>
+            </div>
 
             <label class="calc-field calc-field--branding" id="calc-branding-rate-field" hidden>
               <span>Branding rate / hookah</span>
@@ -282,13 +304,16 @@
                 <option value="15">$15</option>
               </select>
             </label>
+            <p class="calc-hint" id="calc-branding-hint" hidden>
+              Branding requires a minimum of 4 units.
+            </p>
 
             <label class="calc-check" id="calc-blends-wrap">
               <input id="calc-blends" name="blends" type="checkbox" />
-              <span>Custom flavour blends <strong>quoted separately</strong></span>
+              <span>Custom flavour blends <strong>quoted separately · 5+ hookahs</strong></span>
             </label>
             <p class="calc-hint" id="calc-blends-hint" hidden>
-              Custom blends are available on 5+ hookah packages.
+              Custom blends unlock on 5+ hookah packages.
             </p>
           </fieldset>
 
