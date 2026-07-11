@@ -612,7 +612,13 @@ code {
 .playlist__layout {
   display: grid;
   gap: clamp(1.5rem, 4vw, 2.75rem);
-  align-items: center;
+  align-items: stretch;
+}
+
+.playlist__copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .playlist .section__title {
@@ -624,9 +630,10 @@ code {
 }
 
 .playlist__embed {
+  position: relative;
   margin-top: 0;
   width: 100%;
-  max-width: none;
+  min-height: 16rem;
   overflow: hidden;
   border-radius: 12px;
   background: #121212;
@@ -634,8 +641,11 @@ code {
 }
 
 .playlist__embed iframe {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
+  height: 100%;
   border: 0;
 }
 
@@ -643,6 +653,11 @@ code {
   .playlist__layout {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     gap: clamp(2rem, 5vw, 4rem);
+  }
+
+  .playlist__embed {
+    min-height: 100%;
+    height: 100%;
   }
 }
 
