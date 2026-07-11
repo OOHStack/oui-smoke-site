@@ -35,6 +35,7 @@ body {
 img {
   display: block;
   max-width: 100%;
+  height: auto;
 }
 
 a {
@@ -63,6 +64,8 @@ code {
 .topbar__brand img {
   width: clamp(7rem, 14vw, 9.5rem);
   height: auto;
+  aspect-ratio: 1355 / 364;
+  object-fit: contain;
 }
 
 .topbar__nav {
@@ -151,6 +154,9 @@ code {
 
 .hero__logo {
   width: min(58vw, 380px);
+  height: auto;
+  aspect-ratio: 1355 / 364;
+  object-fit: contain;
   margin-bottom: 0.35rem;
   filter: drop-shadow(0 12px 30px var(--shadow));
 }
@@ -471,6 +477,9 @@ code {
 
 .footer img {
   width: 8rem;
+  height: auto;
+  aspect-ratio: 1355 / 364;
+  object-fit: contain;
   margin: 0 auto 1rem;
   opacity: 0.85;
 }
