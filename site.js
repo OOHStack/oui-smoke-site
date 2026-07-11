@@ -6,6 +6,9 @@
   const slides = Array.from(document.querySelectorAll(".hero__slide"));
   const mm = gsap.matchMedia();
 
+  // Prefer native scroll; ScrollToPlugin handles nav clicks.
+  document.documentElement.style.scrollBehavior = "auto";
+
   mm.add("(prefers-reduced-motion: reduce)", () => {
     gsap.set(
       [
@@ -30,43 +33,62 @@
   mm.add("(prefers-reduced-motion: no-preference)", () => {
     gsap.defaults({ ease: "power3.out" });
 
+    const reveal = (targets, vars = {}) => {
+      const elements = gsap.utils.toArray(targets);
+      if (!elements.length) return;
+
+      gsap.set(elements, { autoAlpha: 0, y: vars.y ?? 28, x: vars.x ?? 0 });
+
+      gsap.to(elements, {
+        autoAlpha: 1,
+        y: 0,
+        x: 0,
+        duration: vars.duration ?? 0.75,
+        stagger: vars.stagger ?? 0.08,
+        ease: "power2.out",
+        overwrite: "auto",
+        scrollTrigger: {
+          trigger: vars.trigger || elements[0],
+          start: vars.start || "top 85%",
+          once: true,
+          toggleActions: "play none none none",
+        },
+      });
+    };
+
     // —— Hero entrance ——
     const heroTl = gsap.timeline({ defaults: { ease: "power3.out" } });
 
-    gsap.set(".topbar", { autoAlpha: 0, y: -16 });
-    gsap.set(".hero__logo", { autoAlpha: 0, y: 28, scale: 0.92, filter: "blur(10px)" });
-    gsap.set([".hero__title", ".hero__lede", ".hero__actions"], { autoAlpha: 0, y: 32 });
-    gsap.set(".hero__slide.is-active", { scale: 1.12 });
+    gsap.set(".topbar", { autoAlpha: 0, y: -12 });
+    gsap.set(".hero__logo", { autoAlpha: 0, y: 20, scale: 0.96 });
+    gsap.set([".hero__title", ".hero__lede", ".hero__actions"], { autoAlpha: 0, y: 24 });
+    gsap.set(".hero__slide.is-active", { scale: 1.08 });
 
     heroTl
-      .to(".hero__slide.is-active", { scale: 1.04, duration: 2.4, ease: "power2.out" }, 0)
-      .to(".topbar", { autoAlpha: 1, y: 0, duration: 0.8 }, 0.15)
-      .to(
-        ".hero__logo",
-        { autoAlpha: 1, y: 0, scale: 1, filter: "blur(0px)", duration: 1.2 },
-        0.25
-      )
-      .to(".hero__title", { autoAlpha: 1, y: 0, duration: 0.9 }, "-=0.55")
-      .to(".hero__lede", { autoAlpha: 1, y: 0, duration: 0.8 }, "-=0.55")
-      .to(".hero__actions", { autoAlpha: 1, y: 0, duration: 0.75 }, "-=0.45");
+      .to(".hero__slide.is-active", { scale: 1.03, duration: 2.2, ease: "power2.out" }, 0)
+      .to(".topbar", { autoAlpha: 1, y: 0, duration: 0.7 }, 0.1)
+      .to(".hero__logo", { autoAlpha: 1, y: 0, scale: 1, duration: 1 }, 0.2)
+      .to(".hero__title", { autoAlpha: 1, y: 0, duration: 0.8 }, "-=0.5")
+      .to(".hero__lede", { autoAlpha: 1, y: 0, duration: 0.7 }, "-=0.5")
+      .to(".hero__actions", { autoAlpha: 1, y: 0, duration: 0.65 }, "-=0.4");
 
     // —— Hero background crossfade + ken burns ——
     if (slides.length > 1) {
       let index = 0;
-      gsap.set(slides, { autoAlpha: 0, scale: 1.08 });
-      gsap.set(slides[0], { autoAlpha: 1, scale: 1.04 });
+      gsap.set(slides, { autoAlpha: 0, scale: 1.06 });
+      gsap.set(slides[0], { autoAlpha: 1, scale: 1.03 });
 
       const burn = (slide) => {
         gsap.fromTo(
           slide,
-          { scale: 1.04 },
-          { scale: 1.14, duration: 9, ease: "none", overwrite: "auto" }
+          { scale: 1.03 },
+          { scale: 1.1, duration: 10, ease: "none", overwrite: "auto" }
         );
       };
 
       burn(slides[0]);
 
-      gsap.delayedCall(6.5, function cycle() {
+      gsap.delayedCall(7, function cycle() {
         const current = slides[index];
         index = (index + 1) % slides.length;
         const next = slides[index];
@@ -76,43 +98,30 @@
         gsap.set(next, { autoAlpha: 0, zIndex: 2 });
         gsap.set(current, { zIndex: 1 });
 
-        gsap.to(next, { autoAlpha: 1, duration: 1.5, ease: "power2.inOut" });
+        gsap.to(next, { autoAlpha: 1, duration: 1.4, ease: "power2.inOut" });
         gsap.to(current, {
           autoAlpha: 0,
-          duration: 1.5,
+          duration: 1.4,
           ease: "power2.inOut",
           onComplete: () => gsap.set(current, { zIndex: 0 }),
         });
         burn(next);
-        gsap.delayedCall(6.5, cycle);
+        gsap.delayedCall(7, cycle);
       });
     }
 
-    // —— Hero parallax while in view ——
+    // Soft parallax on media only — keep hero text pinned/stable
     gsap.to(".hero__media", {
-      yPercent: 18,
+      yPercent: 10,
       ease: "none",
       scrollTrigger: {
         trigger: ".hero",
         start: "top top",
         end: "bottom top",
-        scrub: true,
+        scrub: 0.6,
       },
     });
 
-    gsap.to(".hero__content", {
-      yPercent: 12,
-      autoAlpha: 0.15,
-      ease: "none",
-      scrollTrigger: {
-        trigger: ".hero",
-        start: "center top",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-
-    // —— Topbar densifies after leaving hero ——
     ScrollTrigger.create({
       trigger: ".hero",
       start: "bottom top+=64",
@@ -120,107 +129,38 @@
       onLeaveBack: () => document.querySelector(".topbar")?.classList.remove("is-solid"),
     });
 
-    // —— Section reveals ——
+    // —— One-shot section reveals (no reverse = no scroll flicker) ——
     document.querySelectorAll(".section").forEach((section) => {
-      const introBits = section.querySelectorAll(".eyebrow, .section__title, .section__lede");
-      if (introBits.length) {
-        gsap.from(introBits, {
-          autoAlpha: 0,
-          y: 40,
-          duration: 0.9,
-          stagger: 0.12,
-          scrollTrigger: {
-            trigger: section,
-            start: "top 78%",
-            toggleActions: "play none none reverse",
-          },
-        });
-      }
-    });
-
-    gsap.from(".pillars li", {
-      autoAlpha: 0,
-      y: 48,
-      duration: 0.85,
-      stagger: 0.14,
-      scrollTrigger: {
-        trigger: ".pillars",
+      reveal(section.querySelectorAll(".eyebrow, .section__title, .section__lede"), {
+        trigger: section,
         start: "top 80%",
-        toggleActions: "play none none reverse",
-      },
+        y: 24,
+        stagger: 0.1,
+      });
     });
 
-    gsap.from(".rate-row", {
-      autoAlpha: 0,
-      y: 28,
-      duration: 0.7,
-      stagger: 0.1,
-      scrollTrigger: {
-        trigger: ".rate-table",
-        start: "top 82%",
-        toggleActions: "play none none reverse",
-      },
-    });
+    reveal(".pillars li", { trigger: ".pillars", y: 28, stagger: 0.1 });
+    reveal(".rate-row", { trigger: ".rate-table", y: 18, stagger: 0.07 });
+    reveal(".fineprint", { trigger: ".fineprint", y: 12 });
+    reveal(".addon-list li", { trigger: ".addon-list", y: 18, stagger: 0.06 });
+    reveal(".contact__inner > *", { trigger: ".contact__inner", start: "top 78%", y: 22, stagger: 0.08 });
+    reveal(".footer > *", { trigger: ".footer", start: "top 95%", y: 14, stagger: 0.05 });
 
-    gsap.from(".fineprint", {
-      autoAlpha: 0,
-      y: 16,
-      duration: 0.6,
-      scrollTrigger: {
-        trigger: ".fineprint",
-        start: "top 90%",
-        toggleActions: "play none none reverse",
-      },
-    });
+    gsap.fromTo(
+      ".contact__media",
+      { scale: 1.06 },
+      {
+        scale: 1,
+        ease: "none",
+        scrollTrigger: {
+          trigger: ".contact",
+          start: "top bottom",
+          end: "bottom top",
+          scrub: 0.8,
+        },
+      }
+    );
 
-    gsap.from(".addon-list li", {
-      autoAlpha: 0,
-      x: -24,
-      duration: 0.65,
-      stagger: 0.08,
-      scrollTrigger: {
-        trigger: ".addon-list",
-        start: "top 82%",
-        toggleActions: "play none none reverse",
-      },
-    });
-
-    gsap.from(".contact__media", {
-      scale: 1.12,
-      ease: "none",
-      scrollTrigger: {
-        trigger: ".contact",
-        start: "top bottom",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-
-    gsap.from(".contact__inner > *", {
-      autoAlpha: 0,
-      y: 36,
-      duration: 0.8,
-      stagger: 0.1,
-      scrollTrigger: {
-        trigger: ".contact__inner",
-        start: "top 75%",
-        toggleActions: "play none none reverse",
-      },
-    });
-
-    gsap.from(".footer > *", {
-      autoAlpha: 0,
-      y: 20,
-      duration: 0.7,
-      stagger: 0.08,
-      scrollTrigger: {
-        trigger: ".footer",
-        start: "top 92%",
-        toggleActions: "play none none reverse",
-      },
-    });
-
-    // —— Smooth in-page nav ——
     document.querySelectorAll('a[href^="#"]').forEach((link) => {
       link.addEventListener("click", (event) => {
         const id = link.getAttribute("href");
@@ -229,20 +169,23 @@
         if (!target) return;
         event.preventDefault();
         gsap.to(window, {
-          duration: 1,
-          scrollTo: { y: target, offsetY: 12 },
+          duration: 0.85,
+          scrollTo: { y: target, offsetY: 12, autoKill: true },
           ease: "power2.inOut",
+          overwrite: "auto",
         });
       });
     });
 
-    // —— Button hover lift ——
     document.querySelectorAll(".btn").forEach((btn) => {
-      const enter = () => gsap.to(btn, { y: -2, duration: 0.25, ease: "power2.out" });
-      const leave = () => gsap.to(btn, { y: 0, duration: 0.35, ease: "power2.out" });
+      const enter = () => gsap.to(btn, { y: -2, duration: 0.22, ease: "power2.out", overwrite: "auto" });
+      const leave = () => gsap.to(btn, { y: 0, duration: 0.28, ease: "power2.out", overwrite: "auto" });
       btn.addEventListener("pointerenter", enter);
       btn.addEventListener("pointerleave", leave);
     });
+
+    // Recalculate after fonts/images settle to avoid mid-scroll jumps
+    window.addEventListener("load", () => ScrollTrigger.refresh());
 
     return () => {
       ScrollTrigger.getAll().forEach((st) => st.kill());

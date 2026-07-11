@@ -19,7 +19,7 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 body {
@@ -131,7 +131,8 @@ code {
   background-size: cover;
   background-position: center;
   opacity: 0;
-  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .hero__slide.is-active {
@@ -437,7 +438,8 @@ code {
   z-index: 0;
   background-size: cover;
   background-position: center;
-  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .contact__veil {
