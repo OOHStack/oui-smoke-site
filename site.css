@@ -474,6 +474,48 @@ code {
   color: var(--ink-mute);
 }
 
+.social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-top: 1.5rem;
+}
+
+.social--footer {
+  justify-content: center;
+  margin-top: 1.15rem;
+  margin-bottom: 0.35rem;
+}
+
+.social__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.4rem;
+  padding: 0.35rem 0.7rem 0.35rem 0.45rem;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: color 200ms var(--ease), border-color 200ms var(--ease), background 200ms var(--ease);
+}
+
+.social__link:hover,
+.social__link:focus-visible {
+  color: var(--ink);
+  border-color: rgba(247, 244, 239, 0.35);
+  background: rgba(247, 244, 239, 0.05);
+  outline: none;
+}
+
+.social__icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+}
+
 .footer {
   padding: 2.5rem var(--pad) 3rem;
   border-top: 1px solid var(--line);
