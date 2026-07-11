@@ -149,29 +149,13 @@
     // —— Summer promo ——
     const summer = document.querySelector(".summer");
     if (summer) {
-      const moteLayer = summer.querySelector(".summer__motes");
-      if (moteLayer && !moteLayer.childElementCount) {
-        for (let i = 0; i < 14; i += 1) {
-          const mote = document.createElement("span");
-          mote.className = "summer__mote";
-          const size = 6 + Math.random() * 18;
-          mote.style.width = `${size}px`;
-          mote.style.height = `${size}px`;
-          mote.style.left = `${8 + Math.random() * 84}%`;
-          mote.style.top = `${10 + Math.random() * 75}%`;
-          moteLayer.appendChild(mote);
-        }
-      }
-
       gsap.set(".summer__eyebrow, .summer__title-line, .summer__lede, .summer__stats, .summer__compare, .summer__actions", {
         autoAlpha: 0,
         y: 28,
       });
       gsap.set(".summer__ring", { autoAlpha: 0, scale: 0.82, transformOrigin: "50% 50%" });
       gsap.set(".summer__glow", { autoAlpha: 0, scale: 0.9 });
-      gsap.set(".summer__haze", { autoAlpha: 0 });
-      gsap.set(".summer__frond", { autoAlpha: 0, y: 40 });
-      gsap.set(".summer__mote", { autoAlpha: 0, scale: 0.4 });
+      gsap.set(".summer__smoke", { autoAlpha: 0 });
 
       const summerTl = gsap.timeline({
         defaults: { ease: "power2.out" },
@@ -184,14 +168,12 @@
 
       summerTl
         .to(".summer__glow", { autoAlpha: 1, scale: 1, duration: 1.1 }, 0)
-        .to(".summer__haze", { autoAlpha: 1, duration: 1.2 }, 0)
+        .to(".summer__smoke", { autoAlpha: 1, duration: 1.4 }, 0)
         .to(
           ".summer__ring",
           { autoAlpha: 1, scale: 1, duration: 1, stagger: 0.12, ease: "power3.out" },
           0.1
         )
-        .to(".summer__frond", { autoAlpha: 0.55, y: 0, duration: 1, stagger: 0.1 }, 0.15)
-        .to(".summer__mote", { autoAlpha: 0.7, scale: 1, duration: 0.9, stagger: 0.04 }, 0.2)
         .to(".summer__eyebrow", { autoAlpha: 1, y: 0, duration: 0.6 }, 0.15)
         .to(".summer__title-line", { autoAlpha: 1, y: 0, duration: 0.75, stagger: 0.12 }, 0.25)
         .to(".summer__lede", { autoAlpha: 1, y: 0, duration: 0.65 }, 0.45)
@@ -218,92 +200,14 @@
         });
       });
 
-      // Ambient summer drift — only while section is near viewport
-      const ambient = gsap.timeline({
-        repeat: -1,
-        paused: true,
-      });
-
-      ambient
-        .to(".summer__haze", {
-          xPercent: 4,
-          yPercent: -3,
-          duration: 10,
-          ease: "sine.inOut",
-        })
-        .to(".summer__haze", {
-          xPercent: -3,
-          yPercent: 2,
-          duration: 11,
-          ease: "sine.inOut",
-        })
-        .to(".summer__haze", {
-          xPercent: 0,
-          yPercent: 0,
-          duration: 9,
-          ease: "sine.inOut",
-        });
-
-      gsap.to(".summer__glow", {
-        scale: 1.08,
-        opacity: 0.85,
-        duration: 5.5,
-        ease: "sine.inOut",
-        yoyo: true,
-        repeat: -1,
-      });
-
-      gsap.utils.toArray(".summer__mote").forEach((mote, i) => {
-        gsap.to(mote, {
-          y: -40 - Math.random() * 50,
-          x: (Math.random() - 0.5) * 36,
-          opacity: 0.15 + Math.random() * 0.45,
-          duration: 6 + Math.random() * 5,
-          delay: i * 0.15,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-        });
-      });
-
-      gsap.to(".summer__fronds", {
-        rotation: -4,
-        duration: 8,
-        ease: "sine.inOut",
-        yoyo: true,
-        repeat: -1,
-        transformOrigin: "30% 100%",
-      });
-
-      ScrollTrigger.create({
-        trigger: summer,
-        start: "top bottom",
-        end: "bottom top",
-        onEnter: () => ambient.play(),
-        onEnterBack: () => ambient.play(),
-        onLeave: () => ambient.pause(),
-        onLeaveBack: () => ambient.pause(),
-      });
-
       gsap.to(".summer__rings", {
-        rotation: 18,
+        rotation: 14,
         ease: "none",
         scrollTrigger: {
           trigger: summer,
           start: "top bottom",
           end: "bottom top",
           scrub: 1,
-        },
-      });
-
-      gsap.to(".summer__haze", {
-        yPercent: 8,
-        ease: "none",
-        scrollTrigger: {
-          trigger: summer,
-          start: "top bottom",
-          end: "bottom top",
-          scrub: 1.2,
         },
       });
     }
