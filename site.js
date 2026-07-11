@@ -146,6 +146,81 @@
     reveal(".contact__inner > *", { trigger: ".contact__inner", start: "top 78%", y: 22, stagger: 0.08 });
     reveal(".footer > *", { trigger: ".footer", start: "top 95%", y: 14, stagger: 0.05 });
 
+    // —— Summer promo ——
+    const summer = document.querySelector(".summer");
+    if (summer) {
+      gsap.set(".summer__eyebrow, .summer__title-line, .summer__lede, .summer__stats, .summer__compare, .summer__actions", {
+        autoAlpha: 0,
+        y: 28,
+      });
+      gsap.set(".summer__ring", { autoAlpha: 0, scale: 0.82, transformOrigin: "50% 50%" });
+      gsap.set(".summer__glow", { autoAlpha: 0, scale: 0.9 });
+
+      const summerTl = gsap.timeline({
+        defaults: { ease: "power2.out" },
+        scrollTrigger: {
+          trigger: summer,
+          start: "top 75%",
+          once: true,
+        },
+      });
+
+      summerTl
+        .to(".summer__glow", { autoAlpha: 1, scale: 1, duration: 1.1 }, 0)
+        .to(
+          ".summer__ring",
+          { autoAlpha: 1, scale: 1, duration: 1, stagger: 0.12, ease: "power3.out" },
+          0.1
+        )
+        .to(".summer__eyebrow", { autoAlpha: 1, y: 0, duration: 0.6 }, 0.15)
+        .to(".summer__title-line", { autoAlpha: 1, y: 0, duration: 0.75, stagger: 0.12 }, 0.25)
+        .to(".summer__lede", { autoAlpha: 1, y: 0, duration: 0.65 }, 0.45)
+        .to(".summer__stats", { autoAlpha: 1, y: 0, duration: 0.7 }, 0.55)
+        .to(".summer__compare", { autoAlpha: 1, y: 0, duration: 0.55 }, 0.7)
+        .to(".summer__actions", { autoAlpha: 1, y: 0, duration: 0.55 }, 0.8);
+
+      document.querySelectorAll("[data-summer-count]").forEach((el) => {
+        const end = Number(el.getAttribute("data-summer-count")) || 0;
+        const counter = { val: 0 };
+        gsap.to(counter, {
+          val: end,
+          duration: 1.15,
+          ease: "power2.out",
+          delay: 0.55,
+          scrollTrigger: {
+            trigger: summer,
+            start: "top 75%",
+            once: true,
+          },
+          onUpdate: () => {
+            el.textContent = String(Math.round(counter.val));
+          },
+        });
+      });
+
+      gsap.to(".summer__rings", {
+        rotation: 18,
+        ease: "none",
+        scrollTrigger: {
+          trigger: summer,
+          start: "top bottom",
+          end: "bottom top",
+          scrub: 1,
+        },
+      });
+
+      gsap.to(".summer__glow", {
+        yPercent: 18,
+        ease: "none",
+        scrollTrigger: {
+          trigger: summer,
+          start: "top bottom",
+          end: "bottom top",
+          scrub: 1,
+        },
+      });
+    }
+
     gsap.fromTo(
       ".contact__media",
       { scale: 1.06 },

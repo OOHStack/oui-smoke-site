@@ -265,6 +265,175 @@ code {
     var(--bg);
 }
 
+/* —— Summer promo —— */
+.summer {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(4.5rem, 12vh, 8rem) 0;
+  background:
+    linear-gradient(145deg, #c94a42 0%, var(--accent) 42%, #9e2f2a 100%);
+  color: #140f0e;
+}
+
+.summer__glow {
+  position: absolute;
+  inset: -20% -10% auto;
+  height: 70%;
+  background: radial-gradient(closest-side, rgba(255, 236, 210, 0.35), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.summer__rings {
+  position: absolute;
+  right: -12%;
+  top: 50%;
+  width: min(70vw, 34rem);
+  height: auto;
+  transform: translateY(-50%);
+  opacity: 0.22;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.summer__ring {
+  fill: none;
+  stroke: #140f0e;
+  stroke-width: 1.25;
+}
+
+.summer__inner {
+  position: relative;
+  z-index: 1;
+  width: min(100% - (var(--pad) * 2), var(--max));
+  margin-inline: auto;
+}
+
+.summer__eyebrow {
+  margin: 0 0 0.85rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(20, 15, 14, 0.62);
+}
+
+.summer__title {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(3.4rem, 11vw, 7.5rem);
+  line-height: 0.9;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 400;
+  max-width: 10ch;
+}
+
+.summer__title-line {
+  display: block;
+}
+
+.summer__lede {
+  margin: 1.15rem 0 0;
+  max-width: 34ch;
+  font-size: clamp(1.05rem, 2vw, 1.25rem);
+  color: rgba(20, 15, 14, 0.78);
+}
+
+.summer__stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 1.25rem 0;
+  margin-top: clamp(2rem, 5vh, 3rem);
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(20, 15, 14, 0.2);
+  max-width: 40rem;
+}
+
+.summer__stat {
+  flex: 1 1 6.5rem;
+  min-width: 5.5rem;
+}
+
+.summer__stat-num,
+.summer__stat-price {
+  display: block;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(3rem, 8vw, 4.6rem);
+  line-height: 0.95;
+  letter-spacing: 0.03em;
+}
+
+.summer__stat-label {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(20, 15, 14, 0.58);
+}
+
+.summer__stat-divider {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(20, 15, 14, 0.18);
+  margin: 0 0.35rem;
+}
+
+.summer__compare {
+  margin: 1.25rem 0 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  color: rgba(20, 15, 14, 0.72);
+}
+
+.summer__compare span {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.summer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-top: 1.75rem;
+}
+
+.btn--ink {
+  background: #140f0e;
+  color: #f7f4ef;
+}
+
+.btn--ink:hover,
+.btn--ink:focus-visible {
+  opacity: 0.9;
+}
+
+.btn--summer-ghost {
+  border: 1px solid rgba(20, 15, 14, 0.28);
+  color: #140f0e;
+  background: transparent;
+}
+
+.btn--summer-ghost:hover,
+.btn--summer-ghost:focus-visible {
+  background: rgba(20, 15, 14, 0.06);
+}
+
+@media (max-width: 700px) {
+  .summer__rings {
+    right: -30%;
+    width: 22rem;
+    opacity: 0.14;
+  }
+
+  .summer__stat-divider {
+    display: none;
+  }
+}
+
 .pillars {
   list-style: none;
   margin: clamp(2.5rem, 6vh, 4rem) 0 0;
