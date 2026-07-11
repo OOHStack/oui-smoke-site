@@ -66,8 +66,10 @@
             crafted to feel unforgettable.
           </p>
           <div class="hero__actions">
-            <a class="btn btn--solid" href="#pricing">View pricing</a>
-            <a class="btn btn--ghost" href="mailto:contact@ouismoke.co">Request a quote</a>
+            <button class="btn btn--solid" type="button" data-open-calculator>
+              Estimate my event
+            </button>
+            <a class="btn btn--ghost" href="#pricing">View pricing</a>
           </div>
         </div>
       </section>
@@ -139,6 +141,11 @@
           </div>
 
           <p class="fineprint">All packages include up to 4 hours of service within the GTA. Modifications quoted on request.</p>
+          <div class="section__actions">
+            <button class="btn btn--solid" type="button" data-open-calculator>
+              Calculate my cost
+            </button>
+          </div>
         </div>
       </section>
 
@@ -182,9 +189,11 @@
             Tell us the date, guest count, and vibe — we’ll craft a package around it.
           </p>
           <div class="contact__links">
+            <button class="btn btn--solid" type="button" data-open-calculator>
+              Estimate my event
+            </button>
             <a href="mailto:contact@ouismoke.co">contact@ouismoke.co</a>
             <a href="https://instagram.com/ouismoke" target="_blank" rel="noopener">@ouismoke</a>
-            <a href="https://www.ouismoke.co" target="_blank" rel="noopener">ouismoke.co</a>
           </div>
           <p class="locale">Toronto · Available beyond the GTA</p>
         </div>
@@ -197,9 +206,119 @@
       <p class="footer__note">Promo mode: set <code>promoMode</code> in <code>config.js</code>, or visit <a href="./promo.html">/promo</a></p>
     </footer>
 
+    <div
+      class="calc-modal"
+      id="cost-calculator"
+      hidden
+      aria-hidden="true"
+    >
+      <div class="calc-modal__backdrop" data-close-calculator></div>
+      <div
+        class="calc-modal__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="calc-title"
+        tabindex="-1"
+      >
+        <header class="calc-modal__header">
+          <div>
+            <p class="calc-modal__eyebrow">GTA · 4-hour base</p>
+            <h2 id="calc-title">Event cost calculator</h2>
+          </div>
+          <button class="calc-modal__close" type="button" data-close-calculator aria-label="Close calculator">
+            ×
+          </button>
+        </header>
+
+        <form class="calc-form" id="calc-form">
+          <div class="calc-grid">
+            <label class="calc-field">
+              <span>Hookahs</span>
+              <input id="calc-hookahs" name="hookahs" type="number" min="1" max="40" value="4" inputmode="numeric" />
+            </label>
+
+            <label class="calc-field">
+              <span>Extra hours</span>
+              <input id="calc-hours" name="extraHours" type="number" min="0" max="12" value="0" inputmode="numeric" />
+            </label>
+
+            <label class="calc-field calc-field--refills" id="calc-refills-field">
+              <span>Extra refills <em>1 included</em></span>
+              <input id="calc-refills" name="extraRefills" type="number" min="0" max="40" value="0" inputmode="numeric" />
+            </label>
+          </div>
+
+          <p class="calc-tier" id="calc-tier" aria-live="polite"></p>
+
+          <fieldset class="calc-addons">
+            <legend>Add-ons</legend>
+
+            <label class="calc-check">
+              <input id="calc-led" name="led" type="checkbox" />
+              <span>LED base <strong>$10 / hookah</strong></span>
+            </label>
+
+            <label class="calc-check">
+              <input id="calc-water" name="water" type="checkbox" />
+              <span>Water enhancers <strong>$5 / hookah</strong></span>
+            </label>
+
+            <label class="calc-check">
+              <input id="calc-branding" name="branding" type="checkbox" />
+              <span>Unit branding <strong>min. 4</strong></span>
+            </label>
+
+            <label class="calc-field calc-field--branding" id="calc-branding-rate-field" hidden>
+              <span>Branding rate / hookah</span>
+              <select id="calc-branding-rate" name="brandingRate">
+                <option value="12">$12</option>
+                <option value="13.5" selected>$13.50</option>
+                <option value="15">$15</option>
+              </select>
+            </label>
+
+            <label class="calc-check" id="calc-blends-wrap">
+              <input id="calc-blends" name="blends" type="checkbox" />
+              <span>Custom flavour blends <strong>quoted separately</strong></span>
+            </label>
+            <p class="calc-hint" id="calc-blends-hint" hidden>
+              Custom blends are available on 5+ hookah packages.
+            </p>
+          </fieldset>
+
+          <div class="calc-summary" aria-live="polite">
+            <ul class="calc-breakdown" id="calc-breakdown"></ul>
+            <div class="calc-totals">
+              <div>
+                <span>Subtotal</span>
+                <strong id="calc-subtotal">$0</strong>
+              </div>
+              <div>
+                <span>Est. HST (13%)</span>
+                <strong id="calc-hst">$0</strong>
+              </div>
+              <div class="calc-totals__grand">
+                <span>Estimated total</span>
+                <strong id="calc-total">$0</strong>
+              </div>
+            </div>
+            <p class="calc-note">
+              Estimate for within the GTA. Final quotes may vary for travel, themes, and custom requests.
+            </p>
+          </div>
+
+          <div class="calc-actions">
+            <a class="btn btn--solid" id="calc-email" href="mailto:contact@ouismoke.co">Email this estimate</a>
+            <button class="btn btn--ghost" type="button" data-close-calculator>Close</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollToPlugin.min.js"></script>
+    <script src="./calculator.js"></script>
     <script src="./site.js"></script>
   </body>
 </html>
