@@ -198,6 +198,8 @@ export default function HookahBoard({
   assignments,
   onBoardPlace,
   onOpen,
+  paymentModel,
+  onBulkAction,
 }: {
   assignments: BoardAssignment[];
   onBoardPlace: (payload: {
@@ -206,6 +208,19 @@ export default function HookahBoard({
     beforeAssignmentId?: number | null;
   }) => Promise<{ ok: boolean; code?: string; error?: string }>;
   onOpen: (id: number, prompt?: string) => void;
+  paymentModel?: "client_deposit" | "pay_at_event" | "complimentary";
+  onBulkAction?: (payload: {
+    bulkAction:
+      | "send_out"
+      | "check"
+      | "return"
+      | "restage"
+      | "remove"
+      | "set_guest_pay_tier";
+    assignmentIds: number[];
+    guestPayTier?: "standard" | "unlimited";
+    outcome?: "returned" | "not_returned" | "returned_with_issue";
+  }) => Promise<{ succeeded: number; failed: number; message?: string }>;
 }) {
   const [itemsById, setItemsById] = useState(() =>
     itemsByIdFromAssignments(assignments),
@@ -216,7 +231,10 @@ export default function HookahBoard({
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [overColumn, setOverColumn] = useState<BoardStatus | null>(null);
   const [boardError, setBoardError] = useState("");
+  const [bulkMsg, setBulkMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(() => new Set());
 
   const columnsRef = useRef(columns);
   const itemsByIdRef = useRef(itemsById);
@@ -230,7 +248,80 @@ export default function HookahBoard({
     if (activeId != null || busy) return;
     setItemsById(itemsByIdFromAssignments(assignments));
     setColumns(columnsFromAssignments(assignments));
+    const alive = new Set(assignments.map((a) => a.id));
+    setSelected((prev) => {
+      const next = new Set<number>();
+      for (const id of prev) {
+        if (alive.has(id)) next.add(id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
   }, [assignments, activeId, busy]);
+
+  function toggleSelected(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setBulkMsg("");
+  }
+
+  function setColumnSelected(status: BoardStatus, on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of columns[status]) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+    setBulkMsg("");
+  }
+
+  function selectedInColumn(status: BoardStatus) {
+    return columns[status].filter((id) => selected.has(id));
+  }
+
+  async function runBulk(
+    status: BoardStatus,
+    bulkAction:
+      | "send_out"
+      | "check"
+      | "return"
+      | "restage"
+      | "remove"
+      | "set_guest_pay_tier",
+    extra?: {
+      guestPayTier?: "standard" | "unlimited";
+      outcome?: "returned" | "not_returned" | "returned_with_issue";
+    },
+  ) {
+    if (!onBulkAction) return;
+    const ids = selectedInColumn(status);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    setBulkMsg("");
+    setBoardError("");
+    try {
+      const result = await onBulkAction({
+        bulkAction,
+        assignmentIds: ids,
+        ...extra,
+      });
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+      const parts = [`${result.succeeded} updated`];
+      if (result.failed > 0) parts.push(`${result.failed} skipped`);
+      setBulkMsg(result.message ?? parts.join(" · "));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -502,11 +593,13 @@ export default function HookahBoard({
   return (
     <>
       <p className="job-fleet-hint" style={{ marginBottom: "0.65rem" }}>
-        Drag tiles between columns or between other tiles · drop anywhere, in any
-        order · tap to open details
+        Drag to move · tap to open · checkboxes for bulk actions per column
       </p>
       {boardError ? <p className="login-error">{boardError}</p> : null}
-      {busy ? <p className="list-meta">Updating board…</p> : null}
+      {bulkMsg ? <p className="list-meta">{bulkMsg}</p> : null}
+      {busy || bulkBusy ? (
+        <p className="list-meta">{bulkBusy ? "Running bulk…" : "Updating board…"}</p>
+      ) : null}
 
       <DndContext
         sensors={sensors}
@@ -525,7 +618,13 @@ export default function HookahBoard({
               itemsById={itemsById}
               isOver={overColumn === group.key}
               activeId={activeId}
+              selected={selected}
+              paymentModel={paymentModel}
+              bulkBusy={bulkBusy}
               onOpen={onOpen}
+              onToggleSelected={toggleSelected}
+              onSelectAll={(on) => setColumnSelected(group.key, on)}
+              onBulk={(action, extra) => runBulk(group.key, action, extra)}
             />
           ))}
         </div>
@@ -549,20 +648,48 @@ function BoardColumn({
   itemsById,
   isOver,
   activeId,
+  selected,
+  paymentModel,
+  bulkBusy,
   onOpen,
+  onToggleSelected,
+  onSelectAll,
+  onBulk,
 }: {
   group: (typeof BOARD_GROUPS)[number];
   itemIds: number[];
   itemsById: Record<number, BoardAssignment>;
   isOver: boolean;
   activeId: UniqueIdentifier | null;
+  selected: Set<number>;
+  paymentModel?: "client_deposit" | "pay_at_event" | "complimentary";
+  bulkBusy: boolean;
   onOpen: (id: number, prompt?: string) => void;
+  onToggleSelected: (id: number) => void;
+  onSelectAll: (on: boolean) => void;
+  onBulk: (
+    action:
+      | "send_out"
+      | "check"
+      | "return"
+      | "restage"
+      | "remove"
+      | "set_guest_pay_tier",
+    extra?: {
+      guestPayTier?: "standard" | "unlimited";
+      outcome?: "returned" | "not_returned" | "returned_with_issue";
+    },
+  ) => void;
 }) {
   const { setNodeRef, isOver: isOverDroppable } = useDroppable({
     id: group.key,
   });
 
   const sortableIds = useMemo(() => itemIds.map(toItemId), [itemIds]);
+  const selectedIds = itemIds.filter((id) => selected.has(id));
+  const allSelected = itemIds.length > 0 && selectedIds.length === itemIds.length;
+  const someSelected = selectedIds.length > 0;
+  const payAtEvent = paymentModel === "pay_at_event";
 
   return (
     <div
@@ -571,6 +698,7 @@ function BoardColumn({
         "hookah-group",
         `hookah-group--${group.key}`,
         isOver || isOverDroppable ? "hookah-group--drop-target" : "",
+        someSelected ? "hookah-group--has-selection" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -581,8 +709,116 @@ function BoardColumn({
           <h3 className="hookah-group__title">{group.title}</h3>
           <p className="hookah-group__hint">{group.hint}</p>
         </div>
-        <span className="hookah-group__count">{itemIds.length}</span>
+        <div className="hookah-group__head-aside">
+          {itemIds.length > 0 ? (
+            <label className="hookah-group__select-all">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) {
+                    el.indeterminate = someSelected && !allSelected;
+                  }
+                }}
+                onChange={(e) => onSelectAll(e.target.checked)}
+                disabled={bulkBusy}
+              />
+              <span>All</span>
+            </label>
+          ) : null}
+          <span className="hookah-group__count">{itemIds.length}</span>
+        </div>
       </div>
+
+      {someSelected ? (
+        <div className="hookah-bulk" role="toolbar" aria-label={`${group.title} bulk actions`}>
+          <span className="hookah-bulk__count">{selectedIds.length} selected</span>
+          {group.key === "staged" ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                disabled={bulkBusy}
+                onClick={() => onBulk("send_out")}
+              >
+                Send to floor
+              </button>
+              {payAtEvent ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={bulkBusy}
+                    onClick={() =>
+                      onBulk("set_guest_pay_tier", { guestPayTier: "standard" })
+                    }
+                  >
+                    Tier · Standard
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={bulkBusy}
+                    onClick={() =>
+                      onBulk("set_guest_pay_tier", {
+                        guestPayTier: "unlimited",
+                      })
+                    }
+                  >
+                    Tier · Unlimited
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                disabled={bulkBusy}
+                onClick={() => onBulk("remove")}
+              >
+                Remove
+              </button>
+            </>
+          ) : null}
+          {group.key === "out" ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={bulkBusy}
+                onClick={() => onBulk("check")}
+              >
+                Log check
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                disabled={bulkBusy}
+                onClick={() => onBulk("return", { outcome: "returned" })}
+              >
+                Return OK
+              </button>
+            </>
+          ) : null}
+          {group.key === "returned" ? (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              disabled={bulkBusy}
+              onClick={() => onBulk("restage")}
+            >
+              Move to ready
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            disabled={bulkBusy}
+            onClick={() => onSelectAll(false)}
+          >
+            Clear
+          </button>
+        </div>
+      ) : null}
 
       <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
         {itemIds.length === 0 ? (
@@ -597,7 +833,9 @@ function BoardColumn({
                   key={id}
                   assignment={a}
                   isActive={activeId === toItemId(id)}
+                  selected={selected.has(id)}
                   onOpen={() => onOpen(id)}
+                  onToggleSelected={() => onToggleSelected(id)}
                 />
               );
             })}
@@ -611,11 +849,15 @@ function BoardColumn({
 function SortableHookahTile({
   assignment,
   isActive,
+  selected,
   onOpen,
+  onToggleSelected,
 }: {
   assignment: BoardAssignment;
   isActive: boolean;
+  selected: boolean;
   onOpen: () => void;
+  onToggleSelected: () => void;
 }) {
   const {
     attributes,
@@ -636,12 +878,17 @@ function SortableHookahTile({
       ref={setNodeRef}
       assignment={assignment}
       style={style}
-      className={
-        isDragging || isActive ? "job-fleet-tile--ghost" : undefined
-      }
+      className={[
+        isDragging || isActive ? "job-fleet-tile--ghost" : "",
+        selected ? "job-fleet-tile--selected" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       attributes={attributes}
       listeners={listeners}
+      selected={selected}
       onOpen={onOpen}
+      onToggleSelected={onToggleSelected}
       suppressClick={isDragging || isActive}
     />
   );
@@ -653,7 +900,9 @@ function HookahTileContent({
   style,
   attributes,
   listeners,
+  selected,
   onOpen,
+  onToggleSelected,
   suppressClick,
   ref,
 }: {
@@ -662,9 +911,11 @@ function HookahTileContent({
   style?: CSSProperties;
   attributes?: DraggableAttributes;
   listeners?: ReturnType<typeof useSortable>["listeners"];
+  selected?: boolean;
   onOpen?: () => void;
+  onToggleSelected?: () => void;
   suppressClick?: boolean;
-  ref?: Ref<HTMLButtonElement>;
+  ref?: Ref<HTMLDivElement>;
 }) {
   const overdue =
     a.status === "out" &&
@@ -674,9 +925,8 @@ function HookahTileContent({
   const call = a.activeCall;
 
   return (
-    <button
+    <div
       ref={ref}
-      type="button"
       data-assignment-id={a.id}
       style={style}
       className={[
@@ -698,42 +948,62 @@ function HookahTileContent({
             }`
           : undefined
       }
-      onClick={(e) => {
-        e.stopPropagation();
-        if (suppressClick || !onOpen) return;
-        onOpen();
-      }}
       {...attributes}
       {...listeners}
     >
-      <div className="fleet-num">#{a.hookah.modelNumber}</div>
-      <StatusBadge status={a.status} kind="assignment" />
-      {a.guestPayTier ? (
-        <span className={`tier-chip tier-chip--${a.guestPayTier}`}>
-          {a.guestPayTier}
-        </span>
+      {onToggleSelected ? (
+        <label
+          className="job-fleet-tile__check"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={onToggleSelected}
+            aria-label={`Select unit #${a.hookah.modelNumber}`}
+          />
+        </label>
       ) : null}
-      {flavourName ? <div className="list-meta">{flavourName}</div> : null}
-      {a.status === "out" && a.nextCheckAt ? (
-        <div className="job-fleet-tile__timer">
-          <Countdown target={a.nextCheckAt} />
-        </div>
-      ) : null}
-      {call ? (
-        <span className={`hookah-call-chip hookah-call-chip--${call.type}`}>
-          {call.status === "acknowledged"
-            ? "On the way"
-            : call.type === "refill" && call.flavourLabel
-              ? `Refill: ${call.flavourLabel}`
-              : callTypeLabel(call.type)}
-          {call.message && call.type !== "refill" ? (
-            <span className="hookah-call-chip__msg"> · {call.message}</span>
-          ) : null}
-        </span>
-      ) : null}
-      {a.issueFlag && !call ? (
-        <span className="hookah-chip hookah-chip--issue">Issue</span>
-      ) : null}
-    </button>
+      <button
+        type="button"
+        className="job-fleet-tile__open"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (suppressClick || !onOpen) return;
+          onOpen();
+        }}
+      >
+        <div className="fleet-num">#{a.hookah.modelNumber}</div>
+        <StatusBadge status={a.status} kind="assignment" />
+        {a.guestPayTier ? (
+          <span className={`tier-chip tier-chip--${a.guestPayTier}`}>
+            {a.guestPayTier}
+          </span>
+        ) : null}
+        {flavourName ? <div className="list-meta">{flavourName}</div> : null}
+        {a.status === "out" && a.nextCheckAt ? (
+          <div className="job-fleet-tile__timer">
+            <Countdown target={a.nextCheckAt} />
+          </div>
+        ) : null}
+        {call ? (
+          <span className={`hookah-call-chip hookah-call-chip--${call.type}`}>
+            {call.status === "acknowledged"
+              ? "On the way"
+              : call.type === "refill" && call.flavourLabel
+                ? `Refill: ${call.flavourLabel}`
+                : callTypeLabel(call.type)}
+            {call.message && call.type !== "refill" ? (
+              <span className="hookah-call-chip__msg"> · {call.message}</span>
+            ) : null}
+          </span>
+        ) : null}
+        {a.issueFlag && !call ? (
+          <span className="hookah-chip hookah-chip--issue">Issue</span>
+        ) : null}
+      </button>
+    </div>
   );
 }

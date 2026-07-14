@@ -1102,6 +1102,96 @@ a.admin-user.active {
   margin-bottom: 0.65rem;
 }
 
+.hookah-group__head-aside {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.hookah-group__select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.hookah-group__select-all input {
+  margin: 0;
+}
+
+.hookah-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: -0.15rem 0 0.65rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: color-mix(in srgb, var(--panel) 70%, var(--bg));
+}
+
+.hookah-bulk__count {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-right: 0.15rem;
+}
+
+.hookah-group--has-selection {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, var(--ok)) 28%, transparent);
+}
+
+.job-fleet-tile {
+  position: relative;
+  padding: 0;
+  cursor: grab;
+}
+
+.job-fleet-tile__check {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  z-index: 2;
+  display: flex;
+  padding: 0.15rem;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  cursor: pointer;
+}
+
+.job-fleet-tile__check input {
+  margin: 0;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.job-fleet-tile__open {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  min-height: 100%;
+  padding: 0.55rem 0.55rem 0.55rem 1.7rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: inherit;
+}
+
+.job-fleet-tile--overlay .job-fleet-tile__check {
+  display: none;
+}
+
+.job-fleet-tile--overlay .job-fleet-tile__open {
+  padding: 0.55rem;
+  pointer-events: none;
+}
+
 .hookah-group__title {
   margin: 0;
   font-size: 0.95rem;
@@ -1682,8 +1772,8 @@ button.fleet-tile {
   aspect-ratio: auto;
   min-height: 118px;
   justify-content: flex-start;
-  padding: 0.65rem 0.45rem 0.55rem;
-  gap: 0.28rem;
+  padding: 0;
+  gap: 0;
   touch-action: none;
   cursor: grab;
   will-change: transform;

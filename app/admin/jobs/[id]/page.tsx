@@ -1836,15 +1836,72 @@ function JobHookahBoard({
     return { ok: true as const };
   }
 
+  async function bulkAction(payload: {
+    bulkAction:
+      | "send_out"
+      | "check"
+      | "return"
+      | "restage"
+      | "remove"
+      | "set_guest_pay_tier";
+    assignmentIds: number[];
+    guestPayTier?: "standard" | "unlimited";
+    outcome?: "returned" | "not_returned" | "returned_with_issue";
+  }) {
+    let succeeded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const assignmentId of payload.assignmentIds) {
+      const body: Record<string, unknown> = {
+        action: payload.bulkAction,
+        assignmentId,
+      };
+      if (payload.bulkAction === "set_guest_pay_tier") {
+        body.guestPayTier = payload.guestPayTier;
+      }
+      if (payload.bulkAction === "return") {
+        body.outcome = payload.outcome ?? "returned";
+      }
+
+      const res = await fetch(`/api/jobs/${jobId}/hookahs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        succeeded += 1;
+      } else {
+        failed += 1;
+        const data = await res.json().catch(() => ({}));
+        if (typeof data.error === "string" && errors.length < 3) {
+          errors.push(data.error);
+        }
+      }
+    }
+
+    await onRefresh();
+    return {
+      succeeded,
+      failed,
+      message:
+        errors.length > 0
+          ? `${succeeded} updated · ${failed} skipped — ${errors[0]}`
+          : undefined,
+    };
+  }
+
   return (
     <>
       <HookahBoard
         assignments={assignments}
+        paymentModel={paymentModel}
         onOpen={(id, prompt = "") => {
           setModalId(id);
           setModalPrompt(prompt);
         }}
         onBoardPlace={boardPlace}
+        onBulkAction={bulkAction}
       />
       {modalAssignment ? (
         <HookahModal
