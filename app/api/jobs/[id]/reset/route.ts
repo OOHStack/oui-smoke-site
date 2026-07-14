@@ -8,10 +8,11 @@ import {
   jobHookahs,
   jobPhotos,
   jobs,
+  payments,
   serviceRequests,
 } from "@/lib/db/schema";
 import { releaseJobHookahsToAvailable } from "@/lib/fleet";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -70,6 +71,15 @@ export async function POST(request: Request, context: RouteContext) {
   await db.delete(hookahRefills).where(eq(hookahRefills.jobId, jobId));
   await db.delete(jobEvents).where(eq(jobEvents.jobId, jobId));
   await db.delete(serviceRequests).where(eq(serviceRequests.jobId, jobId));
+  // Guest ledger rows only — keep succeeded package deposit/balance history
+  await db
+    .delete(payments)
+    .where(
+      and(
+        eq(payments.jobId, jobId),
+        inArray(payments.kind, ["onsite_unit", "refill", "tip", "other"]),
+      ),
+    );
 
   await db
     .update(jobHookahs)
@@ -81,11 +91,13 @@ export async function POST(request: Request, context: RouteContext) {
       nextCheckAt: null,
       checkCount: 0,
       refillCount: 0,
+      sortOrder: 0,
       outNotes: "",
       returnNotes: "",
       returnOutcome: null,
       issueFlag: false,
       guestToken: null,
+      guestPayTier: null,
       guestRating: null,
       guestComment: "",
       guestFeedbackAt: null,
@@ -105,6 +117,7 @@ export async function POST(request: Request, context: RouteContext) {
       status: nextStatus,
       actualCents: null,
       tipCents: 0,
+      tipSplitJson: "",
       outcomeNotes: "",
       rating: null,
       rebookLikely: null,
@@ -116,7 +129,8 @@ export async function POST(request: Request, context: RouteContext) {
   await db.insert(jobEvents).values({
     jobId,
     type: "note",
-    message: "Job reset — cleared floor activity, requests, photos, and outcomes",
+    message:
+      "Job reset — cleared floor activity, ledger, requests, photos, and outcomes",
     createdBy: session.name,
   });
 

@@ -1433,8 +1433,10 @@ export default function JobDetailPage() {
               </p>
               <ul className="page-sub" style={{ margin: "0 0 1rem", paddingLeft: "1.1rem" }}>
                 <li>Restages all hookahs and releases fleet units</li>
+                <li>Clears guest pay tiers and guest QR tokens</li>
+                <li>Deletes guest ledger / payment rows for this job</li>
                 <li>Deletes guest calls, refills, photos, and activity log</li>
-                <li>Clears guest QR tokens, feedback, and job outcome</li>
+                <li>Clears tip split, feedback, and job outcome</li>
                 <li>Sets active/completed jobs back to confirmed</li>
               </ul>
 
