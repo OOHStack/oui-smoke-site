@@ -92,6 +92,7 @@ export async function GET(_request: Request, context: RouteContext) {
     clientPortalUrl: job.clientToken ? clientPortalUrl(job.clientToken) : null,
     assignments: assignmentsWithCalls,
     events,
+    payments: paymentRows,
     paymentSummary: summarizeJobMoney(job, paymentRows),
   });
 }
@@ -164,6 +165,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (body.quotedCents !== undefined) updates.quotedCents = body.quotedCents;
     if (body.actualCents !== undefined) updates.actualCents = body.actualCents;
     if (body.tipCents !== undefined) updates.tipCents = body.tipCents;
+    if (body.tipSplitJson !== undefined) {
+      updates.tipSplitJson =
+        typeof body.tipSplitJson === "string" ? body.tipSplitJson : "";
+    }
     if (body.depositPercent !== undefined) {
       const pct = Number(body.depositPercent);
       if (Number.isFinite(pct)) {

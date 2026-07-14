@@ -71,7 +71,7 @@ function guideForStatus(opts: {
     return {
       step: 0,
       title: "Square isn’t connected",
-      body: "Add SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID on Vercel before you can send payment links.",
+      body: "Add SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID on Vercel before you can send payment links. Optional: SQUARE_TERMINAL_DEVICE_ID for hardware collect.",
     };
   }
   switch (opts.status) {
@@ -142,6 +142,7 @@ export default function JobPaymentsPage() {
   const [payments, setPayments] = useState<JobPayment[]>([]);
   const [summary, setSummary] = useState<MoneySummary | null>(null);
   const [squareConfigured, setSquareConfigured] = useState(false);
+  const [terminalConfigured, setTerminalConfigured] = useState(false);
   const [quotedDollars, setQuotedDollars] = useState("");
   const [depositPercent, setDepositPercent] = useState(50);
   const [customAmount, setCustomAmount] = useState("");
@@ -176,6 +177,7 @@ export default function JobPaymentsPage() {
       const payData = await payRes.json();
       setPayments(payData.payments ?? []);
       setSquareConfigured(!!payData.squareConfigured);
+      setTerminalConfigured(!!payData.terminalConfigured);
       if (payData.summary) setSummary(payData.summary as MoneySummary);
     }
     if (copyRes.ok) {
@@ -246,12 +248,15 @@ export default function JobPaymentsPage() {
     }
   }
 
-  async function sendLink(kind: "deposit" | "balance") {
+  async function sendPayment(
+    kind: "deposit" | "balance",
+    channel: "link" | "terminal",
+  ) {
     setBusy(true);
     setMsg("");
     setError("");
     try {
-      const body: Record<string, unknown> = { kind };
+      const body: Record<string, unknown> = { kind, channel };
       if (customAmount.trim()) body.amountDollars = customAmount.trim();
       const res = await fetch(`/api/jobs/${jobId}/payments`, {
         method: "POST",
@@ -260,24 +265,52 @@ export default function JobPaymentsPage() {
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(d.error ?? "Couldn’t create payment link");
+        setError(d.error ?? "Couldn’t create payment");
         return;
       }
-      const url = d.url as string | undefined;
       const label = kind === "balance" ? "Balance" : "Deposit";
-      if (url) {
-        try {
-          await navigator.clipboard.writeText(url);
-          setMsg(
-            d.emailed
-              ? `${label} link copied and emailed.`
-              : `${label} link copied.`,
-          );
-        } catch {
-          setMsg(url);
+      if (channel === "terminal") {
+        setMsg(
+          `${label} sent to Square Terminal — complete the charge on the device.`,
+        );
+      } else {
+        const url = d.url as string | undefined;
+        if (url) {
+          try {
+            await navigator.clipboard.writeText(url);
+            setMsg(
+              d.emailed
+                ? `${label} link copied and emailed.`
+                : `${label} link copied.`,
+            );
+          } catch {
+            setMsg(url);
+          }
         }
       }
       setCustomAmount("");
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancelPending(paymentId: number) {
+    setBusy(true);
+    setMsg("");
+    setError("");
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel_pending", paymentId }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(d.error ?? "Couldn’t cancel");
+        return;
+      }
+      setMsg("Pending payment cancelled.");
       await load();
     } finally {
       setBusy(false);
@@ -462,16 +495,32 @@ export default function JobPaymentsPage() {
             {!squareConfigured ? null : (
               <div className="collect-next__actions">
                 {status === "deposit_due" ? (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={busy || !canSendDeposit}
-                    onClick={() => void sendLink("deposit")}
-                  >
-                    {busy
-                      ? "Creating…"
-                      : `Send deposit · $${customAmount || suggestedDollars || "—"}`}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={busy || !canSendDeposit}
+                      onClick={() => void sendPayment("deposit", "link")}
+                    >
+                      {busy
+                        ? "Creating…"
+                        : `Email deposit link · $${customAmount || suggestedDollars || "—"}`}
+                    </button>
+                    {terminalConfigured ? (
+                      <button
+                        type="button"
+                        className="btn btn-ok"
+                        disabled={busy || !canSendDeposit}
+                        onClick={() => void sendPayment("deposit", "terminal")}
+                      >
+                        Collect deposit on Terminal
+                      </button>
+                    ) : (
+                      <p className="list-meta" style={{ margin: 0 }}>
+                        Set SQUARE_TERMINAL_DEVICE_ID to collect on hardware.
+                      </p>
+                    )}
+                  </>
                 ) : null}
 
                 {status === "no_quote" ? (
@@ -490,21 +539,41 @@ export default function JobPaymentsPage() {
                   </button>
                 ) : null}
 
+                {status === "deposit_pending" &&
+                !openLink &&
+                payments.some((p) => p.status === "pending" && p.kind === "deposit") ? (
+                  <p className="list-meta" style={{ margin: 0 }}>
+                    Terminal deposit pending — finish on the device, or Cancel it in Activity.
+                  </p>
+                ) : null}
+
                 {status === "balance_due" ? (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={busy || !canSendBalance}
-                    onClick={() => void sendLink("balance")}
-                  >
-                    {busy
-                      ? "Creating…"
-                      : `Send balance · ${formatCadCents(
-                          customAmount
-                            ? Math.round(parseFloat(customAmount) * 100)
-                            : (summary?.balanceCents ?? 0),
-                        )}`}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={busy || !canSendBalance}
+                      onClick={() => void sendPayment("balance", "link")}
+                    >
+                      {busy
+                        ? "Creating…"
+                        : `Email balance link · ${formatCadCents(
+                            customAmount
+                              ? Math.round(parseFloat(customAmount) * 100)
+                              : (summary?.balanceCents ?? 0),
+                          )}`}
+                    </button>
+                    {terminalConfigured ? (
+                      <button
+                        type="button"
+                        className="btn btn-ok"
+                        disabled={busy || !canSendBalance}
+                        onClick={() => void sendPayment("balance", "terminal")}
+                      >
+                        Collect balance on Terminal
+                      </button>
+                    ) : null}
+                  </>
                 ) : null}
 
                 {status === "balance_pending" && openLink ? (
@@ -624,6 +693,16 @@ export default function JobPaymentsPage() {
                           onClick={() => void copyPaymentLink(p.checkoutUrl!)}
                         >
                           Copy link
+                        </button>
+                      ) : null}
+                      {p.status === "pending" ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={busy}
+                          onClick={() => void cancelPending(p.id)}
+                        >
+                          Cancel
                         </button>
                       ) : null}
                     </div>

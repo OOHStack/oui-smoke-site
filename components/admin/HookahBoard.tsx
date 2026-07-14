@@ -69,6 +69,7 @@ export type BoardAssignment = {
   sortOrder?: number;
   issueFlag: boolean;
   guestToken: string | null;
+  guestPayTier?: "standard" | "unlimited" | null;
   sentOutAt: string | null;
   returnNotes: string | null;
   returnOutcome: "returned" | "not_returned" | "returned_with_issue" | null;
@@ -189,6 +190,7 @@ function canEnterColumn(
   ) {
     return { ok: false, reason: "NEED_FLAVOUR" };
   }
+  // Tier gate is server-side + modal; allow optimistic move — server will reject.
   return { ok: true };
 }
 
@@ -303,6 +305,11 @@ export default function HookahBoard({
           onOpen(
             assignmentId,
             "Assign a flavour, then send out to move this hookah onto the floor.",
+          );
+        } else if (result.code === "NEED_GUEST_TIER") {
+          onOpen(
+            assignmentId,
+            "Choose Standard ($80) or Unlimited ($100) guest pay, then send out.",
           );
         } else if (result.code === "NEED_RETURN") {
           onOpen(
@@ -701,6 +708,11 @@ function HookahTileContent({
     >
       <div className="fleet-num">#{a.hookah.modelNumber}</div>
       <StatusBadge status={a.status} kind="assignment" />
+      {a.guestPayTier ? (
+        <span className={`tier-chip tier-chip--${a.guestPayTier}`}>
+          {a.guestPayTier}
+        </span>
+      ) : null}
       {flavourName ? <div className="list-meta">{flavourName}</div> : null}
       {a.status === "out" && a.nextCheckAt ? (
         <div className="job-fleet-tile__timer">

@@ -7,6 +7,7 @@ import {
   jobEvents,
   jobHookahs,
   jobs,
+  payments,
   serviceRequests,
 } from "@/lib/db/schema";
 import {
@@ -14,7 +15,14 @@ import {
   hookahOutOnOtherActiveJob,
 } from "@/lib/fleet";
 import { createGuestToken } from "@/lib/guest";
-import { REFILL_PRICE_CENTS } from "@/lib/pricing";
+import {
+  defaultRefillCentsForTier,
+  guestPayTierLabel,
+  guestPayTierUnitCents,
+  isGuestPayTier,
+  type GuestPayTier,
+} from "@/lib/ops/guest-pay";
+import { randomUUID } from "crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -322,6 +330,16 @@ export async function POST(request: Request, context: RouteContext) {
             );
           }
 
+          if (job.paymentModel === "pay_at_event" && !assignment.guestPayTier) {
+            return NextResponse.json(
+              {
+                error: "Choose Standard or Unlimited guest pay before sending out",
+                code: "NEED_GUEST_TIER",
+              },
+              { status: 409 },
+            );
+          }
+
           const now = new Date();
           const nextCheckAt = new Date(now.getTime() + job.checkIntervalMinutes * 60_000);
           const guestToken = assignment.guestToken || createGuestToken();
@@ -479,6 +497,16 @@ export async function POST(request: Request, context: RouteContext) {
           return NextResponse.json(
             { error: "Assign a flavour before sending out" },
             { status: 400 }
+          );
+        }
+
+        if (job.paymentModel === "pay_at_event" && !assignment.guestPayTier) {
+          return NextResponse.json(
+            {
+              error: "Choose Standard or Unlimited guest pay before sending out",
+              code: "NEED_GUEST_TIER",
+            },
+            { status: 409 },
           );
         }
 
@@ -756,8 +784,11 @@ export async function POST(request: Request, context: RouteContext) {
           typeof body.serviceRequestId === "number" ? body.serviceRequestId : null;
         const note = typeof body.note === "string" ? body.note.trim() : "";
         const source = body.source === "guest" ? "guest" : "staff";
+        const defaultPrice = defaultRefillCentsForTier(
+          assignment.guestPayTier as GuestPayTier | null,
+        );
         const priceCents =
-          typeof body.priceCents === "number" ? body.priceCents : REFILL_PRICE_CENTS;
+          typeof body.priceCents === "number" ? body.priceCents : defaultPrice;
 
         if (serviceRequestId) {
           const [req] = await db
@@ -837,6 +868,20 @@ export async function POST(request: Request, context: RouteContext) {
             createdBy: session.name,
           })
           .returning();
+
+        if (priceCents > 0) {
+          await db.insert(payments).values({
+            jobId,
+            jobHookahId: assignmentId,
+            kind: "refill",
+            status: "succeeded",
+            amountCents: priceCents,
+            label: `Refill · ${flavourLabel}`,
+            idempotencyKey: `refill-${refillRow.id}`,
+            createdBy: session.name,
+            paidAt: now,
+          });
+        }
 
         if (serviceRequestId) {
           await db
@@ -993,6 +1038,199 @@ export async function POST(request: Request, context: RouteContext) {
         return NextResponse.json(updated);
       }
 
+      case "set_guest_pay_tier": {
+        const assignmentId = body.assignmentId;
+        const tier = body.guestPayTier;
+        if (typeof assignmentId !== "number") {
+          return NextResponse.json({ error: "assignmentId required" }, { status: 400 });
+        }
+        if (!isGuestPayTier(tier)) {
+          return NextResponse.json(
+            { error: "guestPayTier must be standard or unlimited" },
+            { status: 400 },
+          );
+        }
+
+        const [updated] = await db
+          .update(jobHookahs)
+          .set({ guestPayTier: tier })
+          .where(and(eq(jobHookahs.id, assignmentId), eq(jobHookahs.jobId, jobId)))
+          .returning();
+
+        if (!updated) {
+          return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+        }
+
+        await db.insert(jobEvents).values({
+          jobId,
+          jobHookahId: assignmentId,
+          type: "note",
+          message: `Guest pay set · ${guestPayTierLabel(tier)}`,
+          createdBy: session.name,
+        });
+
+        return NextResponse.json(updated);
+      }
+
+      case "mark_onsite_paid": {
+        const assignmentId = body.assignmentId;
+        if (typeof assignmentId !== "number") {
+          return NextResponse.json({ error: "assignmentId required" }, { status: 400 });
+        }
+
+        const [assignment] = await db
+          .select()
+          .from(jobHookahs)
+          .where(and(eq(jobHookahs.id, assignmentId), eq(jobHookahs.jobId, jobId)))
+          .limit(1);
+
+        if (!assignment) {
+          return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+        }
+        if (!isGuestPayTier(assignment.guestPayTier)) {
+          return NextResponse.json(
+            { error: "Set guest pay tier first", code: "NEED_GUEST_TIER" },
+            { status: 409 },
+          );
+        }
+
+        const existing = await db
+          .select({ id: payments.id })
+          .from(payments)
+          .where(
+            and(
+              eq(payments.jobId, jobId),
+              eq(payments.jobHookahId, assignmentId),
+              eq(payments.kind, "onsite_unit"),
+              eq(payments.status, "succeeded"),
+            ),
+          )
+          .limit(1);
+
+        if (existing.length > 0) {
+          return NextResponse.json({ ok: true, alreadyPaid: true });
+        }
+
+        const amountCents = guestPayTierUnitCents(assignment.guestPayTier);
+        const label = guestPayTierLabel(assignment.guestPayTier);
+
+        if (body.channel === "terminal") {
+          const { pushJobPaymentToTerminal } = await import(
+            "@/lib/terminal-checkout"
+          );
+          const result = await pushJobPaymentToTerminal({
+            jobId,
+            kind: "onsite_unit",
+            amountCents,
+            label,
+            jobHookahId: assignmentId,
+            createdBy: session.name,
+          });
+          if (!result.ok) {
+            return NextResponse.json(
+              {
+                error:
+                  result.reason === "terminal_not_configured"
+                    ? "Set SQUARE_TERMINAL_DEVICE_ID to collect on Terminal"
+                    : result.reason,
+              },
+              { status: result.reason === "terminal_not_configured" ? 503 : 400 },
+            );
+          }
+          return NextResponse.json({
+            ok: true,
+            channel: "terminal",
+            paymentId: result.paymentId,
+            terminalCheckoutId: result.terminalCheckoutId,
+          });
+        }
+
+        const now = new Date();
+        const [row] = await db
+          .insert(payments)
+          .values({
+            jobId,
+            jobHookahId: assignmentId,
+            kind: "onsite_unit",
+            status: "succeeded",
+            amountCents,
+            label,
+            idempotencyKey: `onsite-${assignmentId}-${randomUUID()}`,
+            createdBy: session.name,
+            paidAt: now,
+          })
+          .returning();
+
+        await db.insert(jobEvents).values({
+          jobId,
+          jobHookahId: assignmentId,
+          type: "note",
+          message: `Guest unit paid · ${label}`,
+          createdBy: session.name,
+        });
+
+        return NextResponse.json({ payment: row, channel: "manual" });
+      }
+
+      case "add_guest_tip": {
+        const amountCents =
+          typeof body.amountCents === "number"
+            ? Math.round(body.amountCents)
+            : typeof body.amountDollars === "number"
+              ? Math.round(body.amountDollars * 100)
+              : NaN;
+        if (!Number.isFinite(amountCents) || amountCents <= 0) {
+          return NextResponse.json({ error: "Positive tip amount required" }, { status: 400 });
+        }
+
+        const assignmentId =
+          typeof body.assignmentId === "number" ? body.assignmentId : null;
+        const now = new Date();
+        const [row] = await db
+          .insert(payments)
+          .values({
+            jobId,
+            jobHookahId: assignmentId,
+            kind: "tip",
+            status: "succeeded",
+            amountCents,
+            label: assignmentId ? `Tip · unit #${assignmentId}` : "Tip",
+            idempotencyKey: `tip-${jobId}-${randomUUID()}`,
+            createdBy: session.name,
+            paidAt: now,
+          })
+          .returning();
+
+        const tipTotal = await db
+          .select({
+            sum: sql<number>`coalesce(sum(${payments.amountCents}), 0)`,
+          })
+          .from(payments)
+          .where(
+            and(
+              eq(payments.jobId, jobId),
+              eq(payments.kind, "tip"),
+              eq(payments.status, "succeeded"),
+            ),
+          );
+
+        const tipCents = Number(tipTotal[0]?.sum ?? 0);
+        await db
+          .update(jobs)
+          .set({ tipCents, updatedAt: now })
+          .where(eq(jobs.id, jobId));
+
+        await db.insert(jobEvents).values({
+          jobId,
+          jobHookahId: assignmentId,
+          type: "note",
+          message: `Tip recorded · $${(amountCents / 100).toFixed(2)}`,
+          createdBy: session.name,
+        });
+
+        return NextResponse.json({ payment: row, tipCents });
+      }
+
       case "ensure_guest_token": {
         const assignmentId = body.assignmentId;
         if (typeof assignmentId !== "number") {
@@ -1009,7 +1247,7 @@ export async function POST(request: Request, context: RouteContext) {
           return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
         }
 
-        if (assignment.guestToken) {
+        if (assignment.guestToken && body.regenerate !== true) {
           return NextResponse.json(assignment);
         }
 
@@ -1019,6 +1257,14 @@ export async function POST(request: Request, context: RouteContext) {
           .set({ guestToken })
           .where(eq(jobHookahs.id, assignmentId))
           .returning();
+
+        await db.insert(jobEvents).values({
+          jobId,
+          jobHookahId: assignmentId,
+          type: "note",
+          message: body.regenerate === true ? "Guest QR regenerated" : "Guest QR created",
+          createdBy: session.name,
+        });
 
         return NextResponse.json(updated);
       }

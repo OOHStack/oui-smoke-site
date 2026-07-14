@@ -7,11 +7,18 @@ import { format } from "date-fns";
 import Countdown from "@/components/admin/Countdown";
 import StatusBadge from "@/components/admin/StatusBadge";
 import HookahBoard from "@/components/admin/HookahBoard";
+import GuestLedger from "@/components/admin/GuestLedger";
 import { PasswordField } from "@/components/admin/PasswordField";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { useSse } from "@/lib/hooks/useSse";
 import { paymentModelLabel } from "@/lib/payment-model";
 import { formatCadCents } from "@/lib/job-balance";
+import {
+  defaultRefillCentsForTier,
+  type GuestPayTier,
+} from "@/lib/ops/guest-pay";
+import { resolveTipSplit } from "@/lib/ops/tip-split";
+import TipSplitEditor from "@/components/admin/TipSplitEditor";
 import {
   ONSITE_UNIT_RATE,
   ONSITE_UNLIMITED_RATE,
@@ -47,6 +54,7 @@ type Assignment = {
   sortOrder?: number;
   issueFlag: boolean;
   guestToken: string | null;
+  guestPayTier?: GuestPayTier | null;
   guestRating?: number | null;
   guestComment?: string | null;
   guestFeedbackAt?: string | null;
@@ -127,6 +135,7 @@ type Job = {
   packingNotes: string | null;
   actualCents: number | null;
   tipCents: number | null;
+  tipSplitJson?: string | null;
   quotedCents: number | null;
   outcomeNotes: string | null;
   clientToken?: string | null;
@@ -179,6 +188,18 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [events, setEvents] = useState<JobEvent[]>([]);
+  const [payments, setPayments] = useState<
+    Array<{
+      id: number;
+      kind: string;
+      status: string;
+      amountCents: number;
+      jobHookahId: number | null;
+      label?: string | null;
+    }>
+  >([]);
+  const [ledgerBusyId, setLedgerBusyId] = useState<number | null>(null);
+  const [tipSplitBusy, setTipSplitBusy] = useState(false);
   const [flavours, setFlavours] = useState<Flavour[]>([]);
   const [availableHookahs, setAvailableHookahs] = useState<Hookah[]>([]);
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
@@ -234,10 +255,11 @@ export default function JobDetailPage() {
       return;
     }
     const data = await jobRes.json();
-    const { assignments: a, events: ev, ...jobData } = data;
+    const { assignments: a, events: ev, payments: payRows, ...jobData } = data;
     setJob(jobData as Job);
     setAssignments(a ?? []);
     setEvents(ev ?? []);
+    setPayments(payRows ?? []);
     if (photosRes.ok) {
       const photoData = await photosRes.json();
       setPhotos(photoData.photos ?? []);
@@ -347,14 +369,30 @@ export default function JobDetailPage() {
     }
   }, [load]);
 
-  useSse<{ job?: Job & { assignments: Assignment[]; events: JobEvent[] }; error?: string }>(
+  useSse<{
+    job?: Job & {
+      assignments: Assignment[];
+      events: JobEvent[];
+      payments?: Array<{
+        id: number;
+        kind: string;
+        status: string;
+        amountCents: number;
+        jobHookahId: number | null;
+        label?: string | null;
+      }>;
+    };
+    error?: string;
+  }>(
     Number.isFinite(jobId) ? `/api/stream/jobs/${jobId}` : null,
     (data) => {
       if (!data.job || data.error) return;
-      const { assignments: a, events: ev, ...jobData } = data.job;
+      const { assignments: a, events: ev, payments: payRows, ...jobData } =
+        data.job;
       setJob(jobData as Job);
       setAssignments(a ?? []);
       setEvents(ev ?? []);
+      if (payRows) setPayments(payRows);
       setOutcome({
         actualDollars: centsToDollars(jobData.actualCents),
         tipDollars: centsToDollars(jobData.tipCents),
@@ -711,6 +749,7 @@ export default function JobDetailPage() {
             jobId={jobId}
             assignments={assignments}
             flavours={flavours}
+            paymentModel={job.paymentModel}
             onAction={hookahAction}
             onRefresh={load}
           />
@@ -911,6 +950,10 @@ export default function JobDetailPage() {
                   >
                     view guest rates
                   </button>
+                  {" · "}
+                  <Link href="/admin/playbook" className="job-pricing-summary__inline">
+                    Night-of playbook
+                  </Link>
                   .
                 </>
               ) : job.paymentModel === "complimentary" ? (
@@ -920,6 +963,50 @@ export default function JobDetailPage() {
               )}
             </p>
           )}
+          {job.paymentModel === "pay_at_event" ? (
+            <GuestLedger
+              jobId={jobId}
+              assignments={assignments}
+              payments={payments}
+              tipCents={job.tipCents ?? 0}
+              staffNames={job.staffNames}
+              tipSplitJson={job.tipSplitJson}
+              busyId={ledgerBusyId}
+              tipSplitBusy={tipSplitBusy}
+              onApplySuggestedActual={(cents) => {
+                setOutcome((o) => ({
+                  ...o,
+                  actualDollars: (cents / 100).toFixed(2),
+                }));
+              }}
+              onSaveTipSplit={async (json) => {
+                setTipSplitBusy(true);
+                try {
+                  await patchJob({ tipSplitJson: json });
+                  await load();
+                } finally {
+                  setTipSplitBusy(false);
+                }
+              }}
+              onMarkPaid={async (assignmentId, channel) => {
+                setLedgerBusyId(assignmentId);
+                try {
+                  await fetch(`/api/jobs/${jobId}/hookahs`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      action: "mark_onsite_paid",
+                      assignmentId,
+                      channel,
+                    }),
+                  });
+                  await load();
+                } finally {
+                  setLedgerBusyId(null);
+                }
+              }}
+            />
+          ) : null}
           {assignments.some((a) => a.guestFeedbackAt && a.guestRating != null) ? (
             <div className="guest-feedback-list">
               <p className="list-meta" style={{ marginBottom: "0.65rem" }}>
@@ -964,6 +1051,46 @@ export default function JobDetailPage() {
                 />
               </div>
             </div>
+            {(() => {
+              const tipCents = dollarsToCents(outcome.tipDollars) ?? 0;
+              const shares = resolveTipSplit({
+                tipCents,
+                staffNames: job.staffNames,
+                tipSplitJson: job.tipSplitJson,
+              });
+              if (tipCents <= 0 || shares.length === 0) return null;
+              return (
+                <div className="tip-split">
+                  Tip split
+                  <ul>
+                    {shares.map((s) => (
+                      <li key={s.name}>
+                        {s.name}
+                        {s.percent != null ? ` · ${s.percent}%` : ""} ·{" "}
+                        {formatCadCents(s.cents)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
+            {job.paymentModel !== "pay_at_event" ? (
+              <TipSplitEditor
+                tipCents={dollarsToCents(outcome.tipDollars) ?? 0}
+                staffNames={job.staffNames}
+                tipSplitJson={job.tipSplitJson}
+                busy={tipSplitBusy}
+                onSave={async (json) => {
+                  setTipSplitBusy(true);
+                  try {
+                    await patchJob({ tipSplitJson: json });
+                    await load();
+                  } finally {
+                    setTipSplitBusy(false);
+                  }
+                }}
+              />
+            ) : null}
             <div className="field">
               <label>Outcome notes</label>
               <textarea
@@ -1639,12 +1766,14 @@ function JobHookahBoard({
   jobId,
   assignments,
   flavours,
+  paymentModel,
   onAction,
   onRefresh,
 }: {
   jobId: string;
   assignments: Assignment[];
   flavours: Flavour[];
+  paymentModel?: Job["paymentModel"];
   onAction: (body: Record<string, unknown>) => void | Promise<void>;
   onRefresh: () => void | Promise<void>;
 }) {
@@ -1689,6 +1818,7 @@ function JobHookahBoard({
         <HookahModal
           assignment={modalAssignment}
           flavours={flavours}
+          paymentModel={paymentModel}
           prompt={modalPrompt}
           onAction={onAction}
           onRefresh={onRefresh}
@@ -1705,6 +1835,7 @@ function JobHookahBoard({
 function HookahModal({
   assignment: a,
   flavours,
+  paymentModel,
   prompt,
   onAction,
   onRefresh,
@@ -1712,6 +1843,7 @@ function HookahModal({
 }: {
   assignment: Assignment;
   flavours: Flavour[];
+  paymentModel?: Job["paymentModel"];
   prompt?: string;
   onAction: (body: Record<string, unknown>) => void | Promise<void>;
   onRefresh: () => void | Promise<void>;
@@ -1768,10 +1900,27 @@ function HookahModal({
     !!a.nextCheckAt &&
     new Date(a.nextCheckAt).getTime() < Date.now();
   const canSendOut = !!flavourId || assignmentHasFlavour(a);
+  const needsGuestTier = paymentModel === "pay_at_event";
+  const canSendOutFully =
+    canSendOut && (!needsGuestTier || !!a.guestPayTier);
   const params = useParams();
   const jobId = params.id as string;
   const guestRefill = a.activeCall?.type === "refill" ? a.activeCall : null;
-  const refillPrice = guestRefill?.priceCents ?? REFILL_PRICE_CENTS;
+  const refillPrice =
+    guestRefill?.priceCents ??
+    defaultRefillCentsForTier(a.guestPayTier ?? null);
+
+  function assertReadyToSend(): boolean {
+    if (!flavourId && !assignmentHasFlavour(a)) {
+      setFormError("Choose a flavour before sending to the floor");
+      return false;
+    }
+    if (needsGuestTier && !a.guestPayTier) {
+      setFormError("Choose Standard or Unlimited guest pay before sending out");
+      return false;
+    }
+    return true;
+  }
 
   async function run(body: Record<string, unknown>, close = false) {
     setFormError("");
@@ -1834,6 +1983,11 @@ function HookahModal({
             </h2>
             <div className="hookah-modal__badges">
               <StatusBadge status={a.status} kind="assignment" />
+              {a.guestPayTier ? (
+                <span className={`tier-chip tier-chip--${a.guestPayTier}`}>
+                  {a.guestPayTier}
+                </span>
+              ) : null}
               {overdue ? <span className="hookah-chip hookah-chip--overdue">Overdue</span> : null}
               {a.issueFlag ? <span className="hookah-chip hookah-chip--issue">Issue</span> : null}
             </div>
@@ -1845,6 +1999,48 @@ function HookahModal({
 
         {prompt ? <p className="hookah-modal__prompt">{prompt}</p> : null}
         {formError ? <p className="login-error">{formError}</p> : null}
+
+        {paymentModel === "pay_at_event" ? (
+          <section className="hookah-modal__section">
+            <h3 className="hookah-modal__section-title">Guest pay tier</h3>
+            <p className="hookah-modal__hint">
+              Required before send-out. Standard charges ${REFILL_PRICE_DOLLARS}{" "}
+              refills; Unlimited does not.
+            </p>
+            <div className="guest-tier-picker__row">
+              <button
+                type="button"
+                className={`btn hookah-modal__btn-main ${
+                  a.guestPayTier === "standard" ? "btn-ok" : ""
+                }`}
+                onClick={() =>
+                  run({
+                    action: "set_guest_pay_tier",
+                    assignmentId: a.id,
+                    guestPayTier: "standard",
+                  })
+                }
+              >
+                Standard · ${ONSITE_UNIT_RATE}
+              </button>
+              <button
+                type="button"
+                className={`btn hookah-modal__btn-main ${
+                  a.guestPayTier === "unlimited" ? "btn-ok" : ""
+                }`}
+                onClick={() =>
+                  run({
+                    action: "set_guest_pay_tier",
+                    assignmentId: a.id,
+                    guestPayTier: "unlimited",
+                  })
+                }
+              >
+                Unlimited · ${ONSITE_UNLIMITED_RATE}
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         {a.activeCall ? (
           <div className={`hookah-call-banner hookah-call-banner--${a.activeCall.type}`}>
@@ -1859,7 +2055,10 @@ function HookahModal({
                 <p className="hookah-call-banner__msg">
                   {a.activeCall.flavourLabel || "Flavour TBD"}
                   {" · "}
-                  {formatMoney(a.activeCall.priceCents ?? REFILL_PRICE_CENTS)}
+                  {formatMoney(
+                    a.activeCall.priceCents ??
+                      defaultRefillCentsForTier(a.guestPayTier ?? null),
+                  )}
                   {a.activeCall.priceAgreed ? " · guest agreed" : ""}
                   {" — prep a new head and take the payment terminal."}
                 </p>
@@ -1899,7 +2098,9 @@ function HookahModal({
                       serviceRequestId: a.activeCall!.id,
                       flavourId: a.activeCall!.flavourId ?? undefined,
                       flavourLabel: a.activeCall!.flavourLabel ?? undefined,
-                      priceCents: a.activeCall!.priceCents ?? REFILL_PRICE_CENTS,
+                      priceCents:
+                        a.activeCall!.priceCents ??
+                        defaultRefillCentsForTier(a.guestPayTier ?? null),
                       source: "guest",
                       note: note || undefined,
                     })
@@ -2001,12 +2202,9 @@ function HookahModal({
                 <button
                   type="button"
                   className="btn btn-ok hookah-modal__btn-main"
-                  disabled={!canSendOut}
+                  disabled={!canSendOutFully}
                   onClick={() => {
-                    if (!flavourId && !assignmentHasFlavour(a)) {
-                      setFormError("Choose a flavour before sending to the floor");
-                      return;
-                    }
+                    if (!assertReadyToSend()) return;
                     run(
                       {
                         action: "send_out",
@@ -2231,12 +2429,9 @@ function HookahModal({
                 <button
                   type="button"
                   className="btn btn-ok hookah-modal__btn-main"
-                  disabled={!canSendOut}
+                  disabled={!canSendOutFully}
                   onClick={() => {
-                    if (!flavourId && !assignmentHasFlavour(a)) {
-                      setFormError("Choose a flavour before sending to the floor");
-                      return;
-                    }
+                    if (!assertReadyToSend()) return;
                     run(
                       {
                         action: "send_out",
@@ -2272,6 +2467,54 @@ function HookahModal({
             >
               {qrLoading ? "Preparing QR…" : "Show guest QR code"}
             </button>
+            {a.status === "out" ? (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={qrLoading}
+                onClick={async () => {
+                  setQrLoading(true);
+                  setFormError("");
+                  try {
+                    const ensureRes = await fetch(`/api/jobs/${jobId}/hookahs`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        action: "ensure_guest_token",
+                        assignmentId: a.id,
+                        regenerate: true,
+                      }),
+                    });
+                    if (!ensureRes.ok) {
+                      setFormError("Couldn’t regenerate guest link");
+                      return;
+                    }
+                    const updated = await ensureRes.json();
+                    const token = updated.guestToken as string | undefined;
+                    if (!token) {
+                      setFormError("Couldn’t regenerate guest link");
+                      return;
+                    }
+                    const qrRes = await fetch(
+                      `/api/qr?token=${encodeURIComponent(token)}`,
+                    );
+                    if (!qrRes.ok) {
+                      setFormError("Couldn’t generate QR");
+                      return;
+                    }
+                    const qr = await qrRes.json();
+                    setQrDataUrl(qr.qrDataUrl);
+                    setQrUrl(qr.url);
+                    setQrOpen(true);
+                    await onRefresh();
+                  } finally {
+                    setQrLoading(false);
+                  }
+                }}
+              >
+                Regenerate guest link
+              </button>
+            ) : null}
             <p className="hookah-modal__footer-hint">
               Guest scans this to request coals, flavour refills, or help.
             </p>

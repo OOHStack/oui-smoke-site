@@ -362,6 +362,12 @@ export default function PartnerSheet() {
           </div>
           <p className="partner-sheet__note">
             Private events · Toronto &amp; beyond the GTA · Travel quoted on request
+            {mode === "on_site" ? (
+              <>
+                {" · "}
+                <a href="/partner/playbook">Night-of playbook</a>
+              </>
+            ) : null}
           </p>
         </footer>
       </article>

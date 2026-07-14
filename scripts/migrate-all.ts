@@ -302,6 +302,18 @@ async function main() {
   `;
   console.log("✓ payment_settings");
 
+  // --- guest pay tier + onsite_unit ledger kind ---
+  await sql`DO $$ BEGIN
+    CREATE TYPE guest_pay_tier AS ENUM ('standard', 'unlimited');
+  EXCEPTION WHEN duplicate_object THEN null; END $$`;
+  await sql`ALTER TABLE job_hookahs ADD COLUMN IF NOT EXISTS guest_pay_tier guest_pay_tier`;
+  await sql`DO $$ BEGIN
+    ALTER TYPE payment_kind ADD VALUE IF NOT EXISTS 'onsite_unit';
+  EXCEPTION WHEN duplicate_object THEN null; END $$`;
+  await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS square_terminal_checkout_id text`;
+  await sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tip_split_json text DEFAULT ''`;
+  console.log("✓ guest pay tier + onsite_unit + terminal + tip split");
+
   // --- verify ---
   console.log("\nVerifying schema…");
   const requiredTables = [
@@ -322,6 +334,7 @@ async function main() {
       "guest_rating",
       "guest_comment",
       "guest_feedback_at",
+      "guest_pay_tier",
     ],
     service_requests: ["flavour_id", "flavour_label", "price_cents", "price_agreed"],
     job_photos: [
@@ -331,7 +344,7 @@ async function main() {
       "approved_for_social",
       "featured",
     ],
-    jobs: ["client_token", "payment_model", "deposit_percent"],
+    jobs: ["client_token", "payment_model", "deposit_percent", "tip_split_json"],
     flavours: ["description"],
     hookah_refills: ["price_cents", "source", "flavour_label"],
     ops_users: [
@@ -349,6 +362,7 @@ async function main() {
       "amount_cents",
       "idempotency_key",
       "square_payment_link_id",
+      "square_terminal_checkout_id",
     ],
   };
 

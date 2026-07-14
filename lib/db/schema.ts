@@ -43,6 +43,11 @@ export const returnOutcomeEnum = pgEnum("return_outcome", [
   "returned_with_issue",
 ]);
 
+export const guestPayTierEnum = pgEnum("guest_pay_tier", [
+  "standard",
+  "unlimited",
+]);
+
 export const flavourKindEnum = pgEnum("flavour_kind", ["single", "mix"]);
 
 export const eventTypeEnum = pgEnum("event_type", [
@@ -99,6 +104,8 @@ export const jobs = pgTable("jobs", {
   /** Package jobs: suggested deposit as % of quote (25 / 50 / 100 typical) */
   depositPercent: integer("deposit_percent").notNull().default(50),
   tipCents: integer("tip_cents").default(0),
+  /** JSON array of { name, percent } for custom tip splits. Empty = even split. */
+  tipSplitJson: text("tip_split_json").default(""),
   staffNames: text("staff_names").default(""),
   packingNotes: text("packing_notes").default(""),
   outcomeNotes: text("outcome_notes").default(""),
@@ -134,6 +141,8 @@ export const jobHookahs = pgTable("job_hookahs", {
   returnOutcome: returnOutcomeEnum("return_outcome"),
   issueFlag: boolean("issue_flag").notNull().default(false),
   guestToken: text("guest_token").unique(),
+  /** Pay-at-event menu: standard ($80 + refills) or unlimited ($100). */
+  guestPayTier: guestPayTierEnum("guest_pay_tier"),
   guestRating: integer("guest_rating"),
   guestComment: text("guest_comment").default(""),
   guestFeedbackAt: timestamp("guest_feedback_at", { withTimezone: true }),
@@ -272,6 +281,7 @@ export const paymentKindEnum = pgEnum("payment_kind", [
   "refill",
   "tip",
   "other",
+  "onsite_unit",
 ]);
 
 export const paymentStatusEnum = pgEnum("payment_status", [
@@ -299,6 +309,7 @@ export const payments = pgTable("payments", {
   squarePaymentLinkId: text("square_payment_link_id"),
   squareOrderId: text("square_order_id"),
   squarePaymentId: text("square_payment_id"),
+  squareTerminalCheckoutId: text("square_terminal_checkout_id"),
   idempotencyKey: text("idempotency_key").notNull().unique(),
   createdBy: text("created_by").default("ops"),
   paidAt: timestamp("paid_at", { withTimezone: true }),

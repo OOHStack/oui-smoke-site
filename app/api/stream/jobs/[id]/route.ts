@@ -1,6 +1,6 @@
 import { requireApiSession } from "@/lib/auth/api";
 import { getDb } from "@/lib/db";
-import { jobEvents, jobHookahs, jobs, serviceRequests } from "@/lib/db/schema";
+import { jobEvents, jobHookahs, jobs, payments, serviceRequests } from "@/lib/db/schema";
 import { createSseResponse } from "@/lib/sse";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -55,10 +55,16 @@ async function loadJobSnapshot(id: number) {
     .where(eq(jobEvents.jobId, id))
     .orderBy(desc(jobEvents.createdAt));
 
+  const paymentRows = await db
+    .select()
+    .from(payments)
+    .where(eq(payments.jobId, id));
+
   return {
     ...job,
     assignments: assignmentsWithCalls,
     events,
+    payments: paymentRows,
   };
 }
 

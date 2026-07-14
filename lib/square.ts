@@ -26,6 +26,19 @@ export function isSquareConfigured() {
   );
 }
 
+/** Terminal checkouts need a paired device id (Square Dashboard → Terminal). */
+export function isSquareTerminalConfigured() {
+  return Boolean(
+    isSquareConfigured() && process.env.SQUARE_TERMINAL_DEVICE_ID?.trim(),
+  );
+}
+
+export function getSquareTerminalDeviceId() {
+  const id = process.env.SQUARE_TERMINAL_DEVICE_ID?.trim();
+  if (!id) throw new Error("SQUARE_TERMINAL_DEVICE_ID is not set");
+  return id;
+}
+
 /** Square rejects reserved / fake domains — only pass real buyer emails through. */
 export function sanitizeBuyerEmail(email: string | null | undefined): string | null {
   if (!email) return null;
@@ -133,6 +146,61 @@ export async function createDepositPaymentLink(input: {
     url: link.url,
     orderId: link.order_id,
     longUrl: link.long_url,
+  };
+}
+
+export type SquareTerminalCheckout = {
+  id: string;
+  status?: string;
+  paymentIds?: string[];
+};
+
+/** Push an amount to the paired Square Terminal hardware. */
+export async function createTerminalCheckout(input: {
+  idempotencyKey: string;
+  amountCents: number;
+  currency?: string;
+  /** Stored as note + reference for webhook matching — use oui:payment:{id} */
+  paymentNote: string;
+  referenceId?: string;
+  label?: string;
+}): Promise<SquareTerminalCheckout> {
+  const body = {
+    idempotency_key: input.idempotencyKey.slice(0, 64),
+    checkout: {
+      amount_money: {
+        amount: input.amountCents,
+        currency: input.currency || "CAD",
+      },
+      device_options: {
+        device_id: getSquareTerminalDeviceId(),
+        skip_receipt_screen: false,
+      },
+      reference_id: (input.referenceId || input.paymentNote).slice(0, 40),
+      note: input.paymentNote.slice(0, 500),
+    },
+  };
+
+  const data = await squareFetch<{
+    checkout?: {
+      id?: string;
+      status?: string;
+      payment_ids?: string[];
+    };
+  }>("/v2/terminals/checkouts", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+  const checkout = data.checkout;
+  if (!checkout?.id) {
+    throw new Error("Square Terminal did not return a checkout");
+  }
+
+  return {
+    id: checkout.id,
+    status: checkout.status,
+    paymentIds: checkout.payment_ids,
   };
 }
 

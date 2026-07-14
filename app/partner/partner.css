@@ -903,3 +903,31 @@ body {
     text-decoration: none;
   }
 }
+
+/* Partner night-of playbook */
+.partner-playbook-page {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+.partner-playbook-page__back {
+  margin: 0 0 1rem;
+}
+
+.partner-playbook-page__back a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+@media print {
+  .no-print,
+  .partner-toolbar {
+    display: none !important;
+  }
+
+  .partner-playbook-page {
+    padding: 0;
+  }
+}
