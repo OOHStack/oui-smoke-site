@@ -300,7 +300,7 @@
       .filter(Boolean)
       .join("\n");
 
-    els.email.href = `mailto:ouismokeinc@gmail.com?subject=${encodeURIComponent(
+    els.email.href = `mailto:contact@ouismoke.co?subject=${encodeURIComponent(
       "Oui Smoke event estimate"
     )}&body=${encodeURIComponent(summary)}`;
   };

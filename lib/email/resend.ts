@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { CONTACT_EMAIL, CONTACT_FROM } from "@/lib/brand-contact";
 
 let client: Resend | null = null;
 
@@ -17,20 +18,20 @@ function getResend() {
 }
 
 export function getFromAddress() {
-  return process.env.RESEND_FROM || "Oui Smoke <bookings@ouismoke.co>";
+  return process.env.RESEND_FROM || CONTACT_FROM;
 }
 
 export function getOpsNotifyEmail() {
   const raw =
     process.env.OPS_NOTIFY_EMAIL ||
     process.env.RESEND_OPS_EMAIL ||
-    "ouismokeinc@gmail.com";
+    CONTACT_EMAIL;
   const email = raw.trim().toLowerCase();
   if (isBlockedRecipient(email)) {
     console.warn(
-      "OPS_NOTIFY_EMAIL blocked (oohstack) — using ouismokeinc@gmail.com",
+      `OPS_NOTIFY_EMAIL blocked (oohstack) — using ${CONTACT_EMAIL}`,
     );
-    return "ouismokeinc@gmail.com";
+    return CONTACT_EMAIL;
   }
   return email;
 }
@@ -84,7 +85,7 @@ export async function sendEmail(input: SendEmailInput): Promise<boolean> {
       html: input.html,
       text: input.text,
       replyTo: isBlockedRecipient(replyTo.toLowerCase())
-        ? "ouismokeinc@gmail.com"
+        ? CONTACT_EMAIL
         : replyTo,
     });
     if (error) {

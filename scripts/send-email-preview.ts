@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { CONTACT_EMAIL, CONTACT_FROM } from "../lib/brand-contact";
 import {
   bookingInquiryClientEmail,
   depositLinkClientEmail,
@@ -13,8 +14,8 @@ async function main() {
     throw new Error("RESEND_API_KEY missing");
   }
 
-  const from = process.env.RESEND_FROM || "Oui Smoke <bookings@ouismoke.co>";
-  const to = process.env.OPS_NOTIFY_EMAIL || "ouismokeinc@gmail.com";
+  const from = process.env.RESEND_FROM || CONTACT_FROM;
+  const to = process.env.OPS_NOTIFY_EMAIL || CONTACT_EMAIL;
 
   const preview = depositLinkClientEmail({
     clientName: "Vinesh",

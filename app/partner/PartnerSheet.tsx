@@ -345,7 +345,7 @@ export default function PartnerSheet() {
         <footer className="partner-sheet__foot">
           <div>
             <p className="partner-sheet__foot-label">Contact</p>
-            <a href="mailto:ouismokeinc@gmail.com">ouismokeinc@gmail.com</a>
+            <a href="mailto:contact@ouismoke.co">contact@ouismoke.co</a>
             <div className="partner-social" aria-label="Social media">
               <a
                 className="partner-social__link"

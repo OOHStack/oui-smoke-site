@@ -3,6 +3,7 @@
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PasswordField } from "@/components/admin/PasswordField";
+import { CONTACT_EMAIL } from "@/lib/brand-contact";
 
 type Mode = "signin" | "forgot" | "reset";
 
@@ -97,7 +98,7 @@ function AdminLoginForm() {
       }
       setOkMsg(
         data.message ||
-          "If that account exists, a reset link was sent to ouismokeinc@gmail.com.",
+          `If that account exists, a reset link was sent to ${CONTACT_EMAIL}.`,
       );
       setMode("signin");
     } catch {
@@ -162,7 +163,7 @@ function AdminLoginForm() {
     mode === "signin"
       ? "Access the floor board, fleet, and guest service tools."
       : mode === "forgot"
-        ? "Enter your username. We’ll email a one-time reset link to ouismokeinc@gmail.com."
+        ? `Enter your username. We’ll email a one-time reset link to ${CONTACT_EMAIL}.`
         : "Choose a new password for this account. The link works once and expires in an hour.";
 
   return (
@@ -274,7 +275,7 @@ function AdminLoginForm() {
                 />
               </div>
               <p className="login-hint">
-                A secure link goes to the ops inbox at ouismokeinc@gmail.com —
+                A secure link goes to the ops inbox at {CONTACT_EMAIL} —
                 open it there to set a new password.
               </p>
 

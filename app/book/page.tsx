@@ -166,13 +166,13 @@ function BookForm() {
       // Require a real job id — honeypot / soft-success responses omit it
       if (!data.jobId) {
         setError(
-          "Couldn’t submit right now. Email ouismokeinc@gmail.com or try again.",
+          "Couldn’t submit right now. Email contact@ouismoke.co or try again.",
         );
         return;
       }
       setDone((data.engagement as Engagement) || engagement);
     } catch {
-      setError("Couldn’t reach Oui Smoke. Try again or email ouismokeinc@gmail.com.");
+      setError("Couldn’t reach Oui Smoke. Try again or email contact@ouismoke.co.");
     } finally {
       setBusy(false);
     }
@@ -187,7 +187,7 @@ function BookForm() {
           {promo ? ` with your ${promo.label.toLowerCase()}` : ""}.
         </p>
         <ol className="book__steps">
-          <li>Check your email for a confirmation from bookings@ouismoke.co.</li>
+          <li>Check your email for a confirmation from contact@ouismoke.co.</li>
           <li>
             You’ll get a Square deposit link (~{depositPct}% of the estimate) to
             lock the date.
@@ -198,8 +198,8 @@ function BookForm() {
           </li>
         </ol>
         <p className="book__alt">
-          Watch for email from <strong>bookings@ouismoke.co</strong>. Questions?{" "}
-          <a href="mailto:ouismokeinc@gmail.com">ouismokeinc@gmail.com</a>
+          Watch for email from <strong>contact@ouismoke.co</strong>. Questions?{" "}
+          <a href="mailto:contact@ouismoke.co">contact@ouismoke.co</a>
         </p>
         <Link href="/" className="book__btn">
           Back to Oui Smoke
@@ -225,8 +225,8 @@ function BookForm() {
           <li>We’ll send timing and floor details once confirmed.</li>
         </ol>
         <p className="book__alt">
-          Watch for email from <strong>bookings@ouismoke.co</strong>. Questions?{" "}
-          <a href="mailto:ouismokeinc@gmail.com">ouismokeinc@gmail.com</a>
+          Watch for email from <strong>contact@ouismoke.co</strong>. Questions?{" "}
+          <a href="mailto:contact@ouismoke.co">contact@ouismoke.co</a>
         </p>
         <Link href="/" className="book__btn">
           Back to Oui Smoke
@@ -468,7 +468,7 @@ function BookForm() {
       </button>
       <p className="book__alt">
         Prefer email?{" "}
-        <a href="mailto:ouismokeinc@gmail.com">ouismokeinc@gmail.com</a>
+        <a href="mailto:contact@ouismoke.co">contact@ouismoke.co</a>
       </p>
     </form>
   );

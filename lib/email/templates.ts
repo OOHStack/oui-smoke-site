@@ -5,6 +5,8 @@ import {
   type PricingConfig,
 } from "@/lib/pricing";
 
+import { CONTACT_EMAIL } from "@/lib/brand-contact";
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -117,7 +119,7 @@ ${pre}
             <span style="color:${brand.line};padding:0 8px;">·</span>
             GTA full-service hookah
             <br>
-            <a href="mailto:ouismokeinc@gmail.com" style="color:${brand.inkMute};text-decoration:none;">ouismokeinc@gmail.com</a>
+            <a href="mailto:${CONTACT_EMAIL}" style="color:${brand.inkMute};text-decoration:none;">${CONTACT_EMAIL}</a>
             <span style="color:${brand.line};padding:0 8px;">·</span>
             <a href="https://instagram.com/ouismoke" style="color:${brand.inkMute};text-decoration:none;">@ouismoke</a>
           </td>
@@ -197,7 +199,7 @@ export function bookingInquiryClientEmail(input: {
         ["Promo", input.promoCode || ""],
       ]),
       p(
-        `Questions? Reply to this email or write <a href="mailto:ouismokeinc@gmail.com" style="color:${brand.accent};text-decoration:none;">ouismokeinc@gmail.com</a>.`,
+        `Questions? Reply to this email or write <a href="mailto:${CONTACT_EMAIL}" style="color:${brand.accent};text-decoration:none;">${CONTACT_EMAIL}</a>.`,
       ),
     ].join(""),
   });

@@ -171,7 +171,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("booking create failed", err);
     return NextResponse.json(
-      { error: "Couldn’t submit right now. Email ouismokeinc@gmail.com." },
+      { error: "Couldn’t submit right now. Email contact@ouismoke.co." },
       { status: 500 },
     );
   }

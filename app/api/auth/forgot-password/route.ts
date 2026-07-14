@@ -4,6 +4,7 @@ import {
   hashPasswordResetToken,
   passwordResetExpiry,
 } from "@/lib/auth/password-reset";
+import { CONTACT_EMAIL } from "@/lib/brand-contact";
 import { getDb } from "@/lib/db";
 import { opsUsers } from "@/lib/db/schema";
 import { getOpsNotifyEmail, isEmailConfigured, sendEmail } from "@/lib/email/resend";
@@ -14,13 +15,12 @@ import { NextResponse } from "next/server";
 
 const GENERIC_OK = {
   ok: true as const,
-  message:
-    "If that account exists, a reset link was sent to ouismokeinc@gmail.com.",
+  message: `If that account exists, a reset link was sent to ${CONTACT_EMAIL}.`,
 };
 
 /**
  * Request a password-reset magic link.
- * Link is always emailed to the ops inbox (OPS_NOTIFY_EMAIL / ouismokeinc@gmail.com)
+ * Link is always emailed to the ops inbox (OPS_NOTIFY_EMAIL / contact@)
  * so resets stay under team control without per-user emails.
  */
 export async function POST(request: Request) {

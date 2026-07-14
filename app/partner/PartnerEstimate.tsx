@@ -401,7 +401,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
         <a className="partner-estimate__book" href={bookHref}>
           {isPackage ? "Book this estimate" : "Request on-site sales"}
         </a>
-        <a className="partner-estimate__mail" href="mailto:ouismokeinc@gmail.com">
+        <a className="partner-estimate__mail" href="mailto:contact@ouismoke.co">
           Or email the brief
         </a>
       </div>
