@@ -4,22 +4,12 @@ import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
+  DEFAULT_PRICING,
   estimateBooking,
   formatCad,
-  EXTRA_HOUR_RATE,
-  GUEST_REBOOK_PROMO,
-  ONSITE_UNIT_RATE,
-  ONSITE_UNLIMITED_RATE,
-  REFILL_PRICE_DOLLARS,
+  type PricingConfig,
 } from "@/lib/pricing";
 import "./book.css";
-
-const PROMO_CODES: Record<string, { discountDollars: number; label: string }> = {
-  [GUEST_REBOOK_PROMO.code]: {
-    discountDollars: GUEST_REBOOK_PROMO.discountDollars,
-    label: GUEST_REBOOK_PROMO.label,
-  },
-};
 
 type Engagement = "package" | "on_site";
 
@@ -40,7 +30,6 @@ const FALLBACK_COPY: PaymentCopy = {
 function BookForm() {
   const searchParams = useSearchParams();
   const promoCode = (searchParams.get("code") || "").trim().toUpperCase();
-  const promo = useMemo(() => PROMO_CODES[promoCode] ?? null, [promoCode]);
 
   const initialType = (searchParams.get("type") || "").trim().toLowerCase();
   const initialHours = (() => {
@@ -66,31 +55,66 @@ function BookForm() {
   const [hours, setHours] = useState(initialHours);
   const [hookahs, setHookahs] = useState(initialHookahs);
   const [payCopy, setPayCopy] = useState<PaymentCopy>(FALLBACK_COPY);
+  const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
+
+  const promo = useMemo(() => {
+    if (
+      promoCode &&
+      promoCode === pricing.guestRebookCode.toUpperCase()
+    ) {
+      return {
+        discountDollars: pricing.guestRebookDiscountDollars,
+        label: pricing.guestRebookLabel,
+      };
+    }
+    return null;
+  }, [promoCode, pricing]);
 
   useEffect(() => {
     if (engagement !== "package") return;
     setHookahs((current) => {
       const n = Number(current);
-      if (!Number.isFinite(n) || n < 4) return "4";
+      if (!Number.isFinite(n) || n < pricing.minPackageHookahs) {
+        return String(pricing.minPackageHookahs);
+      }
       return current;
     });
-  }, [engagement]);
+  }, [engagement, pricing.minPackageHookahs]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/payment-copy");
-        if (!res.ok) return;
-        const data = (await res.json()) as PaymentCopy;
-        if (!cancelled && data?.defaultDepositPercent) {
-          setPayCopy({
-            defaultDepositPercent: data.defaultDepositPercent,
-            autoBalanceEnabled: data.autoBalanceEnabled !== false,
-            autoBalanceDaysBefore: data.autoBalanceDaysBefore ?? 7,
-            balanceTiming:
-              data.balanceTiming || FALLBACK_COPY.balanceTiming,
-          });
+        const [copyRes, priceRes] = await Promise.all([
+          fetch("/api/payment-copy"),
+          fetch("/api/pricing"),
+        ]);
+        if (copyRes.ok) {
+          const data = (await copyRes.json()) as PaymentCopy;
+          if (!cancelled && data?.defaultDepositPercent) {
+            setPayCopy({
+              defaultDepositPercent: data.defaultDepositPercent,
+              autoBalanceEnabled: data.autoBalanceEnabled !== false,
+              autoBalanceDaysBefore: data.autoBalanceDaysBefore ?? 7,
+              balanceTiming:
+                data.balanceTiming || FALLBACK_COPY.balanceTiming,
+            });
+          }
+        }
+        if (priceRes.ok) {
+          const data = await priceRes.json();
+          if (!cancelled && data.pricing) {
+            const p = data.pricing as PricingConfig & {
+              refillPriceDollars?: number;
+              guestRebookPromo?: unknown;
+            };
+            const {
+              refillPriceDollars: _d,
+              guestRebookPromo: _g,
+              ...rest
+            } = p;
+            setPricing({ ...DEFAULT_PRICING, ...rest });
+          }
         }
       } catch {
         /* keep fallback */
@@ -103,6 +127,7 @@ function BookForm() {
 
   const depositPct = payCopy.defaultDepositPercent;
   const balanceTiming = payCopy.balanceTiming;
+  const refillDollars = pricing.refillPriceCents / 100;
 
   const estimate = useMemo(() => {
     if (engagement !== "package") return null;
@@ -112,8 +137,9 @@ function BookForm() {
       units,
       serviceHours,
       promo?.discountDollars ?? 0,
+      pricing,
     );
-  }, [hookahs, hours, promo, engagement]);
+  }, [hookahs, hours, promo, engagement, pricing]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -192,8 +218,8 @@ function BookForm() {
         <ol className="book__steps">
           <li>We’ll confirm we can attend your date and venue.</li>
           <li>
-            No package deposit — guests pay ${ONSITE_UNIT_RATE} (+$
-            {REFILL_PRICE_DOLLARS} refills) or ${ONSITE_UNLIMITED_RATE}{" "}
+            No package deposit — guests pay ${pricing.onsiteUnitRate} (+$
+            {refillDollars} refills) or ${pricing.onsiteUnlimitedRate}{" "}
             unlimited per unit.
           </li>
           <li>We’ll send timing and floor details once confirmed.</li>
@@ -258,8 +284,8 @@ function BookForm() {
           <span className="book__choice-body">
             <strong>On-site sales</strong>
             <span>
-              We attend your event and sell to guests at ${ONSITE_UNIT_RATE}{" "}
-              (+${REFILL_PRICE_DOLLARS} refills) or ${ONSITE_UNLIMITED_RATE}{" "}
+              We attend your event and sell to guests at ${pricing.onsiteUnitRate}{" "}
+              (+${refillDollars} refills) or ${pricing.onsiteUnlimitedRate}{" "}
               unlimited. No package deposit from you.
             </span>
           </span>
@@ -363,7 +389,7 @@ function BookForm() {
               <li>
                 <span>
                   {estimate.extraHours} extra hour
-                  {estimate.extraHours === 1 ? "" : "s"} × {formatCad(EXTRA_HOUR_RATE)}
+                  {estimate.extraHours === 1 ? "" : "s"} × {formatCad(pricing.extraHourRate)}
                 </span>
                 <span>{formatCad(estimate.extras)}</span>
               </li>
@@ -402,12 +428,12 @@ function BookForm() {
             <li>
               <span>Standard unit</span>
               <span>
-                ${ONSITE_UNIT_RATE} · ${REFILL_PRICE_DOLLARS} refills
+                ${pricing.onsiteUnitRate} · ${refillDollars} refills
               </span>
             </li>
             <li>
               <span>Unlimited unit</span>
-              <span>${ONSITE_UNLIMITED_RATE} / night</span>
+              <span>${pricing.onsiteUnlimitedRate} / night</span>
             </li>
           </ul>
           <p className="book__estimate-note" style={{ margin: "0.65rem 0 0" }}>

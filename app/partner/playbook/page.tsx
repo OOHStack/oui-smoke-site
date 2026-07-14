@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getPartnerNightOfPlaybook } from "@/lib/ops/partner-night-of-playbook";
+import { getPricing } from "@/lib/pricing";
 import PlaybookDocument from "@/components/PlaybookDocument";
 
 export const metadata: Metadata = {
@@ -9,8 +10,9 @@ export const metadata: Metadata = {
     "What hosts and partners should expect on Oui Smoke on-site sales nights.",
 };
 
-export default function PartnerPlaybookPage() {
-  const doc = getPartnerNightOfPlaybook();
+export default async function PartnerPlaybookPage() {
+  const pricing = await getPricing();
+  const doc = getPartnerNightOfPlaybook(pricing);
   return (
     <div className="partner-playbook-page">
       <p className="partner-playbook-page__back no-print">

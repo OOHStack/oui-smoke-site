@@ -20,10 +20,8 @@ import {
 import { resolveTipSplit } from "@/lib/ops/tip-split";
 import TipSplitEditor from "@/components/admin/TipSplitEditor";
 import {
-  ONSITE_UNIT_RATE,
-  ONSITE_UNLIMITED_RATE,
-  REFILL_PRICE_CENTS,
-  REFILL_PRICE_DOLLARS,
+  DEFAULT_PRICING,
+  type PricingConfig,
 } from "@/lib/pricing";
 
 type Flavour = { id: number; name: string; active: boolean };
@@ -211,6 +209,7 @@ export default function JobDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
   const [guestRatesOpen, setGuestRatesOpen] = useState(false);
+  const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
   const [editError, setEditError] = useState("");
   const [editForm, setEditForm] = useState({
     title: "",
@@ -367,6 +366,33 @@ export default function JobDetailPage() {
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
       Notification.requestPermission();
     }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/pricing");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data.pricing) {
+          const p = data.pricing as PricingConfig & {
+            refillPriceDollars?: number;
+            guestRebookPromo?: unknown;
+          };
+          const {
+            refillPriceDollars: _d,
+            guestRebookPromo: _g,
+            ...rest
+          } = p;
+          setPricing({ ...DEFAULT_PRICING, ...rest });
+        }
+      } catch {
+        /* keep fallback */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   useSse<{
@@ -750,6 +776,7 @@ export default function JobDetailPage() {
             assignments={assignments}
             flavours={flavours}
             paymentModel={job.paymentModel}
+            pricing={pricing}
             onAction={hookahAction}
             onRefresh={load}
           />
@@ -973,6 +1000,7 @@ export default function JobDetailPage() {
               tipSplitJson={job.tipSplitJson}
               busyId={ledgerBusyId}
               tipSplitBusy={tipSplitBusy}
+              pricing={pricing}
               onApplySuggestedActual={(cents) => {
                 setOutcome((o) => ({
                   ...o,
@@ -1143,16 +1171,16 @@ export default function JobDetailPage() {
                 <div className="guest-rates-modal__tier">
                   <span className="guest-rates-modal__label">Standard</span>
                   <strong className="guest-rates-modal__price">
-                    ${ONSITE_UNIT_RATE}
+                    ${pricing.onsiteUnitRate}
                   </strong>
                   <span className="guest-rates-modal__meta">
-                    Per unit · ${REFILL_PRICE_DOLLARS} refills
+                    Per unit · ${pricing.refillPriceCents / 100} refills
                   </span>
                 </div>
                 <div className="guest-rates-modal__tier">
                   <span className="guest-rates-modal__label">Unlimited</span>
                   <strong className="guest-rates-modal__price">
-                    ${ONSITE_UNLIMITED_RATE}
+                    ${pricing.onsiteUnlimitedRate}
                   </strong>
                   <span className="guest-rates-modal__meta">
                     Per unit · unlimited refills
@@ -1160,7 +1188,7 @@ export default function JobDetailPage() {
                 </div>
               </div>
               <p className="list-meta" style={{ margin: "1rem 0 0" }}>
-                Refill add-on is {formatCadCents(REFILL_PRICE_CENTS)} when guests
+                Refill add-on is {formatCadCents(pricing.refillPriceCents)} when guests
                 take the standard rate.
               </p>
               <div className="hookah-modal__btn-stack" style={{ marginTop: "1rem" }}>
@@ -1769,6 +1797,7 @@ function JobHookahBoard({
   assignments,
   flavours,
   paymentModel,
+  pricing,
   onAction,
   onRefresh,
 }: {
@@ -1776,6 +1805,7 @@ function JobHookahBoard({
   assignments: Assignment[];
   flavours: Flavour[];
   paymentModel?: Job["paymentModel"];
+  pricing: PricingConfig;
   onAction: (body: Record<string, unknown>) => void | Promise<void>;
   onRefresh: () => void | Promise<void>;
 }) {
@@ -1821,6 +1851,7 @@ function JobHookahBoard({
           assignment={modalAssignment}
           flavours={flavours}
           paymentModel={paymentModel}
+          pricing={pricing}
           prompt={modalPrompt}
           onAction={onAction}
           onRefresh={onRefresh}
@@ -1838,6 +1869,7 @@ function HookahModal({
   assignment: a,
   flavours,
   paymentModel,
+  pricing,
   prompt,
   onAction,
   onRefresh,
@@ -1846,6 +1878,7 @@ function HookahModal({
   assignment: Assignment;
   flavours: Flavour[];
   paymentModel?: Job["paymentModel"];
+  pricing: PricingConfig;
   prompt?: string;
   onAction: (body: Record<string, unknown>) => void | Promise<void>;
   onRefresh: () => void | Promise<void>;
@@ -1910,7 +1943,7 @@ function HookahModal({
   const guestRefill = a.activeCall?.type === "refill" ? a.activeCall : null;
   const refillPrice =
     guestRefill?.priceCents ??
-    defaultRefillCentsForTier(a.guestPayTier ?? null);
+    defaultRefillCentsForTier(a.guestPayTier ?? null, pricing);
 
   function assertReadyToSend(): boolean {
     if (!flavourId && !assignmentHasFlavour(a)) {
@@ -2006,7 +2039,8 @@ function HookahModal({
           <section className="hookah-modal__section">
             <h3 className="hookah-modal__section-title">Guest pay tier</h3>
             <p className="hookah-modal__hint">
-              Required before send-out. Standard charges ${REFILL_PRICE_DOLLARS}{" "}
+              Required before send-out. Standard charges $
+              {pricing.refillPriceCents / 100}{" "}
               refills; Unlimited does not.
             </p>
             <div className="guest-tier-picker__row">
@@ -2023,7 +2057,7 @@ function HookahModal({
                   })
                 }
               >
-                Standard · ${ONSITE_UNIT_RATE}
+                Standard · ${pricing.onsiteUnitRate}
               </button>
               <button
                 type="button"
@@ -2038,7 +2072,7 @@ function HookahModal({
                   })
                 }
               >
-                Unlimited · ${ONSITE_UNLIMITED_RATE}
+                Unlimited · ${pricing.onsiteUnlimitedRate}
               </button>
             </div>
           </section>
@@ -2059,7 +2093,7 @@ function HookahModal({
                   {" · "}
                   {formatMoney(
                     a.activeCall.priceCents ??
-                      defaultRefillCentsForTier(a.guestPayTier ?? null),
+                      defaultRefillCentsForTier(a.guestPayTier ?? null, pricing),
                   )}
                   {a.activeCall.priceAgreed ? " · guest agreed" : ""}
                   {" — prep a new head and take the payment terminal."}
@@ -2102,7 +2136,7 @@ function HookahModal({
                       flavourLabel: a.activeCall!.flavourLabel ?? undefined,
                       priceCents:
                         a.activeCall!.priceCents ??
-                        defaultRefillCentsForTier(a.guestPayTier ?? null),
+                        defaultRefillCentsForTier(a.guestPayTier ?? null, pricing),
                       source: "guest",
                       note: note || undefined,
                     })

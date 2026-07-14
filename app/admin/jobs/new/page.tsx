@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PAYMENT_MODELS } from "@/lib/payment-model";
+import { DEFAULT_PRICING, type PricingConfig } from "@/lib/pricing";
 
 type Hookah = {
   id: number;
@@ -51,6 +52,41 @@ export default function NewJobPage() {
         setHookahs(list.filter((h: Hookah) => h.status === "available"));
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/pricing");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data.pricing) {
+          const p = data.pricing as PricingConfig & {
+            refillPriceDollars?: number;
+            guestRebookPromo?: unknown;
+          };
+          const {
+            refillPriceDollars: _d,
+            guestRebookPromo: _g,
+            ...rest
+          } = p;
+          const pricing = { ...DEFAULT_PRICING, ...rest };
+          setForm((f) => ({
+            ...f,
+            checkIntervalMinutes:
+              f.checkIntervalMinutes === "45"
+                ? String(pricing.defaultCheckIntervalMinutes)
+                : f.checkIntervalMinutes,
+          }));
+        }
+      } catch {
+        /* keep fallback */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function toggleHookah(id: number) {

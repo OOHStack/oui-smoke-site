@@ -2,31 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  BRANDING_LARGE,
-  BRANDING_MEDIUM,
-  BRANDING_MIN,
-  EXTRA_HOUR_RATE,
-  HST_RATE,
-  INCLUDED_HOURS,
-  LED_RATE,
-  MIN_PACKAGE_DOLLARS,
-  MIN_PACKAGE_HOOKAHS,
-  ONSITE_UNIT_RATE,
-  ONSITE_UNLIMITED_RATE,
-  REFILL_PRICE_DOLLARS,
-  WATER_RATE,
+  DEFAULT_PRICING,
   estimateBooking,
   formatCad,
+  type PricingConfig,
 } from "@/lib/pricing";
 
 export type PartnerMode = "package" | "on_site";
 
-const INTRO_HOOKAHS = MIN_PACKAGE_HOOKAHS;
-const INTRO_HOURS = INCLUDED_HOURS;
 const MAX_HOURS = 12;
 const MAX_HOOKAHS = 40;
 
-type BrandingSize = typeof BRANDING_MEDIUM | typeof BRANDING_LARGE;
+type BrandingSize = number;
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
@@ -38,16 +25,48 @@ type Props = {
 };
 
 export default function PartnerEstimate({ mode, onModeChange }: Props) {
-  const [hookahs, setHookahs] = useState(INTRO_HOOKAHS);
-  const [hours, setHours] = useState(INTRO_HOURS);
+  const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
+  const [hookahs, setHookahs] = useState(DEFAULT_PRICING.minPackageHookahs);
+  const [hours, setHours] = useState(DEFAULT_PRICING.includedHours);
   const [led, setLed] = useState(false);
   const [water, setWater] = useState(false);
   const [branding, setBranding] = useState(false);
-  const [brandingSize, setBrandingSize] = useState<BrandingSize>(BRANDING_MEDIUM);
+  const [brandingSize, setBrandingSize] = useState<BrandingSize>(
+    DEFAULT_PRICING.brandingMedium,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/pricing");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data.pricing) {
+          const p = data.pricing as PricingConfig & {
+            refillPriceDollars?: number;
+            guestRebookPromo?: unknown;
+          };
+          const {
+            refillPriceDollars: _d,
+            guestRebookPromo: _g,
+            ...rest
+          } = p;
+          setPricing({ ...DEFAULT_PRICING, ...rest });
+        }
+      } catch {
+        /* keep defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isPackage = mode === "package";
-  const minHookahs = isPackage ? MIN_PACKAGE_HOOKAHS : 1;
-  const minHours = isPackage ? INCLUDED_HOURS : 1;
+  const minHookahs = isPackage ? pricing.minPackageHookahs : 1;
+  const minHours = isPackage ? pricing.includedHours : 1;
+  const refillPriceDollars = pricing.refillPriceCents / 100;
 
   useEffect(() => {
     setHookahs((n) => clamp(n, minHookahs, MAX_HOOKAHS));
@@ -55,8 +74,8 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
   }, [minHookahs, minHours]);
 
   const estimate = useMemo(
-    () => (isPackage ? estimateBooking(hookahs, hours) : null),
-    [hookahs, hours, isPackage],
+    () => (isPackage ? estimateBooking(hookahs, hours, 0, pricing) : null),
+    [hookahs, hours, isPackage, pricing],
   );
 
   const addOns = useMemo(() => {
@@ -70,14 +89,14 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
         hst: 0,
       };
     }
-    const ledTotal = led ? hookahs * LED_RATE : 0;
-    const waterTotal = water ? hookahs * WATER_RATE : 0;
-    const brandingUnits = branding ? Math.max(BRANDING_MIN, hookahs) : 0;
+    const ledTotal = led ? hookahs * pricing.ledRate : 0;
+    const waterTotal = water ? hookahs * pricing.waterRate : 0;
+    const brandingUnits = branding ? Math.max(pricing.brandingMin, hookahs) : 0;
     const brandingTotal = brandingUnits * brandingSize;
     const subtotal = ledTotal + waterTotal + brandingTotal;
-    const hst = Math.round(subtotal * HST_RATE * 100) / 100;
+    const hst = Math.round(subtotal * pricing.hstRate * 100) / 100;
     return { ledTotal, waterTotal, brandingUnits, brandingTotal, subtotal, hst };
-  }, [hookahs, led, water, branding, brandingSize, isPackage]);
+  }, [hookahs, led, water, branding, brandingSize, isPackage, pricing]);
 
   const total = useMemo(() => {
     if (!estimate) return null;
@@ -85,7 +104,8 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
   }, [estimate, addOns]);
 
   const bookHref = `/book?type=${mode}&hookahs=${hookahs}&hours=${hours}`;
-  const sizeLabel = brandingSize === BRANDING_LARGE ? "large" : "medium";
+  const sizeLabel = brandingSize === pricing.brandingLarge ? "large" : "medium";
+  const hstPercent = Math.round(pricing.hstRate * 100);
 
   return (
     <section className="partner-estimate" aria-label="Event estimate">
@@ -93,7 +113,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
         <h2>{isPackage ? "Estimate your event" : "Plan on-site sales"}</h2>
         <p>
           {isPackage
-            ? `From ${formatCad(MIN_PACKAGE_DOLLARS)} · min ${MIN_PACKAGE_HOOKAHS} hookahs · up to ${INCLUDED_HOURS} hrs included · $${EXTRA_HOUR_RATE}/extra hour · HST in total.`
+            ? `From ${formatCad(pricing.minPackageDollars)} · min ${pricing.minPackageHookahs} hookahs · up to ${pricing.includedHours} hrs included · $${pricing.extraHourRate}/extra hour · HST in total.`
             : "We staff your event and sell to guests. No host package deposit — set units and hours for the request."}
         </p>
       </div>
@@ -124,7 +144,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
           <span className="partner-stepper__label" id="partner-hookahs-label">
             {isPackage ? (
               <>
-                Hookahs <em>(min {MIN_PACKAGE_HOOKAHS})</em>
+                Hookahs <em>(min {pricing.minPackageHookahs})</em>
               </>
             ) : (
               "Hookahs to bring"
@@ -163,7 +183,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
           <span className="partner-stepper__label" id="partner-hours-label">
             {isPackage ? (
               <>
-                Hours <em>(up to {INCLUDED_HOURS} incl.)</em>
+                Hours <em>(up to {pricing.includedHours} incl.)</em>
               </>
             ) : (
               "Hours on site"
@@ -209,7 +229,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
             />
             <span className="partner-toggle__copy">
               <strong>LED base</strong>
-              <em>${LED_RATE} / hookah</em>
+              <em>${pricing.ledRate} / hookah</em>
             </span>
           </label>
           <label className={`partner-toggle${water ? " is-on" : ""}`}>
@@ -220,7 +240,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
             />
             <span className="partner-toggle__copy">
               <strong>Water enhancers</strong>
-              <em>${WATER_RATE} / hookah</em>
+              <em>${pricing.waterRate} / hookah</em>
             </span>
           </label>
           <div
@@ -234,7 +254,10 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
               />
               <span className="partner-toggle__copy">
                 <strong>Unit branding</strong>
-                <em>Min. {BRANDING_MIN} · ${BRANDING_MEDIUM}–${BRANDING_LARGE}</em>
+                <em>
+                  Min. {pricing.brandingMin} · ${pricing.brandingMedium}–$
+                  {pricing.brandingLarge}
+                </em>
               </span>
             </label>
             {branding ? (
@@ -246,11 +269,11 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
                     setBrandingSize(Number(e.target.value) as BrandingSize)
                   }
                 >
-                  <option value={BRANDING_MEDIUM}>
-                    Medium · ${BRANDING_MEDIUM}
+                  <option value={pricing.brandingMedium}>
+                    Medium · ${pricing.brandingMedium}
                   </option>
-                  <option value={BRANDING_LARGE}>
-                    Large · ${BRANDING_LARGE}
+                  <option value={pricing.brandingLarge}>
+                    Large · ${pricing.brandingLarge}
                   </option>
                 </select>
               </label>
@@ -281,13 +304,14 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
               <li>
                 <span>
                   {estimate.extraHours} extra hour
-                  {estimate.extraHours === 1 ? "" : "s"} × {formatCad(EXTRA_HOUR_RATE)}
+                  {estimate.extraHours === 1 ? "" : "s"} ×{" "}
+                  {formatCad(pricing.extraHourRate)}
                 </span>
                 <span>{formatCad(estimate.extras)}</span>
               </li>
             ) : (
               <li className="partner-estimate__lines--muted">
-                <span>Up to {INCLUDED_HOURS} hours included</span>
+                <span>Up to {pricing.includedHours} hours included</span>
                 <span>—</span>
               </li>
             )}
@@ -312,18 +336,20 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
               </li>
             ) : null}
             <li>
-              <span>HST (13%)</span>
+              <span>HST ({hstPercent}%)</span>
               <span>{formatCad(estimate.hst + addOns.hst)}</span>
             </li>
           </ul>
-          {branding && hookahs < BRANDING_MIN ? (
+          {branding && hookahs < pricing.brandingMin ? (
             <p className="partner-estimate__note">
-              Branding bills for a minimum of {BRANDING_MIN} units.
+              Branding bills for a minimum of {pricing.brandingMin} units.
             </p>
           ) : null}
           <p className="partner-estimate__note">
-            Extra hours {formatCad(EXTRA_HOUR_RATE)} each. Refills:{" "}
-            {hookahs <= 4 ? "1 included · $30 after" : "unlimited at this tier"}
+            Extra hours {formatCad(pricing.extraHourRate)} each. Refills:{" "}
+            {hookahs <= 4
+              ? `1 included · $${refillPriceDollars} after`
+              : "unlimited at this tier"}
           </p>
         </div>
       ) : null}
@@ -349,12 +375,12 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
             <li>
               <span>Guest · standard</span>
               <span>
-                ${ONSITE_UNIT_RATE} · ${REFILL_PRICE_DOLLARS} refills
+                ${pricing.onsiteUnitRate} · ${refillPriceDollars} refills
               </span>
             </li>
             <li>
               <span>Guest · unlimited</span>
-              <span>${ONSITE_UNLIMITED_RATE} / unit</span>
+              <span>${pricing.onsiteUnlimitedRate} / unit</span>
             </li>
             <li className="partner-estimate__lines--muted">
               <span>Package deposit</span>
@@ -362,8 +388,8 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
             </li>
           </ul>
           <p className="partner-estimate__intro">
-            Guests choose ${ONSITE_UNIT_RATE} with paid refills, or $
-            {ONSITE_UNLIMITED_RATE} with unlimited refills for the night.
+            Guests choose ${pricing.onsiteUnitRate} with paid refills, or $
+            {pricing.onsiteUnlimitedRate} with unlimited refills for the night.
           </p>
           <p className="partner-estimate__note">
             We’ll confirm we can staff your date and venue before locking in.

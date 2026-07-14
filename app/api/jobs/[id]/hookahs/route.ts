@@ -22,6 +22,7 @@ import {
   isGuestPayTier,
   type GuestPayTier,
 } from "@/lib/ops/guest-pay";
+import { getPricing } from "@/lib/pricing";
 import { randomUUID } from "crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -784,8 +785,10 @@ export async function POST(request: Request, context: RouteContext) {
           typeof body.serviceRequestId === "number" ? body.serviceRequestId : null;
         const note = typeof body.note === "string" ? body.note.trim() : "";
         const source = body.source === "guest" ? "guest" : "staff";
+        const pricing = await getPricing();
         const defaultPrice = defaultRefillCentsForTier(
           assignment.guestPayTier as GuestPayTier | null,
+          pricing,
         );
         const priceCents =
           typeof body.priceCents === "number" ? body.priceCents : defaultPrice;
@@ -1111,8 +1114,12 @@ export async function POST(request: Request, context: RouteContext) {
           return NextResponse.json({ ok: true, alreadyPaid: true });
         }
 
-        const amountCents = guestPayTierUnitCents(assignment.guestPayTier);
-        const label = guestPayTierLabel(assignment.guestPayTier);
+        const pricing = await getPricing();
+        const amountCents = guestPayTierUnitCents(
+          assignment.guestPayTier,
+          pricing,
+        );
+        const label = guestPayTierLabel(assignment.guestPayTier, pricing);
 
         if (body.channel === "terminal") {
           const { pushJobPaymentToTerminal } = await import(

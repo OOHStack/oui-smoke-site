@@ -1,9 +1,8 @@
 import { format } from "date-fns";
 import { getSiteUrl } from "@/lib/guest";
 import {
-  ONSITE_UNIT_RATE,
-  ONSITE_UNLIMITED_RATE,
-  REFILL_PRICE_DOLLARS,
+  DEFAULT_PRICING,
+  type PricingConfig,
 } from "@/lib/pricing";
 
 function escapeHtml(value: string) {
@@ -12,6 +11,11 @@ function escapeHtml(value: string) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function onsiteRatesLine(pricing: PricingConfig = DEFAULT_PRICING) {
+  const refill = pricing.refillPriceCents / 100;
+  return `$${pricing.onsiteUnitRate} + $${refill} refills, or $${pricing.onsiteUnlimitedRate} unlimited`;
 }
 
 function moneyCad(cents: number) {
@@ -164,6 +168,7 @@ export function bookingInquiryClientEmail(input: {
   depositPercent?: number;
   quotedCents?: number | null;
   balanceTiming?: string;
+  pricing?: PricingConfig;
 }) {
   const when = input.startsAt
     ? format(input.startsAt, "EEEE, MMM d · h:mm a")
@@ -171,9 +176,10 @@ export function bookingInquiryClientEmail(input: {
   const model = input.paymentModel || "client_deposit";
   const pct = input.depositPercent ?? 50;
   const timing = input.balanceTiming || "before the event";
+  const rates = input.pricing ?? DEFAULT_PRICING;
   const nextStep =
     model === "pay_at_event"
-      ? `No deposit is required — guests pay on-site ($${ONSITE_UNIT_RATE} + $${REFILL_PRICE_DOLLARS} refills, or $${ONSITE_UNLIMITED_RATE} unlimited). We’ll confirm timing and setup with you shortly.`
+      ? `No deposit is required — guests pay on-site (${onsiteRatesLine(rates)}). We’ll confirm timing and setup with you shortly.`
       : model === "complimentary"
         ? "This booking is complimentary. We’ll confirm timing and setup with you shortly."
         : `A ~${pct}% deposit locks your date. The remaining balance is due ${timing} — we’ll email a final payment link then.`;
@@ -406,14 +412,17 @@ export function bookingConfirmedClientEmail(input: {
   location?: string | null;
   clientPortalUrl?: string | null;
   paymentModel?: "client_deposit" | "pay_at_event" | "complimentary";
+  pricing?: PricingConfig;
 }) {
   const when = input.startsAt
     ? format(input.startsAt, "EEEE, MMM d · h:mm a")
     : "";
   const model = input.paymentModel || "client_deposit";
+  const rates = input.pricing ?? DEFAULT_PRICING;
+  const refill = rates.refillPriceCents / 100;
   const body =
     model === "pay_at_event"
-      ? `Your Oui Smoke booking is confirmed. Guests pay $${ONSITE_UNIT_RATE} (+$${REFILL_PRICE_DOLLARS} refills) or $${ONSITE_UNLIMITED_RATE} unlimited on site — no client deposit was required.`
+      ? `Your Oui Smoke booking is confirmed. Guests pay $${rates.onsiteUnitRate} (+$${refill} refills) or $${rates.onsiteUnlimitedRate} unlimited on site — no client deposit was required.`
       : model === "complimentary"
         ? "Your Oui Smoke booking is confirmed. This one is on us — we’re looking forward to hosting."
         : "Your Oui Smoke booking is confirmed. We’re looking forward to hosting.";

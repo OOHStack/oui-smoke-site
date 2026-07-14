@@ -2,7 +2,7 @@ import { loadServeSnapshot } from "@/lib/serve-snapshot";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { flavours, hookahs, jobHookahs, jobs, serviceRequests } from "@/lib/db/schema";
-import { REFILL_PRICE_CENTS } from "@/lib/pricing";
+import { getPricing } from "@/lib/pricing";
 import { notifyStaffPush } from "@/lib/push";
 import { and, eq, inArray } from "drizzle-orm";
 
@@ -128,7 +128,8 @@ export async function POST(request: Request, context: RouteContext) {
 
     flavourId = flav.id;
     flavourLabel = flav.name;
-    priceCents = REFILL_PRICE_CENTS;
+    const pricing = await getPricing();
+    priceCents = pricing.refillPriceCents;
     priceAgreed = true;
   }
 

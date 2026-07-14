@@ -4,6 +4,7 @@ import { hookahOutOnOtherActiveJob } from "@/lib/fleet";
 import { createClientToken } from "@/lib/guest";
 import { getPaymentSettings } from "@/lib/payment-settings";
 import { normalizePaymentModel } from "@/lib/payment-model";
+import { getPricing } from "@/lib/pricing";
 import { jobEvents, jobHookahs, jobs } from "@/lib/db/schema";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -112,6 +113,7 @@ export async function POST(request: Request) {
     }
 
     const settings = await getPaymentSettings();
+    const pricing = await getPricing();
     const [job] = await db
       .insert(jobs)
       .values({
@@ -122,8 +124,9 @@ export async function POST(request: Request) {
         location: body.location ?? "",
         startsAt: body.startsAt ? new Date(body.startsAt) : null,
         endsAt: body.endsAt ? new Date(body.endsAt) : null,
-        bookedHours: body.bookedHours ?? 4,
-        checkIntervalMinutes: body.checkIntervalMinutes ?? 45,
+        bookedHours: body.bookedHours ?? pricing.includedHours,
+        checkIntervalMinutes:
+          body.checkIntervalMinutes ?? pricing.defaultCheckIntervalMinutes,
         guestCount: body.guestCount ?? null,
         quotedCents: body.quotedCents ?? null,
         depositPercent:

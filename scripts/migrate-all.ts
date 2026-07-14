@@ -314,6 +314,45 @@ async function main() {
   await sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tip_split_json text DEFAULT ''`;
   console.log("✓ guest pay tier + onsite_unit + terminal + tip split");
 
+  // --- site settings (Control Center rates + default check interval) ---
+  await sql`
+    CREATE TABLE IF NOT EXISTS site_settings (
+      id integer PRIMARY KEY DEFAULT 1,
+      pricing_json jsonb NOT NULL DEFAULT '{}'::jsonb,
+      default_check_interval_minutes integer NOT NULL DEFAULT 45,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    INSERT INTO site_settings (id, pricing_json, default_check_interval_minutes)
+    VALUES (
+      1,
+      '{
+        "refillPriceCents": 3000,
+        "onsiteUnitRate": 80,
+        "onsiteUnlimitedRate": 100,
+        "guestRebookCode": "OUI25",
+        "guestRebookDiscountDollars": 25,
+        "guestRebookLabel": "$25 off your next booking",
+        "includedHours": 4,
+        "minPackageHookahs": 4,
+        "minPackageDollars": 450,
+        "midTierRate": 95,
+        "highTierRate": 85,
+        "extraHourRate": 150,
+        "hstRate": 0.13,
+        "ledRate": 15,
+        "waterRate": 8,
+        "brandingMin": 4,
+        "brandingMedium": 15,
+        "brandingLarge": 20
+      }'::jsonb,
+      45
+    )
+    ON CONFLICT (id) DO NOTHING
+  `;
+  console.log("✓ site_settings");
+
   // --- verify ---
   console.log("\nVerifying schema…");
   const requiredTables = [
@@ -324,6 +363,7 @@ async function main() {
     "ops_users",
     "payments",
     "payment_settings",
+    "site_settings",
   ];
   const requiredColumns: Record<string, string[]> = {
     job_hookahs: [

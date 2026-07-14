@@ -1,12 +1,9 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import {
-  DEPOSIT_PERCENT_PRESETS,
-  type JobMoneyStatus,
-} from "@/lib/job-balance";
+import { type JobMoneyStatus } from "@/lib/job-balance";
 
 type Settings = {
   defaultDepositPercent: number;
@@ -121,17 +118,14 @@ function statusBadgeClass(status: JobMoneyStatus) {
 
 export default function AdminPaymentsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [draft, setDraft] = useState<Settings | null>(null);
   const [jobs, setJobs] = useState<OverviewJob[]>([]);
   const [counts, setCounts] = useState<Counts | null>(null);
   const [filter, setFilter] = useState("attention");
   const [squareConfigured, setSquareConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [showDefaults, setShowDefaults] = useState(false);
 
   const loadSettings = useCallback(async () => {
     const [sessionRes, settingsRes] = await Promise.all([
@@ -145,7 +139,6 @@ export default function AdminPaymentsPage() {
     if (settingsRes.ok) {
       const data = await settingsRes.json();
       setSettings(data.settings);
-      setDraft(data.settings);
     }
   }, []);
 
@@ -170,31 +163,6 @@ export default function AdminPaymentsPage() {
     })();
   }, [loadSettings, loadOverview]);
 
-  async function saveSettings(e: FormEvent) {
-    e.preventDefault();
-    if (!draft || !isAdmin) return;
-    setSaving(true);
-    setMsg("");
-    setError("");
-    try {
-      const res = await fetch("/api/payment-settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "Couldn’t save settings");
-        return;
-      }
-      setSettings(data.settings);
-      setDraft(data.settings);
-      setMsg("Payment defaults saved — book page and emails will match.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   const guide = useMemo(
     () => hubGuide({ squareConfigured, counts, settings }),
     [squareConfigured, counts, settings],
@@ -212,10 +180,6 @@ export default function AdminPaymentsPage() {
     packageCount > 0
       ? Math.min(100, Math.round((paidCount / packageCount) * 100))
       : 0;
-
-  const balanceTiming = draft
-    ? timingPhrase(draft.autoBalanceDaysBefore, draft.autoBalanceEnabled)
-    : "about a week before the event";
 
   const stageTiles = [
     {
@@ -264,9 +228,7 @@ export default function AdminPaymentsPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Payments</h1>
-          <p className="page-sub">
-            Track package money · set defaults that drive client copy
-          </p>
+          <p className="page-sub">Track package deposits and balances</p>
         </div>
       </div>
 
@@ -448,174 +410,25 @@ export default function AdminPaymentsPage() {
       </section>
 
       <section className="panel collect-section collect-section--muted">
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={() => setShowDefaults((v) => !v)}
-        >
-          {showDefaults
-            ? "Hide defaults & automations"
-            : "2 · Defaults & automations"}
-        </button>
-
-        {showDefaults ? (
-          <div className="collect-advanced">
-            <p className="list-meta" style={{ margin: 0 }}>
-              These drive new jobs, the book page, and client emails. Deposit
-              default: <strong>{draft?.defaultDepositPercent ?? 50}%</strong>.
-              Balance due: <strong>{balanceTiming}</strong>.
-            </p>
-
-            {draft ? (
-              <form onSubmit={saveSettings}>
-                <div className="field">
-                  <label>Default deposit %</label>
-                  <div className="deposit-pct">
-                    {DEPOSIT_PERCENT_PRESETS.map((pct) => (
-                      <button
-                        key={pct}
-                        type="button"
-                        className={`chip${draft.defaultDepositPercent === pct ? " active" : ""}`}
-                        disabled={!isAdmin}
-                        onClick={() =>
-                          setDraft({ ...draft, defaultDepositPercent: pct })
-                        }
-                      >
-                        {pct}%
-                      </button>
-                    ))}
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      disabled={!isAdmin}
-                      value={draft.defaultDepositPercent}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          defaultDepositPercent: Math.min(
-                            100,
-                            Math.max(1, Number(e.target.value) || 50),
-                          ),
-                        })
-                      }
-                      aria-label="Default deposit percent"
-                    />
-                  </div>
-                </div>
-
-                <label className="pay-toggle">
-                  <input
-                    type="checkbox"
-                    checked={draft.autoDepositOnBooking}
-                    disabled={!isAdmin}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        autoDepositOnBooking: e.target.checked,
-                      })
-                    }
-                  />
-                  <span>
-                    <strong>Auto-email deposit on website booking</strong>
-                    <em>When a package inquiry includes an estimate</em>
-                  </span>
-                </label>
-
-                <label className="pay-toggle">
-                  <input
-                    type="checkbox"
-                    checked={draft.autoDepositOnQuote}
-                    disabled={!isAdmin}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        autoDepositOnQuote: e.target.checked,
-                      })
-                    }
-                  />
-                  <span>
-                    <strong>Auto-email deposit when quote is saved</strong>
-                    <em>Only if no deposit link exists yet</em>
-                  </span>
-                </label>
-
-                <label className="pay-toggle">
-                  <input
-                    type="checkbox"
-                    checked={draft.autoBalanceEnabled}
-                    disabled={!isAdmin}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        autoBalanceEnabled: e.target.checked,
-                      })
-                    }
-                  />
-                  <span>
-                    <strong>Auto-email balance before the event</strong>
-                    <em>
-                      After deposit is paid, send the remaining balance when the
-                      event is inside the window
-                    </em>
-                  </span>
-                </label>
-
-                <div className="field">
-                  <label htmlFor="balance-days">Days before event</label>
-                  <input
-                    id="balance-days"
-                    type="number"
-                    min={0}
-                    max={60}
-                    disabled={!isAdmin || !draft.autoBalanceEnabled}
-                    value={draft.autoBalanceDaysBefore}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        autoBalanceDaysBefore: Math.min(
-                          60,
-                          Math.max(0, Number(e.target.value) || 7),
-                        ),
-                      })
-                    }
-                    style={{ width: "5.5rem" }}
-                  />
-                  <p className="list-meta" style={{ marginTop: "0.35rem" }}>
-                    Clients see “due {balanceTiming}” on /book and in emails.
-                  </p>
-                </div>
-
-                {isAdmin ? (
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={
-                      saving ||
-                      JSON.stringify(draft) === JSON.stringify(settings)
-                    }
-                  >
-                    {saving ? "Saving…" : "Save defaults"}
-                  </button>
-                ) : (
-                  <p className="list-meta">
-                    Only admins can change payment defaults.
-                  </p>
-                )}
-              </form>
-            ) : (
-              <p className="collect-empty">Loading settings…</p>
-            )}
-          </div>
+        <h2 className="panel-title" style={{ marginTop: 0 }}>
+          Defaults &amp; automations
+        </h2>
+        <p className="list-meta" style={{ margin: "0 0 0.65rem" }}>
+          Deposit {settings?.defaultDepositPercent ?? 50}% · balance{" "}
+          {settings
+            ? timingPhrase(
+                settings.autoBalanceDaysBefore,
+                settings.autoBalanceEnabled,
+              )
+            : "…"}
+        </p>
+        {isAdmin ? (
+          <Link href="/admin/settings?tab=payments" className="btn btn-sm">
+            Edit defaults in Settings → Payments
+          </Link>
         ) : (
-          <p className="list-meta" style={{ margin: "0.65rem 0 0" }}>
-            Deposit {settings?.defaultDepositPercent ?? 50}% · balance{" "}
-            {settings
-              ? timingPhrase(
-                  settings.autoBalanceDaysBefore,
-                  settings.autoBalanceEnabled,
-                )
-              : "…"}
+          <p className="list-meta" style={{ margin: 0 }}>
+            Only admins can change payment defaults (Settings → Payments).
           </p>
         )}
       </section>

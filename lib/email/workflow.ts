@@ -14,6 +14,7 @@ import {
   balanceTimingPhrase,
   getPaymentSettings,
 } from "@/lib/payment-settings";
+import { getPricing } from "@/lib/pricing";
 import {
   normalizePaymentModel,
   requiresClientDeposit,
@@ -61,6 +62,7 @@ export async function notifyBookingInquiry(job: JobLike & { promoCode?: string }
   const startsAt = asDate(job.startsAt);
   const paymentModel = normalizePaymentModel(job.paymentModel);
   const copy = await balanceCopy();
+  const pricing = await getPricing();
   const to = clientTo(job);
   if (to) {
     const msg = bookingInquiryClientEmail({
@@ -72,6 +74,7 @@ export async function notifyBookingInquiry(job: JobLike & { promoCode?: string }
       depositPercent: job.depositPercent ?? copy.depositPercent,
       quotedCents: job.quotedCents ?? null,
       balanceTiming: copy.balanceTiming,
+      pricing,
     });
     await sendEmail({ to, ...msg });
   }
@@ -160,12 +163,14 @@ export async function notifyDepositPaid(opts: {
 export async function notifyBookingConfirmed(job: JobLike) {
   const to = clientTo(job);
   if (!to) return false;
+  const pricing = await getPricing();
   const msg = bookingConfirmedClientEmail({
     clientName: job.clientName,
     startsAt: asDate(job.startsAt),
     location: job.location,
     clientPortalUrl: job.clientToken ? clientPortalUrl(job.clientToken) : null,
     paymentModel: normalizePaymentModel(job.paymentModel),
+    pricing,
   });
   return sendEmail({ to, ...msg });
 }
@@ -173,9 +178,10 @@ export async function notifyBookingConfirmed(job: JobLike) {
 export async function notifyJobCompleted(job: JobLike) {
   const to = clientTo(job);
   if (!to) return false;
+  const pricing = await getPricing();
   const msg = jobCompletedClientEmail({
     clientName: job.clientName,
-    rebookUrl: `${getSiteUrl()}/book?code=OUI25`,
+    rebookUrl: `${getSiteUrl()}/book?code=${pricing.guestRebookCode}`,
   });
   return sendEmail({ to, ...msg });
 }

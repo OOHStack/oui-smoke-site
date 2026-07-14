@@ -7,7 +7,7 @@ import {
   jobs,
   serviceRequests,
 } from "@/lib/db/schema";
-import { GUEST_REBOOK_PROMO, REFILL_PRICE_CENTS } from "@/lib/pricing";
+import { getPricing } from "@/lib/pricing";
 import { asc, desc, eq } from "drizzle-orm";
 
 /** Default minutes from “On the way” until guest should expect staff. */
@@ -15,6 +15,7 @@ export const GUEST_ETA_MINUTES = 5;
 
 export async function loadServeSnapshot(token: string) {
   const db = getDb();
+  const pricing = await getPricing();
   const [assignment] = await db
     .select({
       id: jobHookahs.id,
@@ -154,7 +155,7 @@ export async function loadServeSnapshot(token: string) {
     sentOutAt: assignment.sentOutAt,
     returnedAt: assignment.returnedAt,
     refillCount: assignment.refillCount ?? 0,
-    refillPriceCents: REFILL_PRICE_CENTS,
+    refillPriceCents: pricing.refillPriceCents,
     flavours: menu,
     active: !!active,
     sessionEnded,
@@ -167,10 +168,10 @@ export async function loadServeSnapshot(token: string) {
         }
       : null,
     rebookPromo: {
-      code: GUEST_REBOOK_PROMO.code,
-      discountDollars: GUEST_REBOOK_PROMO.discountDollars,
-      label: GUEST_REBOOK_PROMO.label,
-      bookUrl: `/book?code=${GUEST_REBOOK_PROMO.code}`,
+      code: pricing.guestRebookCode,
+      discountDollars: pricing.guestRebookDiscountDollars,
+      label: pricing.guestRebookLabel,
+      bookUrl: `/book?code=${pricing.guestRebookCode}`,
     },
     activeRequest,
     recentRequests: requests.slice(0, 5),

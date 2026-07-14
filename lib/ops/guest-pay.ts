@@ -2,6 +2,8 @@ import {
   ONSITE_UNIT_RATE,
   ONSITE_UNLIMITED_RATE,
   REFILL_PRICE_CENTS,
+  type PricingConfig,
+  DEFAULT_PRICING,
 } from "@/lib/pricing";
 
 export type GuestPayTier = "standard" | "unlimited";
@@ -10,24 +12,35 @@ export function isGuestPayTier(value: unknown): value is GuestPayTier {
   return value === "standard" || value === "unlimited";
 }
 
-export function guestPayTierUnitCents(tier: GuestPayTier): number {
+export function guestPayTierUnitCents(
+  tier: GuestPayTier,
+  pricing: PricingConfig = DEFAULT_PRICING,
+): number {
   return tier === "unlimited"
-    ? ONSITE_UNLIMITED_RATE * 100
-    : ONSITE_UNIT_RATE * 100;
+    ? pricing.onsiteUnlimitedRate * 100
+    : pricing.onsiteUnitRate * 100;
 }
 
-export function guestPayTierLabel(tier: GuestPayTier | null | undefined): string {
-  if (tier === "unlimited") return `Unlimited · $${ONSITE_UNLIMITED_RATE}`;
-  if (tier === "standard") return `Standard · $${ONSITE_UNIT_RATE}`;
+export function guestPayTierLabel(
+  tier: GuestPayTier | null | undefined,
+  pricing: PricingConfig = DEFAULT_PRICING,
+): string {
+  if (tier === "unlimited") {
+    return `Unlimited · $${pricing.onsiteUnlimitedRate}`;
+  }
+  if (tier === "standard") {
+    return `Standard · $${pricing.onsiteUnitRate}`;
+  }
   return "No tier";
 }
 
 /** Default refill charge for a unit’s guest-pay tier. */
 export function defaultRefillCentsForTier(
   tier: GuestPayTier | null | undefined,
+  pricing: PricingConfig = DEFAULT_PRICING,
 ): number {
   if (tier === "unlimited") return 0;
-  return REFILL_PRICE_CENTS;
+  return pricing.refillPriceCents;
 }
 
 export type GuestLedgerPayment = {
@@ -43,7 +56,9 @@ export function summarizeGuestLedger(opts: {
     guestPayTier: GuestPayTier | null | undefined;
   }>;
   payments: GuestLedgerPayment[];
+  pricing?: PricingConfig;
 }) {
+  const pricing = opts.pricing ?? DEFAULT_PRICING;
   const succeeded = opts.payments.filter((p) => p.status === "succeeded");
 
   let unitChargedCents = 0;
@@ -53,7 +68,7 @@ export function summarizeGuestLedger(opts: {
 
   for (const a of opts.assignments) {
     if (a.guestPayTier) {
-      unitChargedCents += guestPayTierUnitCents(a.guestPayTier);
+      unitChargedCents += guestPayTierUnitCents(a.guestPayTier, pricing);
     }
   }
 
@@ -74,3 +89,10 @@ export function summarizeGuestLedger(opts: {
     suggestedActualCents,
   };
 }
+
+/** @deprecated Prefer passing pricing — sync fallbacks only */
+export const FALLBACK_ONSITE = {
+  unit: ONSITE_UNIT_RATE,
+  unlimited: ONSITE_UNLIMITED_RATE,
+  refillCents: REFILL_PRICE_CENTS,
+};

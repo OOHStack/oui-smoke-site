@@ -4,7 +4,7 @@ import { createClientToken } from "@/lib/guest";
 import { notifyBookingInquiry } from "@/lib/email/workflow";
 import { getPaymentSettings } from "@/lib/payment-settings";
 import { normalizePaymentModel } from "@/lib/payment-model";
-import { estimateBooking } from "@/lib/pricing";
+import { estimateBooking, getPricing } from "@/lib/pricing";
 import { jobEvents, jobs } from "@/lib/db/schema";
 import { NextResponse } from "next/server";
 
@@ -82,13 +82,16 @@ export async function POST(request: Request) {
     Boolean,
   );
 
+  const pricing = await getPricing();
+  const promoDollars =
+    promoCode &&
+    promoCode === pricing.guestRebookCode.toUpperCase()
+      ? pricing.guestRebookDiscountDollars
+      : 0;
+
   const estimate =
     paymentModel === "client_deposit"
-      ? estimateBooking(
-          hookahCount,
-          bookedHours,
-          promoCode === "OUI25" ? 25 : 0,
-        )
+      ? estimateBooking(hookahCount, bookedHours, promoDollars, pricing)
       : null;
 
   const quotedCents =
@@ -98,7 +101,11 @@ export async function POST(request: Request) {
     `Engagement: ${engagementLabel}`,
     hookahNote,
     notes,
-    promoCode === "OUI25" ? "Promo: OUI25 · $25 guest rebook discount" : "",
+    promoCode && promoDollars
+      ? `Promo: ${promoCode} · $${promoDollars} guest rebook discount`
+      : promoCode
+        ? `Promo: ${promoCode}`
+        : "",
     estimate
       ? `Website estimate: $${estimate.total.toFixed(2)} CAD (incl. HST)`
       : "",

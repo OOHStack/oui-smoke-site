@@ -1,16 +1,18 @@
 import {
-  ONSITE_UNIT_RATE,
-  ONSITE_UNLIMITED_RATE,
-  REFILL_PRICE_DOLLARS,
+  type PricingConfig,
+  DEFAULT_PRICING,
 } from "@/lib/pricing";
 import type { PlaybookSection } from "@/lib/ops/night-of-playbook";
 
 /** Venue / host-facing night-of expectations (no internal ops steps). */
-export function getPartnerNightOfPlaybook(): {
+export function getPartnerNightOfPlaybook(
+  pricing: PricingConfig = DEFAULT_PRICING,
+): {
   title: string;
   subtitle: string;
   sections: PlaybookSection[];
 } {
+  const refillDollars = pricing.refillPriceCents / 100;
   return {
     title: "Night-of — what to expect",
     subtitle: "On-site sales nights: guests pay on the floor; Oui staff run service.",
@@ -19,8 +21,8 @@ export function getPartnerNightOfPlaybook(): {
         id: "pricing",
         title: "Guest pricing",
         bullets: [
-          `Standard · $${ONSITE_UNIT_RATE} per unit — refills $${REFILL_PRICE_DOLLARS} each.`,
-          `Unlimited · $${ONSITE_UNLIMITED_RATE} per unit — unlimited flavour refills for the night.`,
+          `Standard · $${pricing.onsiteUnitRate} per unit — refills $${refillDollars} each.`,
+          `Unlimited · $${pricing.onsiteUnlimitedRate} per unit — unlimited flavour refills for the night.`,
           `Oui staff collect payment on the floor (Square terminal or cash). Hosts do not need to run a package deposit for on-site sales.`,
         ],
       },

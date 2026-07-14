@@ -223,6 +223,13 @@ a.admin-user.active {
   align-items: flex-start;
 }
 
+.control-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0 0 1.1rem;
+}
+
 .admin-main {
   flex: 1;
   width: 100%;
@@ -627,6 +634,10 @@ a.admin-user.active {
 
 .form-row-2 {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.form-row-3 {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .field label {

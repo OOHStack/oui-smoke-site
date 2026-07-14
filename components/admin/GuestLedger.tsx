@@ -6,6 +6,7 @@ import {
   summarizeGuestLedger,
   type GuestPayTier,
 } from "@/lib/ops/guest-pay";
+import { DEFAULT_PRICING, type PricingConfig } from "@/lib/pricing";
 import { formatCadCents } from "@/lib/job-balance";
 import { resolveTipSplit } from "@/lib/ops/tip-split";
 import TipSplitEditor from "@/components/admin/TipSplitEditor";
@@ -38,6 +39,7 @@ export default function GuestLedger({
   onSaveTipSplit,
   busyId,
   tipSplitBusy,
+  pricing = DEFAULT_PRICING,
 }: {
   jobId: string | number;
   assignments: LedgerAssignment[];
@@ -53,6 +55,7 @@ export default function GuestLedger({
   onSaveTipSplit: (json: string) => void | Promise<void>;
   busyId?: number | null;
   tipSplitBusy?: boolean;
+  pricing?: PricingConfig;
 }) {
   const summary = summarizeGuestLedger({
     assignments: assignments.map((a) => ({
@@ -60,6 +63,7 @@ export default function GuestLedger({
       guestPayTier: a.guestPayTier,
     })),
     payments,
+    pricing,
   });
 
   const tipShares = resolveTipSplit({ tipCents, staffNames, tipSplitJson });
@@ -149,7 +153,7 @@ export default function GuestLedger({
                   </td>
                   <td>
                     {tier
-                      ? formatCadCents(guestPayTierUnitCents(tier))
+                      ? formatCadCents(guestPayTierUnitCents(tier, pricing))
                       : "—"}
                     {paid ? (
                       <span className="list-meta"> · paid</span>

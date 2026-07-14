@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react";
 import PartnerEstimate, { type PartnerMode } from "./PartnerEstimate";
 import PartnerToolbar from "./PartnerToolbar";
-import {
-  ONSITE_UNIT_RATE,
-  ONSITE_UNLIMITED_RATE,
-  REFILL_PRICE_DOLLARS,
-} from "@/lib/pricing";
+import { DEFAULT_PRICING, type PricingConfig } from "@/lib/pricing";
 
 function readInitialMode(): PartnerMode {
   if (typeof window === "undefined") return "package";
@@ -31,10 +27,41 @@ function syncModeToUrl(mode: PartnerMode) {
 
 export default function PartnerSheet() {
   const [mode, setMode] = useState<PartnerMode>("package");
+  const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
 
   useEffect(() => {
     setMode(readInitialMode());
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/pricing");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data.pricing) {
+          const p = data.pricing as PricingConfig & {
+            refillPriceDollars?: number;
+            guestRebookPromo?: unknown;
+          };
+          const {
+            refillPriceDollars: _d,
+            guestRebookPromo: _g,
+            ...rest
+          } = p;
+          setPricing({ ...DEFAULT_PRICING, ...rest });
+        }
+      } catch {
+        /* keep defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const refillPriceDollars = pricing.refillPriceCents / 100;
 
   function onModeChange(next: PartnerMode) {
     setMode(next);
@@ -172,7 +199,7 @@ export default function PartnerSheet() {
             <p className="partner-hero__lede">
               {isPackage
                 ? "Full-service delivery, setup, staff, and teardown for private celebrations across Toronto and the GTA."
-                : `We bring units and staff — guests pay $${ONSITE_UNIT_RATE} (+$${REFILL_PRICE_DOLLARS} refills) or $${ONSITE_UNLIMITED_RATE} unlimited. No host package deposit.`}
+                : `We bring units and staff — guests pay $${pricing.onsiteUnitRate} (+$${refillPriceDollars} refills) or $${pricing.onsiteUnlimitedRate} unlimited. No host package deposit.`}
             </p>
             <a className="partner-hero__jump no-print" href="#estimate">
               {isPackage ? "Build an estimate" : "Plan staffing"}
@@ -218,11 +245,11 @@ export default function PartnerSheet() {
                 <ul>
                   <li>We attend with units + staff</li>
                   <li>
-                    Guests pay ${ONSITE_UNIT_RATE} / unit · $
-                    {REFILL_PRICE_DOLLARS} refills
+                    Guests pay ${pricing.onsiteUnitRate} / unit · $
+                    {refillPriceDollars} refills
                   </li>
                   <li>
-                    Or ${ONSITE_UNLIMITED_RATE} / unit with unlimited refills
+                    Or ${pricing.onsiteUnlimitedRate} / unit with unlimited refills
                   </li>
                   <li>No host package deposit</li>
                   <li>Floor ops handled by our team</li>
@@ -281,16 +308,16 @@ export default function PartnerSheet() {
               <div className="partner-rates__tier">
                 <span className="partner-rates__range">Standard</span>
                 <strong className="partner-rates__price">
-                  ${ONSITE_UNIT_RATE}
+                  ${pricing.onsiteUnitRate}
                 </strong>
                 <span className="partner-rates__meta">
-                  Per unit · ${REFILL_PRICE_DOLLARS} refills
+                  Per unit · ${refillPriceDollars} refills
                 </span>
               </div>
               <div className="partner-rates__tier">
                 <span className="partner-rates__range">Unlimited</span>
                 <strong className="partner-rates__price">
-                  ${ONSITE_UNLIMITED_RATE}
+                  ${pricing.onsiteUnlimitedRate}
                 </strong>
                 <span className="partner-rates__meta">
                   Per unit · unlimited refills
@@ -308,7 +335,7 @@ export default function PartnerSheet() {
             ) : (
               <>
                 Host pays nothing up front — guests settle on site at $
-                {ONSITE_UNIT_RATE} or ${ONSITE_UNLIMITED_RATE}. Extra staffing
+                {pricing.onsiteUnitRate} or ${pricing.onsiteUnlimitedRate}. Extra staffing
                 hours quoted if needed.
               </>
             )}

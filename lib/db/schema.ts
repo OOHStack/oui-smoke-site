@@ -6,6 +6,7 @@ import {
   timestamp,
   boolean,
   pgEnum,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -401,6 +402,18 @@ export const paymentSettings = pgTable("payment_settings", {
 });
 
 export type PaymentSettings = typeof paymentSettings.$inferSelect;
+
+/** Singleton row — catalog rates + ops defaults (Control Center) */
+export const siteSettings = pgTable("site_settings", {
+  id: integer("id").primaryKey().default(1),
+  pricingJson: jsonb("pricing_json").notNull().default({}),
+  defaultCheckIntervalMinutes: integer("default_check_interval_minutes")
+    .notNull()
+    .default(45),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type SiteSettings = typeof siteSettings.$inferSelect;
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
   job: one(jobs, { fields: [payments.jobId], references: [jobs.id] }),
