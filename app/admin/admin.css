@@ -3054,6 +3054,82 @@ button.fleet-tile {
   color: var(--accent);
 }
 
+.job-pricing-summary__action {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+
+.job-pricing-summary__action:hover,
+.job-pricing-summary__action:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+
+.job-pricing-summary__inline {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+
+.guest-rates-modal__tiers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.guest-rates-modal__tier {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 0.9rem;
+  border-top: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+.guest-rates-modal__label {
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.guest-rates-modal__price {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.guest-rates-modal__meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+@media (max-width: 520px) {
+  .guest-rates-modal__tiers {
+    grid-template-columns: 1fr;
+  }
+}
+
 .money-story__grid span {
   color: var(--muted);
   font-size: 0.72rem;

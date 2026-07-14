@@ -12,7 +12,12 @@ import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { useSse } from "@/lib/hooks/useSse";
 import { paymentModelLabel } from "@/lib/payment-model";
 import { formatCadCents } from "@/lib/job-balance";
-import { REFILL_PRICE_CENTS } from "@/lib/pricing";
+import {
+  ONSITE_UNIT_RATE,
+  ONSITE_UNLIMITED_RATE,
+  REFILL_PRICE_CENTS,
+  REFILL_PRICE_DOLLARS,
+} from "@/lib/pricing";
 
 type Flavour = { id: number; name: string; active: boolean };
 type Hookah = { id: number; modelNumber: number; label: string | null; status: string };
@@ -184,6 +189,7 @@ export default function JobDetailPage() {
   const [portalMsg, setPortalMsg] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
+  const [guestRatesOpen, setGuestRatesOpen] = useState(false);
   const [editError, setEditError] = useState("");
   const [editForm, setEditForm] = useState({
     title: "",
@@ -476,6 +482,20 @@ export default function JobDetailPage() {
       document.body.style.overflow = prev;
     };
   }, [resetOpen]);
+
+  useEffect(() => {
+    if (!guestRatesOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setGuestRatesOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [guestRatesOpen]);
 
   async function saveEdit(e: FormEvent) {
     e.preventDefault();
@@ -827,23 +847,45 @@ export default function JobDetailPage() {
             <div>
               <span>Charging</span>
               <strong>
-                {job.paymentModel === "complimentary"
-                  ? "Comp"
-                  : job.paymentSummary && job.paymentSummary.dueCents > 0
-                    ? formatCadCents(job.paymentSummary.dueCents)
-                    : job.quotedCents != null && job.quotedCents > 0
-                      ? formatCadCents(job.quotedCents)
-                      : job.paymentModel === "pay_at_event"
-                        ? "Guest pay"
-                        : "—"}
+                {job.paymentModel === "complimentary" ? (
+                  "Comp"
+                ) : job.paymentModel === "pay_at_event" ? (
+                  <button
+                    type="button"
+                    className="job-pricing-summary__action"
+                    onClick={() => setGuestRatesOpen(true)}
+                  >
+                    {job.paymentSummary && job.paymentSummary.dueCents > 0
+                      ? formatCadCents(job.paymentSummary.dueCents)
+                      : job.quotedCents != null && job.quotedCents > 0
+                        ? formatCadCents(job.quotedCents)
+                        : "Guest pay"}
+                  </button>
+                ) : job.paymentSummary && job.paymentSummary.dueCents > 0 ? (
+                  formatCadCents(job.paymentSummary.dueCents)
+                ) : job.quotedCents != null && job.quotedCents > 0 ? (
+                  formatCadCents(job.quotedCents)
+                ) : (
+                  "—"
+                )}
               </strong>
             </div>
             <div>
               <span>Model</span>
               <strong>
-                <Link href={`/admin/jobs/${jobId}/payments`}>
-                  {paymentModelLabel(job.paymentModel)}
-                </Link>
+                {job.paymentModel === "pay_at_event" ? (
+                  <button
+                    type="button"
+                    className="job-pricing-summary__action"
+                    onClick={() => setGuestRatesOpen(true)}
+                  >
+                    {paymentModelLabel(job.paymentModel)}
+                  </button>
+                ) : (
+                  <Link href={`/admin/jobs/${jobId}/payments`}>
+                    {paymentModelLabel(job.paymentModel)}
+                  </Link>
+                )}
               </strong>
             </div>
           </div>
@@ -859,11 +901,23 @@ export default function JobDetailPage() {
             </p>
           ) : (
             <p className="list-meta" style={{ margin: "0.55rem 0 0.85rem" }}>
-              {job.paymentModel === "pay_at_event"
-                ? "Guests settle on the floor — package deposit not required."
-                : job.paymentModel === "complimentary"
-                  ? "No client package charge on this job."
-                  : "Set a quote in Edit job or Payments to track what you’re charging."}
+              {job.paymentModel === "pay_at_event" ? (
+                <>
+                  Guests settle on the floor —{" "}
+                  <button
+                    type="button"
+                    className="job-pricing-summary__inline"
+                    onClick={() => setGuestRatesOpen(true)}
+                  >
+                    view guest rates
+                  </button>
+                  .
+                </>
+              ) : job.paymentModel === "complimentary" ? (
+                "No client package charge on this job."
+              ) : (
+                "Set a quote in Edit job or Payments to track what you’re charging."
+              )}
             </p>
           )}
           {assignments.some((a) => a.guestFeedbackAt && a.guestRating != null) ? (
@@ -925,6 +979,83 @@ export default function JobDetailPage() {
           </div>
         </section>
       </div>
+
+      {guestRatesOpen ? (
+        <div
+          className="hookah-modal-backdrop"
+          onClick={() => setGuestRatesOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="hookah-modal admin-edit-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="guest-rates-title"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="hookah-modal__body">
+              <div className="hookah-modal__head">
+                <h2 id="guest-rates-title" className="hookah-modal__title">
+                  Guest pay rates
+                </h2>
+                <button
+                  type="button"
+                  className="hookah-modal__close"
+                  aria-label="Close"
+                  onClick={() => setGuestRatesOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <p className="page-sub" style={{ margin: "0 0 1rem" }}>
+                On-site sales — guests choose a unit rate on the floor. No host
+                package deposit.
+              </p>
+              <div className="guest-rates-modal__tiers">
+                <div className="guest-rates-modal__tier">
+                  <span className="guest-rates-modal__label">Standard</span>
+                  <strong className="guest-rates-modal__price">
+                    ${ONSITE_UNIT_RATE}
+                  </strong>
+                  <span className="guest-rates-modal__meta">
+                    Per unit · ${REFILL_PRICE_DOLLARS} refills
+                  </span>
+                </div>
+                <div className="guest-rates-modal__tier">
+                  <span className="guest-rates-modal__label">Unlimited</span>
+                  <strong className="guest-rates-modal__price">
+                    ${ONSITE_UNLIMITED_RATE}
+                  </strong>
+                  <span className="guest-rates-modal__meta">
+                    Per unit · unlimited refills
+                  </span>
+                </div>
+              </div>
+              <p className="list-meta" style={{ margin: "1rem 0 0" }}>
+                Refill add-on is {formatCadCents(REFILL_PRICE_CENTS)} when guests
+                take the standard rate.
+              </p>
+              <div className="hookah-modal__btn-stack" style={{ marginTop: "1rem" }}>
+                <button
+                  type="button"
+                  className="btn btn-primary hookah-modal__btn-main"
+                  onClick={() => setGuestRatesOpen(false)}
+                >
+                  Got it
+                </button>
+                <Link
+                  href={`/admin/jobs/${jobId}/payments`}
+                  className="btn btn-ghost"
+                  onClick={() => setGuestRatesOpen(false)}
+                >
+                  Open payments
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {editOpen ? (
         <div
