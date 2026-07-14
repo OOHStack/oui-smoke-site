@@ -1,0 +1,156 @@
+.night-gallery {
+  --ng-gap: 0.7rem;
+  --ng-slide: min(78vw, 17.5rem);
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.night-gallery__head {
+  padding: 0 0.1rem;
+  min-width: 0;
+}
+
+.night-gallery__title {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.45rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 400;
+  line-height: 1.05;
+}
+
+.night-gallery__sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: rgba(247, 244, 239, 0.55);
+}
+
+.night-gallery__track {
+  display: flex;
+  gap: var(--ng-gap);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 0.15rem;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  padding: 0.35rem 0.15rem 0.55rem;
+  margin: 0;
+  scrollbar-width: none;
+  min-width: 0;
+  contain: paint;
+}
+
+.night-gallery__track::-webkit-scrollbar {
+  display: none;
+}
+
+.night-gallery__slide {
+  flex: 0 0 var(--ng-slide);
+  width: var(--ng-slide);
+  aspect-ratio: 4 / 5;
+  scroll-snap-align: center;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(18, 18, 18, 0.85);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(247, 244, 239, 0.1);
+  cursor: pointer;
+  transform-origin: center center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.night-gallery__slide img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+
+.night-gallery__slide.is-active {
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 1px rgba(228, 87, 77, 0.45);
+}
+
+.night-gallery__dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  min-height: 0.55rem;
+}
+
+.night-gallery__dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: rgba(247, 244, 239, 0.22);
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.night-gallery__dot.is-on {
+  background: #e4574d;
+  transform: scale(1.25);
+}
+
+.night-gallery__lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(10, 9, 8, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.night-gallery__lightbox img {
+  display: block;
+  width: min(100%, 28rem);
+  max-height: min(78svh, 36rem);
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.night-gallery__lightbox-close {
+  position: absolute;
+  top: max(0.85rem, env(safe-area-inset-top));
+  right: max(0.85rem, env(safe-area-inset-right));
+  border: 1px solid rgba(247, 244, 239, 0.22);
+  background: rgba(18, 18, 18, 0.8);
+  color: #f7f4ef;
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+@media (min-width: 520px) {
+  .night-gallery {
+    --ng-slide: 15.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .night-gallery__slide,
+  .night-gallery__dot {
+    transition: none;
+  }
+}

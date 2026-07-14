@@ -1,0 +1,446 @@
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700&display=swap");
+
+html,
+body {
+  margin: 0;
+  min-height: 0;
+  background: #0a0908;
+  overflow-x: clip;
+}
+
+.book,
+.book *,
+.book *::before,
+.book *::after {
+  box-sizing: border-box;
+}
+
+.book {
+  color: #f7f4ef;
+  font-family: "Outfit", system-ui, sans-serif;
+  background: #0a0908;
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+
+.book__shell {
+  width: min(100% - 2rem, 440px);
+  margin: 0 auto;
+  padding: 1.5rem 0 2.5rem;
+  min-width: 0;
+}
+
+.book__brand {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.book__brand img {
+  height: 1.85rem;
+  width: auto;
+  max-width: 100%;
+}
+
+.book__kicker {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(247, 244, 239, 0.55);
+}
+
+.book__back {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+  color: #e4574d;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.book__back:hover {
+  text-decoration: underline;
+}
+
+.book__panel {
+  margin-top: 1.25rem;
+  display: grid;
+  gap: 0.45rem;
+  padding: 1.1rem 1rem 1.2rem;
+  border-radius: 14px;
+  border: 1px solid rgba(247, 244, 239, 0.14);
+  background: rgba(18, 18, 18, 0.85);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.book__panel h1 {
+  margin: 0 0 0.25rem;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(1.8rem, 8vw, 2.2rem);
+  letter-spacing: 0.03em;
+  font-weight: 400;
+}
+
+.book__lede {
+  margin: 0 0 0.55rem;
+  color: rgba(247, 244, 239, 0.55);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.book__engagement {
+  margin: 0.35rem 0 0.55rem;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.book__engagement legend {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  color: rgba(247, 244, 239, 0.55);
+}
+
+.book__choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: start;
+  margin: 0;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(247, 244, 239, 0.14);
+  background: rgba(10, 9, 8, 0.45);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.book__choice input {
+  margin-top: 0.2rem;
+  accent-color: #e4574d;
+}
+
+.book__choice.is-selected {
+  border-color: color-mix(in srgb, #e4574d 55%, transparent);
+  background: color-mix(in srgb, #e4574d 12%, transparent);
+}
+
+.book__choice-body {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.book__choice-body strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f7f4ef;
+}
+
+.book__choice-body span {
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: rgba(247, 244, 239, 0.58);
+}
+
+.book__steps {
+  margin: 0.35rem 0 1rem;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.55rem;
+  color: rgba(247, 244, 239, 0.72);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.book__promo {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0 0 0.35rem;
+  padding: 0.75rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #e4574d 40%, transparent);
+  background: color-mix(in srgb, #e4574d 12%, transparent);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.book__promo strong {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+.book__promo em {
+  font-style: normal;
+  letter-spacing: 0.08em;
+}
+
+.book__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.book__field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.book__panel label {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: rgba(247, 244, 239, 0.55);
+}
+
+.book__field label {
+  margin-top: 0;
+}
+
+.book__panel input,
+.book__panel select,
+.book__panel textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(247, 244, 239, 0.14);
+  background-color: rgba(10, 9, 8, 0.75);
+  color: #f7f4ef;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.35;
+  padding: 0.7rem 0.75rem;
+}
+
+.book__panel input:not([type="checkbox"]):not([type="radio"]),
+.book__panel select {
+  min-height: 2.85rem;
+}
+
+.book__panel select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23a89a8c' d='M1.4 1.4 6 6 10.6 1.4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1.05rem center;
+  background-size: 0.75rem;
+  padding-right: 2.75rem;
+}
+
+.book__panel input[type="date"],
+.book__panel input[type="time"],
+.book__panel input[type="number"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+
+.book__panel input[type="date"],
+.book__panel input[type="time"] {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.book__panel input[type="date"]::-webkit-date-and-time-value,
+.book__panel input[type="time"]::-webkit-date-and-time-value {
+  min-height: 1.4em;
+  text-align: left;
+}
+
+.book__panel input[type="date"]::-webkit-datetime-edit,
+.book__panel input[type="time"]::-webkit-datetime-edit,
+.book__panel input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+.book__panel input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+.book__panel input[type="date"]::-webkit-datetime-edit-text,
+.book__panel input[type="time"]::-webkit-datetime-edit-text,
+.book__panel input[type="date"]::-webkit-datetime-edit-month-field,
+.book__panel input[type="time"]::-webkit-datetime-edit-month-field,
+.book__panel input[type="date"]::-webkit-datetime-edit-day-field,
+.book__panel input[type="time"]::-webkit-datetime-edit-day-field,
+.book__panel input[type="date"]::-webkit-datetime-edit-year-field,
+.book__panel input[type="time"]::-webkit-datetime-edit-year-field,
+.book__panel input[type="date"]::-webkit-datetime-edit-hour-field,
+.book__panel input[type="time"]::-webkit-datetime-edit-hour-field,
+.book__panel input[type="date"]::-webkit-datetime-edit-minute-field,
+.book__panel input[type="time"]::-webkit-datetime-edit-minute-field,
+.book__panel input[type="date"]::-webkit-datetime-edit-meridiem-field,
+.book__panel input[type="time"]::-webkit-datetime-edit-meridiem-field {
+  padding: 0;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.book__panel input[type="date"]::-webkit-calendar-picker-indicator,
+.book__panel input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0.65;
+  cursor: pointer;
+  height: 1.1rem;
+  width: 1.1rem;
+}
+
+.book__panel input::-webkit-inner-spin-button {
+  height: auto;
+}
+
+.book__estimate {
+  margin-top: 0.55rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(247, 244, 239, 0.14);
+  background: rgba(10, 9, 8, 0.55);
+  min-width: 0;
+}
+
+.book__estimate-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.book__estimate-head span {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(247, 244, 239, 0.55);
+}
+
+.book__estimate-head strong {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.85rem;
+  letter-spacing: 0.03em;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.book__estimate-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.book__estimate-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.84rem;
+  color: rgba(247, 244, 239, 0.78);
+  min-width: 0;
+}
+
+.book__estimate-lines li span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.book__estimate-lines li span:last-child {
+  flex-shrink: 0;
+}
+
+.book__estimate-discount {
+  color: #7dcea0 !important;
+}
+
+.book__estimate-note,
+.book__estimate-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: rgba(247, 244, 239, 0.5);
+}
+
+.book__btn {
+  margin-top: 0.75rem;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.7rem 1.1rem;
+  background: #e4574d;
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.book__btn:disabled {
+  opacity: 0.65;
+}
+
+.book__error {
+  color: #ff8d84;
+  font-size: 0.88rem;
+}
+
+.book__alt {
+  margin: 0.55rem 0 0;
+  font-size: 0.82rem;
+  color: rgba(247, 244, 239, 0.55);
+}
+
+.book__alt a {
+  color: #e4574d;
+}
+
+.book__hp {
+  position: absolute;
+  left: -9999px;
+  opacity: 0;
+  height: 0;
+  width: 0;
+}
+
+@media (max-width: 380px) {
+  .book__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .book__shell {
+    width: min(100% - 1.5rem, 440px);
+    padding: 1.15rem 0 max(1.5rem, env(safe-area-inset-bottom));
+  }
+
+  .book__brand {
+    gap: 0.75rem;
+  }
+
+  .book__back {
+    font-size: 0.78rem;
+  }
+
+  .book__panel {
+    padding: 1rem 0.9rem 1.1rem;
+  }
+
+  .book__btn {
+    width: 100%;
+  }
+
+  .book__choice {
+    padding-inline: 0.85rem;
+  }
+
+  .book__alt {
+    margin-bottom: 0;
+  }
+}

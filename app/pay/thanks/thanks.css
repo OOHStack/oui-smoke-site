@@ -1,0 +1,53 @@
+.pay-thanks {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, #2a1810 0%, transparent 55%),
+    linear-gradient(165deg, #0c0a09 0%, #1a120e 45%, #0c0a09 100%);
+  color: #f5ebe0;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+.pay-thanks__panel {
+  width: min(100%, 28rem);
+  text-align: center;
+}
+
+.pay-thanks__brand {
+  margin: 0 0 1rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #c4a484;
+}
+
+.pay-thanks h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.75rem, 5vw, 2.35rem);
+  font-weight: 500;
+}
+
+.pay-thanks p {
+  margin: 0 0 1.5rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, #f5ebe0 78%, transparent);
+  font-family: system-ui, sans-serif;
+  font-size: 0.95rem;
+}
+
+.pay-thanks__link {
+  display: inline-block;
+  color: #f5ebe0;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  font-family: system-ui, sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pay-thanks__link:hover {
+  color: #c4a484;
+}

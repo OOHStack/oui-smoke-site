@@ -1,0 +1,464 @@
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700&display=swap");
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #0a0908;
+}
+
+.demo {
+  --bg: #0a0908;
+  --ink: #f7f4ef;
+  --mute: rgba(247, 244, 239, 0.55);
+  --accent: #e4574d;
+  --ok: #3d9a6a;
+  --warn: #d4a017;
+  --line: rgba(247, 244, 239, 0.14);
+  --panel: #141210;
+  color: var(--ink);
+  font-family: "Outfit", system-ui, sans-serif;
+  background: var(--bg);
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.demo *,
+.demo *::before,
+.demo *::after {
+  box-sizing: border-box;
+}
+
+/* —— Ops —— */
+.demo--ops {
+  padding: 1rem 1.1rem 1.4rem;
+}
+
+.demo-ops__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.demo-ops__brand {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.demo-ops__top h1 {
+  margin: 0.15rem 0 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.demo-ops__pill {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  color: var(--mute);
+  white-space: nowrap;
+}
+
+.demo-ops__hero {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: 0.75rem;
+  background:
+    radial-gradient(
+      ellipse 80% 70% at 100% 0%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 55%
+    ),
+    var(--panel);
+  margin-bottom: 0.9rem;
+}
+
+.demo-ops__kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.demo-ops__hero h2 {
+  margin: 0.2rem 0 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.demo-ops__meta {
+  margin: 0.25rem 0 0;
+  color: var(--mute);
+  font-size: 0.85rem;
+}
+
+.demo-ops__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.demo-ops__stats div {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.55rem 0.5rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  border: 1px solid var(--line);
+}
+
+.demo-ops__stats strong {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.55rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.demo-ops__stats span {
+  font-size: 0.68rem;
+  color: var(--mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.demo-ops__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.9rem;
+}
+
+.demo-ops__tile {
+  padding: 0.55rem 0.55rem 0.6rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  min-width: 0;
+}
+
+.demo-ops__tile header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.demo-ops__tile span {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+}
+
+.demo-ops__tile em {
+  font-style: normal;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.demo-ops__tile p {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: var(--mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.demo-ops__tile--ok {
+  border-color: color-mix(in srgb, var(--ok) 45%, var(--line));
+}
+
+.demo-ops__tile--warn {
+  border-color: color-mix(in srgb, var(--warn) 50%, var(--line));
+}
+
+.demo-ops__tile--accent {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+.demo-ops__tile--mute {
+  opacity: 0.72;
+}
+
+.demo-ops__feed h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.demo-ops__feed ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.demo-ops__feed li {
+  display: grid;
+  grid-template-columns: 2.6rem 1fr;
+  gap: 0.55rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.84rem;
+}
+
+.demo-ops__feed time {
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+
+/* —— Portal —— */
+.demo--portal {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 1.15rem 1.1rem 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.demo-portal__brand img {
+  height: 1.85rem;
+  width: auto;
+  display: block;
+}
+
+.demo-portal__brand p {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.demo-portal__hero h1 {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 2.6rem;
+  letter-spacing: 0.03em;
+  line-height: 0.95;
+  font-weight: 400;
+}
+
+.demo-portal__hero p {
+  margin: 0.35rem 0 0;
+  color: var(--mute);
+}
+
+.demo-portal__status {
+  text-transform: capitalize;
+}
+
+.demo-portal__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.demo-portal__metrics div {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.55rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.demo-portal__metrics strong {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.7rem;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.demo-portal__metrics span {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.demo-portal__list h2,
+.demo-portal__calls h2 {
+  margin: 0 0 0.45rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.demo-portal__list ul,
+.demo-portal__calls ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.demo-portal__list li,
+.demo-portal__calls li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 0.88rem;
+}
+
+.demo-portal__list em,
+.demo-portal__calls span {
+  font-style: normal;
+  color: var(--mute);
+  font-size: 0.78rem;
+}
+
+.demo-portal__calls strong {
+  font-weight: 600;
+}
+
+/* —— QR —— */
+.demo--qr {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 1.15rem 1.1rem 1.5rem;
+  display: grid;
+  gap: 1.1rem;
+}
+
+.demo-qr__brand img {
+  height: 1.85rem;
+  width: auto;
+  display: block;
+}
+
+.demo-qr__brand p {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.demo-qr__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.demo-qr__hero h1 {
+  margin: 0.15rem 0 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 4rem;
+  letter-spacing: 0.04em;
+  line-height: 0.9;
+  font-weight: 400;
+}
+
+.demo-qr__hero p {
+  margin: 0.35rem 0 0;
+  color: var(--mute);
+}
+
+.demo-qr__timer {
+  color: var(--ink) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.demo-qr__actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.demo-qr__action {
+  appearance: none;
+  display: grid;
+  gap: 0.2rem;
+  text-align: left;
+  margin: 0;
+  padding: 0.85rem 0.9rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.demo-qr__action:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  transform: translateY(-1px);
+}
+
+.demo-qr__action strong {
+  font-size: 1rem;
+}
+
+.demo-qr__action span {
+  color: var(--mute);
+  font-size: 0.82rem;
+}
+
+.demo-qr__toast {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line));
+  background: color-mix(in srgb, var(--ok) 12%, var(--panel));
+  display: grid;
+  gap: 0.45rem;
+}
+
+.demo-qr__toast p {
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.88rem;
+}
+
+.demo-qr__toast button {
+  appearance: none;
+  justify-self: start;
+  margin-top: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.demo-qr__note {
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.8rem;
+}

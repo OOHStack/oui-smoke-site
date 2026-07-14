@@ -4,7 +4,58 @@
   "version": "1.0.0",
   "description": "Oui Smoke website with switchable promo mode",
   "scripts": {
-    "dev": "npx --yes serve -l 5173 .",
-    "start": "npx --yes serve -l 5173 ."
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:push": "dotenv -e .env.local -- drizzle-kit push",
+    "db:seed": "dotenv -e .env.local -- tsx scripts/seed.ts",
+    "db:migrate": "dotenv -e .env.local -- tsx scripts/migrate-all.ts",
+    "serve:static": "npx --yes serve -l 5173 public"
+  },
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OOHStack/oui-smoke-site.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/OOHStack/oui-smoke-site/issues"
+  },
+  "homepage": "https://github.com/OOHStack/oui-smoke-site#readme",
+  "dependencies": {
+    "@gsap/react": "^2.1.2",
+    "@neondatabase/serverless": "^1.1.0",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/blob": "^2.6.1",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "drizzle-orm": "^0.45.2",
+    "gsap": "^3.15.0",
+    "jose": "^6.2.3",
+    "next": "^16.2.10",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "resend": "^6.17.2",
+    "web-push": "^3.6.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^26.1.1",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/web-push": "^3.6.4",
+    "dotenv-cli": "^11.0.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.3"
   }
 }

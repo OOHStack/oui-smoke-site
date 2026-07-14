@@ -1,8 +1,11 @@
 {
-  "version": 2,
-  "buildCommand": null,
-  "outputDirectory": ".",
-  "framework": null,
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/payment-reminders",
+      "schedule": "0 14 * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/promo", "destination": "/promo.html" },
     { "source": "/privacy", "destination": "/privacy.html" },

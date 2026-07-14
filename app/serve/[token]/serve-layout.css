@@ -1,0 +1,66 @@
+/* QR /serve pages — content-sized document, fixed bg outside the content tree. */
+
+html {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  background: #0a0908 !important;
+}
+
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  background: #0a0908 !important;
+}
+
+/* Fixed wallpaper — sibling of content, not inside any overflow scroller */
+.serve-page-bg {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.serve-page-bg__media,
+.serve-page-bg__veil {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.serve-page-bg__media {
+  background: url("/images/model-3-web.jpg") center / cover no-repeat;
+  opacity: 0.38;
+}
+
+.serve-page-bg__veil {
+  background: linear-gradient(
+    180deg,
+    rgba(10, 9, 8, 0.55) 0%,
+    rgba(10, 9, 8, 0.82) 42%,
+    #0a0908 100%
+  );
+}
+
+.serve-scroller {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
