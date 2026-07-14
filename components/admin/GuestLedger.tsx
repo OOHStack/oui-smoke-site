@@ -9,7 +9,6 @@ import {
 } from "@/lib/ops/guest-pay";
 import { DEFAULT_PRICING, type PricingConfig } from "@/lib/pricing";
 import { formatCadCents } from "@/lib/job-balance";
-import { resolveTipSplit } from "@/lib/ops/tip-split";
 import TipSplitEditor from "@/components/admin/TipSplitEditor";
 
 export type LedgerAssignment = {
@@ -62,7 +61,6 @@ function refillCentsByAssignment(payments: LedgerPayment[]) {
 }
 
 export default function GuestLedger({
-  jobId,
   assignments,
   payments,
   tipCents,
@@ -100,7 +98,6 @@ export default function GuestLedger({
     pricing,
   });
 
-  const tipShares = resolveTipSplit({ tipCents, staffNames, tipSplitJson });
   const paid = useMemo(() => paidIds(payments), [payments]);
   const pending = useMemo(() => pendingIds(payments), [payments]);
   const refills = useMemo(() => refillCentsByAssignment(payments), [payments]);
@@ -370,21 +367,6 @@ export default function GuestLedger({
             busy={tipSplitBusy}
             onSave={onSaveTipSplit}
           />
-
-          {tipShares.length > 0 && tipCents > 0 ? (
-            <div className="tip-split">
-              Cash-out preview for job #{jobId}:
-              <ul>
-                {tipShares.map((s) => (
-                  <li key={s.name}>
-                    {s.name}
-                    {s.percent != null ? ` · ${s.percent}%` : ""} ·{" "}
-                    {formatCadCents(s.cents)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>

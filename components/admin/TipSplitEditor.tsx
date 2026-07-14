@@ -47,6 +47,11 @@ export default function TipSplitEditor({
     staffNames,
     tipSplitJson: sumOk ? serializeTipSplit(rows) : tipSplitJson,
   });
+  const previewByName = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of preview) map.set(s.name, s.cents);
+    return map;
+  }, [preview]);
 
   function setPercent(index: number, percent: number) {
     setRows((prev) =>
@@ -70,27 +75,39 @@ export default function TipSplitEditor({
     <div className="tip-split-editor">
       <div className="tip-split-editor__head">
         <strong>Tip split</strong>
-        <span className="list-meta">
-          Percents must total 100% (now {sum.toFixed(1)}%)
+        <span className={`list-meta${sumOk ? "" : " tip-split-editor__warn"}`}>
+          {sumOk
+            ? `Totals 100%`
+            : `Must total 100% (now ${sum.toFixed(1)}%)`}
         </span>
       </div>
-      <div className="tip-split-editor__rows">
+
+      <ul className="tip-split-editor__rows">
         {rows.map((row, i) => (
-          <label key={row.name} className="tip-split-editor__row">
-            <span>{row.name}</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={0.5}
-              value={row.percent}
-              onChange={(e) => setPercent(i, Number(e.target.value) || 0)}
-            />
-            <span className="list-meta">%</span>
-          </label>
+          <li key={row.name} className="tip-split-editor__row">
+            <span className="tip-split-editor__name">{row.name}</span>
+            <div className="tip-split-editor__pct">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                value={row.percent}
+                aria-label={`${row.name} tip percent`}
+                onChange={(e) => setPercent(i, Number(e.target.value) || 0)}
+              />
+              <span aria-hidden="true">%</span>
+            </div>
+            {tipCents > 0 ? (
+              <span className="tip-split-editor__cash list-meta">
+                {formatCadCents(previewByName.get(row.name) ?? 0)}
+              </span>
+            ) : null}
+          </li>
         ))}
-      </div>
-      <div className="guest-ledger__actions">
+      </ul>
+
+      <div className="tip-split-editor__actions">
         <button
           type="button"
           className="btn btn-sm"
@@ -108,17 +125,6 @@ export default function TipSplitEditor({
           Save split
         </button>
       </div>
-      {tipCents > 0 ? (
-        <ul className="tip-split" style={{ marginTop: "0.55rem" }}>
-          {preview.map((s) => (
-            <li key={s.name}>
-              {s.name}
-              {s.percent != null ? ` · ${s.percent}%` : ""} ·{" "}
-              {formatCadCents(s.cents)}
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
 }
