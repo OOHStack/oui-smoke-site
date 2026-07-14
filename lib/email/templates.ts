@@ -448,27 +448,32 @@ export function opsPasswordResetEmail(input: {
   expiresInMinutes: number;
 }) {
   const html = layout({
-    title: "Password reset",
-    eyebrow: "Ops security",
-    preheader: `Reset link for @${input.username}`,
+    title: "Reset your access",
+    eyebrow: "Operations console",
+    preheader: `Secure password reset for @${input.username} · expires in ${input.expiresInMinutes} minutes.`,
     bodyHtml: [
       p(
-        `A password reset was requested for ops user <strong>${escapeHtml(input.displayName)}</strong> (@${escapeHtml(input.username)}).`,
+        `A password reset was requested for <strong style="color:${brand.ink};font-weight:500;">${escapeHtml(input.displayName)}</strong>.`,
       ),
       p(
-        `This link expires in ${input.expiresInMinutes} minutes and can only be used once. If you didn’t request it, ignore this email — the current password stays unchanged.`,
+        "Use the button below to choose a new password. This link works once and then expires — if you didn’t ask for this, you can ignore the email and the current password stays unchanged.",
       ),
-      btn(input.resetUrl, "Reset password"),
+      metaList([
+        ["Account", input.displayName],
+        ["Username", `@${input.username}`],
+        ["Expires", `${input.expiresInMinutes} minutes`],
+      ]),
+      btn(input.resetUrl, "Set new password"),
       p(
-        `<span style="color:${brand.inkMute};font-size:13px;">Or open: ${escapeHtml(input.resetUrl)}</span>`,
+        `<span style="color:${brand.inkMute};font-size:13px;">Button not working? Open the secure link from this email on your device — don’t forward it.</span>`,
       ),
     ].join(""),
   });
 
   return {
-    subject: `Password reset · @${input.username}`,
+    subject: `Oui Smoke · password reset for @${input.username}`,
     html,
-    text: `Password reset for @${input.username}. Open ${input.resetUrl} within ${input.expiresInMinutes} minutes.`,
+    text: `Password reset for ${input.displayName} (@${input.username}). Open ${input.resetUrl} within ${input.expiresInMinutes} minutes. If you didn’t request this, ignore the email.`,
   };
 }
 
