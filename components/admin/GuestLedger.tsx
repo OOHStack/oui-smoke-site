@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
   guestPayTierUnitCents,
   summarizeGuestLedger,
@@ -26,6 +27,39 @@ export type LedgerPayment = {
   jobHookahId: number | null;
   label?: string | null;
 };
+
+type FilterId = "open" | "paid" | "no_tier" | "all" | "standard" | "unlimited";
+
+const COLLAPSED_ROWS = 5;
+
+function paidIds(payments: LedgerPayment[]) {
+  return new Set(
+    payments
+      .filter((p) => p.kind === "onsite_unit" && p.status === "succeeded")
+      .map((p) => p.jobHookahId)
+      .filter((id): id is number => id != null),
+  );
+}
+
+function pendingIds(payments: LedgerPayment[]) {
+  return new Set(
+    payments
+      .filter((p) => p.kind === "onsite_unit" && p.status === "pending")
+      .map((p) => p.jobHookahId)
+      .filter((id): id is number => id != null),
+  );
+}
+
+function refillCentsByAssignment(payments: LedgerPayment[]) {
+  const map = new Map<number, number>();
+  for (const p of payments) {
+    if (p.kind !== "refill" || p.status !== "succeeded" || p.jobHookahId == null) {
+      continue;
+    }
+    map.set(p.jobHookahId, (map.get(p.jobHookahId) ?? 0) + p.amountCents);
+  }
+  return map;
+}
 
 export default function GuestLedger({
   jobId,
@@ -67,51 +101,135 @@ export default function GuestLedger({
   });
 
   const tipShares = resolveTipSplit({ tipCents, staffNames, tipSplitJson });
+  const paid = useMemo(() => paidIds(payments), [payments]);
+  const pending = useMemo(() => pendingIds(payments), [payments]);
+  const refills = useMemo(() => refillCentsByAssignment(payments), [payments]);
 
-  function unitPaid(assignmentId: number) {
-    return payments.some(
-      (p) =>
-        p.jobHookahId === assignmentId &&
-        p.kind === "onsite_unit" &&
-        p.status === "succeeded",
-    );
-  }
+  const openCount = assignments.filter(
+    (a) => a.guestPayTier && !paid.has(a.id),
+  ).length;
+  const paidCount = assignments.filter((a) => paid.has(a.id)).length;
+  const noTierCount = assignments.filter((a) => !a.guestPayTier).length;
 
-  function unitPendingTerminal(assignmentId: number) {
-    return payments.some(
-      (p) =>
-        p.jobHookahId === assignmentId &&
-        p.kind === "onsite_unit" &&
-        p.status === "pending",
-    );
-  }
+  const [filter, setFilter] = useState<FilterId>("open");
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [tipsOpen, setTipsOpen] = useState(false);
+  const [filterTouched, setFilterTouched] = useState(false);
 
-  function unitRefillCents(assignmentId: number) {
-    return payments
-      .filter(
-        (p) =>
-          p.jobHookahId === assignmentId &&
-          p.kind === "refill" &&
-          p.status === "succeeded",
-      )
-      .reduce((sum, p) => sum + p.amountCents, 0);
-  }
+  useEffect(() => {
+    if (filterTouched) return;
+    setFilter(openCount > 0 ? "open" : "all");
+  }, [openCount, filterTouched]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return assignments.filter((a) => {
+      const isPaid = paid.has(a.id);
+      const isPending = pending.has(a.id);
+      const tier = a.guestPayTier;
+
+      if (filter === "open" && !(tier && !isPaid)) return false;
+      if (filter === "paid" && !isPaid) return false;
+      if (filter === "no_tier" && tier) return false;
+      if (filter === "standard" && tier !== "standard") return false;
+      if (filter === "unlimited" && tier !== "unlimited") return false;
+
+      if (!q) return true;
+      const hay = [
+        String(a.hookah.modelNumber),
+        `#${a.hookah.modelNumber}`,
+        a.status,
+        tier ?? "no tier",
+        isPaid ? "paid" : "",
+        isPending ? "terminal pending" : "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [assignments, paid, pending, filter, query]);
+
+  const visible = expanded ? filtered : filtered.slice(0, COLLAPSED_ROWS);
+  const hiddenCount = Math.max(0, filtered.length - visible.length);
+
+  const filters: { id: FilterId; label: string; count?: number }[] = [
+    { id: "open", label: "Needs pay", count: openCount },
+    { id: "paid", label: "Paid", count: paidCount },
+    { id: "no_tier", label: "No tier", count: noTierCount },
+    { id: "standard", label: "Standard" },
+    { id: "unlimited", label: "Unlimited" },
+    { id: "all", label: "All", count: assignments.length },
+  ];
 
   return (
     <div className="guest-ledger">
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "0.75rem",
-          alignItems: "baseline",
-          flexWrap: "wrap",
-        }}
-      >
-        <h3 className="guest-ledger__title">Guest ledger</h3>
-        <Link href="/admin/playbook" className="list-meta">
-          Night-of playbook
-        </Link>
+      <div className="guest-ledger__head">
+        <div className="guest-ledger__head-main">
+          <h3 className="guest-ledger__title">Guest ledger</h3>
+          <Link href="/admin/playbook" className="list-meta">
+            Playbook
+          </Link>
+        </div>
+        <div className="guest-ledger__summary" aria-label="Ledger summary">
+          <span>
+            <em>Open</em>
+            <strong>{openCount}</strong>
+          </span>
+          <span>
+            <em>In</em>
+            <strong>
+              {formatCadCents(
+                summary.unitCollectedCents + summary.refillCollectedCents,
+              )}
+            </strong>
+          </span>
+          <span>
+            <em>Suggest</em>
+            <strong>{formatCadCents(summary.suggestedActualCents)}</strong>
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={summary.suggestedActualCents <= 0}
+            onClick={() => onApplySuggestedActual(summary.suggestedActualCents)}
+          >
+            Apply Actual
+          </button>
+        </div>
+      </div>
+
+      <div className="guest-ledger__toolbar">
+        <label className="guest-ledger__search">
+          <span className="guest-ledger__sr">Search units</span>
+          <input
+            type="search"
+            placeholder="Search unit #, tier, status…"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setExpanded(true);
+            }}
+            autoComplete="off"
+          />
+        </label>
+        <div className="guest-ledger__filters" role="group" aria-label="Filter units">
+          {filters.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className={`chip${filter === f.id ? " active" : ""}`}
+              onClick={() => {
+                setFilterTouched(true);
+                setFilter(f.id);
+                setExpanded(f.id !== "open");
+              }}
+            >
+              {f.label}
+              {f.count != null ? ` · ${f.count}` : ""}
+            </button>
+          ))}
+        </div>
       </div>
 
       <table className="guest-ledger__table">
@@ -131,13 +249,22 @@ export default function GuestLedger({
                 No units on this job yet.
               </td>
             </tr>
+          ) : filtered.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="list-meta">
+                No units match this search or filter.
+              </td>
+            </tr>
           ) : (
-            assignments.map((a) => {
-              const paid = unitPaid(a.id);
-              const pending = unitPendingTerminal(a.id);
+            visible.map((a) => {
+              const isPaid = paid.has(a.id);
+              const isPending = pending.has(a.id);
               const tier = a.guestPayTier;
               return (
-                <tr key={a.id}>
+                <tr
+                  key={a.id}
+                  className={isPaid ? "guest-ledger__row--paid" : undefined}
+                >
                   <td>
                     #{a.hookah.modelNumber}
                     <span className="list-meta"> · {a.status}</span>
@@ -155,20 +282,20 @@ export default function GuestLedger({
                     {tier
                       ? formatCadCents(guestPayTierUnitCents(tier, pricing))
                       : "—"}
-                    {paid ? (
+                    {isPaid ? (
                       <span className="list-meta"> · paid</span>
-                    ) : pending ? (
+                    ) : isPending ? (
                       <span className="list-meta"> · terminal…</span>
                     ) : null}
                   </td>
-                  <td>{formatCadCents(unitRefillCents(a.id))}</td>
+                  <td>{formatCadCents(refills.get(a.id) ?? 0)}</td>
                   <td>
-                    {tier && !paid ? (
+                    {tier && !isPaid ? (
                       <div className="guest-ledger__actions">
                         <button
                           type="button"
                           className="btn btn-sm btn-ok"
-                          disabled={busyId === a.id || pending}
+                          disabled={busyId === a.id || isPending}
                           onClick={() => onMarkPaid(a.id, "terminal")}
                         >
                           Terminal
@@ -191,50 +318,73 @@ export default function GuestLedger({
         </tbody>
       </table>
 
-      <div className="guest-ledger__totals">
-        <div>
-          Units charged {formatCadCents(summary.unitChargedCents)} · collected{" "}
-          {formatCadCents(summary.unitCollectedCents)}
+      {hiddenCount > 0 || (expanded && filtered.length > COLLAPSED_ROWS) ? (
+        <div className="guest-ledger__expand">
+          {hiddenCount > 0 ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setExpanded(true)}
+            >
+              Show {hiddenCount} more
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setExpanded(false)}
+            >
+              Collapse list
+            </button>
+          )}
+          <span className="list-meta">
+            Showing {visible.length} of {filtered.length}
+            {filter !== "all" || query ? " (filtered)" : ""}
+          </span>
         </div>
-        <div>Refills collected {formatCadCents(summary.refillCollectedCents)}</div>
-        <div>Tips collected {formatCadCents(summary.tipCollectedCents)}</div>
-        <div>
-          <strong>
-            Suggested actual {formatCadCents(summary.suggestedActualCents)}
-          </strong>
-        </div>
-        <div className="guest-ledger__actions">
-          <button
-            type="button"
-            className="btn btn-sm"
-            disabled={summary.suggestedActualCents <= 0}
-            onClick={() => onApplySuggestedActual(summary.suggestedActualCents)}
-          >
-            Apply to Actual ($)
-          </button>
-        </div>
-      </div>
+      ) : null}
 
-      <TipSplitEditor
-        tipCents={tipCents}
-        staffNames={staffNames}
-        tipSplitJson={tipSplitJson}
-        busy={tipSplitBusy}
-        onSave={onSaveTipSplit}
-      />
+      <p className="guest-ledger__meta list-meta">
+        Units charged {formatCadCents(summary.unitChargedCents)} · collected{" "}
+        {formatCadCents(summary.unitCollectedCents)} · refills{" "}
+        {formatCadCents(summary.refillCollectedCents)} · tips{" "}
+        {formatCadCents(summary.tipCollectedCents)}
+      </p>
 
-      {tipShares.length > 0 && tipCents > 0 ? (
-        <div className="tip-split">
-          Cash-out preview for job #{jobId}:
-          <ul>
-            {tipShares.map((s) => (
-              <li key={s.name}>
-                {s.name}
-                {s.percent != null ? ` · ${s.percent}%` : ""} ·{" "}
-                {formatCadCents(s.cents)}
-              </li>
-            ))}
-          </ul>
+      <button
+        type="button"
+        className="guest-ledger__tips-toggle"
+        aria-expanded={tipsOpen}
+        onClick={() => setTipsOpen((v) => !v)}
+      >
+        {tipsOpen ? "Hide tip split" : "Tip split & cash-out"}
+        {tipCents > 0 ? ` · ${formatCadCents(tipCents)}` : ""}
+      </button>
+
+      {tipsOpen ? (
+        <div className="guest-ledger__tips">
+          <TipSplitEditor
+            tipCents={tipCents}
+            staffNames={staffNames}
+            tipSplitJson={tipSplitJson}
+            busy={tipSplitBusy}
+            onSave={onSaveTipSplit}
+          />
+
+          {tipShares.length > 0 && tipCents > 0 ? (
+            <div className="tip-split">
+              Cash-out preview for job #{jobId}:
+              <ul>
+                {tipShares.map((s) => (
+                  <li key={s.name}>
+                    {s.name}
+                    {s.percent != null ? ` · ${s.percent}%` : ""} ·{" "}
+                    {formatCadCents(s.cents)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
