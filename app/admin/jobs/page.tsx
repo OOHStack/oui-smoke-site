@@ -18,6 +18,11 @@ import {
 } from "date-fns";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
+import { formatCadCents, jobDueCents } from "@/lib/job-balance";
+import {
+  normalizePaymentModel,
+  type PaymentModel,
+} from "@/lib/payment-model";
 
 type JobRow = {
   id: number;
@@ -29,7 +34,32 @@ type JobRow = {
   endsAt?: string | null;
   assignmentCount: number;
   staffNames?: string | null;
+  paymentModel?: PaymentModel | string | null;
+  quotedCents?: number | null;
+  actualCents?: number | null;
 };
+
+function jobPricingLabel(job: JobRow): { amount: string; model: string } {
+  const model = normalizePaymentModel(job.paymentModel);
+  const due = jobDueCents(job);
+
+  if (model === "complimentary") {
+    return { amount: "Comp", model: "Complimentary" };
+  }
+  if (model === "pay_at_event") {
+    return {
+      amount: due > 0 ? formatCadCents(due) : "Guest pay",
+      model: due > 0 ? "Guest pay · estimate" : "On-site sales",
+    };
+  }
+  if (due > 0) {
+    return {
+      amount: formatCadCents(due),
+      model: job.actualCents != null ? "Final" : "Quoted",
+    };
+  }
+  return { amount: "No quote", model: "Client deposit" };
+}
 
 const STATUSES = ["all", "draft", "confirmed", "active", "completed", "cancelled"];
 
@@ -80,6 +110,8 @@ function JobCard({
   highlighted?: boolean;
   compact?: boolean;
 }) {
+  const pricing = jobPricingLabel(job);
+
   return (
     <Link
       href={`/admin/jobs/${job.id}`}
@@ -104,6 +136,10 @@ function JobCard({
         <>
           <h4 className="jobs-cal__card-title">{job.title}</h4>
           <p className="jobs-cal__card-client">{job.clientName}</p>
+          <div className="jobs-cal__card-pricing" title={pricing.model}>
+            <strong>{pricing.amount}</strong>
+            <span>{pricing.model}</span>
+          </div>
           <div className="jobs-cal__card-meta">
             {job.location ? <span>{job.location}</span> : null}
             <span>
@@ -114,7 +150,12 @@ function JobCard({
           </div>
         </>
       ) : (
-        <p className="jobs-cal__card-client">{job.clientName}</p>
+        <>
+          <p className="jobs-cal__card-client">{job.clientName}</p>
+          <div className="jobs-cal__card-pricing is-compact" title={pricing.model}>
+            <strong>{pricing.amount}</strong>
+          </div>
+        </>
       )}
     </Link>
   );
@@ -494,6 +535,7 @@ export default function JobsPage() {
               <tr>
                 <th>Job</th>
                 <th>Client</th>
+                <th>Pricing</th>
                 <th>Status</th>
                 <th>Start</th>
                 <th>Hookahs</th>
@@ -501,42 +543,51 @@ export default function JobsPage() {
               </tr>
             </thead>
             <tbody>
-              {jobs.map((job) => (
-                <tr key={job.id}>
-                  <td>
-                    <Link href={`/admin/jobs/${job.id}`}>{job.title}</Link>
-                  </td>
-                  <td>{job.clientName}</td>
-                  <td>
-                    <StatusBadge status={job.status} kind="job" />
-                  </td>
-                  <td>
-                    {job.startsAt
-                      ? format(new Date(job.startsAt), "MMM d, h:mm a")
-                      : "—"}
-                  </td>
-                  <td>{job.assignmentCount ?? 0}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        onClick={() => router.push(`/admin/jobs/${job.id}`)}
-                      >
-                        Open
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-danger-ghost"
-                        disabled={busyId === job.id}
-                        onClick={() => void deleteJob(job)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {jobs.map((job) => {
+                const pricing = jobPricingLabel(job);
+                return (
+                  <tr key={job.id}>
+                    <td>
+                      <Link href={`/admin/jobs/${job.id}`}>{job.title}</Link>
+                    </td>
+                    <td>{job.clientName}</td>
+                    <td>
+                      <div className="jobs-list__pricing">
+                        <strong>{pricing.amount}</strong>
+                        <span>{pricing.model}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <StatusBadge status={job.status} kind="job" />
+                    </td>
+                    <td>
+                      {job.startsAt
+                        ? format(new Date(job.startsAt), "MMM d, h:mm a")
+                        : "—"}
+                    </td>
+                    <td>{job.assignmentCount ?? 0}</td>
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => router.push(`/admin/jobs/${job.id}`)}
+                        >
+                          Open
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger-ghost"
+                          disabled={busyId === job.id}
+                          onClick={() => void deleteJob(job)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

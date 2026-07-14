@@ -4086,6 +4086,51 @@ button.fleet-tile {
   font-size: 0.84rem;
 }
 
+.jobs-cal__card-pricing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.55rem;
+  margin-top: 0.1rem;
+}
+
+.jobs-cal__card-pricing strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.jobs-cal__card-pricing span {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.jobs-cal__card-pricing.is-compact {
+  margin-top: 0.05rem;
+}
+
+.jobs-cal__card-pricing.is-compact strong {
+  font-size: 0.86rem;
+}
+
+.jobs-list__pricing {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.jobs-list__pricing strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.jobs-list__pricing span {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
 .jobs-cal__card-meta {
   display: flex;
   flex-wrap: wrap;
