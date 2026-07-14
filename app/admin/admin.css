@@ -3036,6 +3036,24 @@ button.fleet-tile {
   min-width: 0;
 }
 
+.job-pricing-summary {
+  margin: 0 0 0.15rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+}
+
+.job-pricing-summary a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.job-pricing-summary a:hover {
+  color: var(--accent);
+}
+
 .money-story__grid span {
   color: var(--muted);
   font-size: 0.72rem;

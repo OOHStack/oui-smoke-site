@@ -123,8 +123,6 @@ type Job = {
   actualCents: number | null;
   tipCents: number | null;
   quotedCents: number | null;
-  rating: number | null;
-  rebookLikely: boolean | null;
   outcomeNotes: string | null;
   clientToken?: string | null;
   clientPortalUrl?: string | null;
@@ -213,8 +211,6 @@ export default function JobDetailPage() {
   const [outcome, setOutcome] = useState({
     actualDollars: "",
     tipDollars: "",
-    rating: "",
-    rebookLikely: "",
     outcomeNotes: "",
   });
 
@@ -243,13 +239,6 @@ export default function JobDetailPage() {
     setOutcome({
       actualDollars: centsToDollars(jobData.actualCents),
       tipDollars: centsToDollars(jobData.tipCents),
-      rating: jobData.rating != null ? String(jobData.rating) : "",
-      rebookLikely:
-        jobData.rebookLikely === true
-          ? "yes"
-          : jobData.rebookLikely === false
-            ? "no"
-            : "",
       outcomeNotes: jobData.outcomeNotes ?? "",
     });
     setLoading(false);
@@ -363,13 +352,6 @@ export default function JobDetailPage() {
       setOutcome({
         actualDollars: centsToDollars(jobData.actualCents),
         tipDollars: centsToDollars(jobData.tipCents),
-        rating: jobData.rating != null ? String(jobData.rating) : "",
-        rebookLikely:
-          jobData.rebookLikely === true
-            ? "yes"
-            : jobData.rebookLikely === false
-              ? "no"
-              : "",
         outcomeNotes: jobData.outcomeNotes ?? "",
       });
       setLoading(false);
@@ -440,13 +422,6 @@ export default function JobDetailPage() {
     await patchJob({
       actualCents: dollarsToCents(outcome.actualDollars),
       tipCents: dollarsToCents(outcome.tipDollars) ?? 0,
-      rating: outcome.rating ? parseInt(outcome.rating, 10) : null,
-      rebookLikely:
-        outcome.rebookLikely === "yes"
-          ? true
-          : outcome.rebookLikely === "no"
-            ? false
-            : null,
       outcomeNotes: outcome.outcomeNotes,
     });
   }
@@ -839,7 +814,58 @@ export default function JobDetailPage() {
         </section>
 
         <section className="panel">
-          <h2 className="panel-title">Outcome</h2>
+          <h2 className="panel-title">Pricing &amp; outcome</h2>
+          <div className="job-pricing-summary money-story__grid money-story__grid--3">
+            <div>
+              <span>Quoted</span>
+              <strong>
+                {job.quotedCents != null && job.quotedCents > 0
+                  ? formatCadCents(job.quotedCents)
+                  : "—"}
+              </strong>
+            </div>
+            <div>
+              <span>Charging</span>
+              <strong>
+                {job.paymentModel === "complimentary"
+                  ? "Comp"
+                  : job.paymentSummary && job.paymentSummary.dueCents > 0
+                    ? formatCadCents(job.paymentSummary.dueCents)
+                    : job.quotedCents != null && job.quotedCents > 0
+                      ? formatCadCents(job.quotedCents)
+                      : job.paymentModel === "pay_at_event"
+                        ? "Guest pay"
+                        : "—"}
+              </strong>
+            </div>
+            <div>
+              <span>Model</span>
+              <strong>
+                <Link href={`/admin/jobs/${jobId}/payments`}>
+                  {paymentModelLabel(job.paymentModel)}
+                </Link>
+              </strong>
+            </div>
+          </div>
+          {job.paymentSummary &&
+          job.paymentModel === "client_deposit" &&
+          job.paymentSummary.dueCents > 0 ? (
+            <p className="list-meta" style={{ margin: "0.55rem 0 0.85rem" }}>
+              Collected {formatCadCents(job.paymentSummary.paidCents)} of{" "}
+              {formatCadCents(job.paymentSummary.dueCents)}
+              {job.paymentSummary.statusLabel
+                ? ` · ${job.paymentSummary.statusLabel}`
+                : ""}
+            </p>
+          ) : (
+            <p className="list-meta" style={{ margin: "0.55rem 0 0.85rem" }}>
+              {job.paymentModel === "pay_at_event"
+                ? "Guests settle on the floor — package deposit not required."
+                : job.paymentModel === "complimentary"
+                  ? "No client package charge on this job."
+                  : "Set a quote in Edit job or Payments to track what you’re charging."}
+            </p>
+          )}
           {assignments.some((a) => a.guestFeedbackAt && a.guestRating != null) ? (
             <div className="guest-feedback-list">
               <p className="list-meta" style={{ marginBottom: "0.65rem" }}>
@@ -882,37 +908,6 @@ export default function JobDetailPage() {
                     setOutcome((o) => ({ ...o, tipDollars: e.target.value }))
                   }
                 />
-              </div>
-            </div>
-            <div className="form-row form-row-2">
-              <div className="field">
-                <label>Rating (1–5)</label>
-                <select
-                  value={outcome.rating}
-                  onChange={(e) =>
-                    setOutcome((o) => ({ ...o, rating: e.target.value }))
-                  }
-                >
-                  <option value="">—</option>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label>Rebook likely?</label>
-                <select
-                  value={outcome.rebookLikely}
-                  onChange={(e) =>
-                    setOutcome((o) => ({ ...o, rebookLikely: e.target.value }))
-                  }
-                >
-                  <option value="">—</option>
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
               </div>
             </div>
             <div className="field">
