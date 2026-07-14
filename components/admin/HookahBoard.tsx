@@ -1,14 +1,44 @@
 "use client";
 
-import { useCallback, useRef, useState, useMemo } from "react";
-import gsap from "gsap";
-import { Draggable } from "gsap/Draggable";
-import { Flip } from "gsap/Flip";
-import { useGSAP } from "@gsap/react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Ref,
+} from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCorners,
+  getFirstCollision,
+  pointerWithin,
+  rectIntersection,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DraggableAttributes,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+  type UniqueIdentifier,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import Countdown from "@/components/admin/Countdown";
 import StatusBadge from "@/components/admin/StatusBadge";
-
-gsap.registerPlugin(Draggable, Flip, useGSAP);
 
 export type BoardFlavour = { id: number; name: string; active: boolean };
 export type BoardHookah = {
@@ -48,6 +78,7 @@ export type BoardAssignment = {
 };
 
 type BoardStatus = "staged" | "out" | "returned";
+type Columns = Record<BoardStatus, number[]>;
 
 const BOARD_GROUPS: Array<{
   key: BoardStatus;
@@ -75,6 +106,8 @@ const BOARD_GROUPS: Array<{
   },
 ];
 
+const COLUMN_IDS: BoardStatus[] = ["staged", "out", "returned"];
+
 function callTypeLabel(type: string) {
   if (type === "coals") return "Coals";
   if (type === "refill") return "Refill";
@@ -90,29 +123,73 @@ function assignmentHasFlavour(a: BoardAssignment) {
   );
 }
 
-function hitFromPoint(x: number, y: number, draggedEl: Element) {
-  const stack = document.elementsFromPoint(x, y);
-  let column: BoardStatus | null = null;
-  let beforeId: number | null = null;
+function isColumnId(id: UniqueIdentifier): id is BoardStatus {
+  return id === "staged" || id === "out" || id === "returned";
+}
 
-  for (const el of stack) {
-    if (!(el instanceof HTMLElement)) continue;
-    if (el === draggedEl || draggedEl.contains(el)) continue;
+function toItemId(id: number): string {
+  return String(id);
+}
 
-    if (!beforeId && el.dataset.assignmentId) {
-      const id = Number(el.dataset.assignmentId);
-      if (Number.isFinite(id)) beforeId = id;
+function parseItemId(id: UniqueIdentifier): number | null {
+  if (isColumnId(id)) return null;
+  const n = Number(id);
+  return Number.isFinite(n) ? n : null;
+}
+
+function sortAssignments(list: BoardAssignment[]) {
+  return [...list].sort((a, b) => {
+    const ao = a.sortOrder ?? 0;
+    const bo = b.sortOrder ?? 0;
+    if (ao !== bo) return ao - bo;
+    return a.id - b.id;
+  });
+}
+
+function columnsFromAssignments(assignments: BoardAssignment[]): Columns {
+  const map: Columns = { staged: [], out: [], returned: [] };
+  for (const a of sortAssignments(assignments)) {
+    if (a.status === "staged" || a.status === "out" || a.status === "returned") {
+      map[a.status].push(a.id);
     }
-    if (!column && el.dataset.boardColumn) {
-      const key = el.dataset.boardColumn;
-      if (key === "staged" || key === "out" || key === "returned") {
-        column = key;
-      }
-    }
-    if (column && beforeId) break;
   }
+  return map;
+}
 
-  return { column, beforeId };
+function itemsByIdFromAssignments(assignments: BoardAssignment[]) {
+  const map: Record<number, BoardAssignment> = {};
+  for (const a of assignments) map[a.id] = a;
+  return map;
+}
+
+function findContainer(
+  columns: Columns,
+  id: UniqueIdentifier,
+): BoardStatus | null {
+  if (isColumnId(id)) return id;
+  const itemId = parseItemId(id);
+  if (itemId == null) return null;
+  for (const key of COLUMN_IDS) {
+    if (columns[key].includes(itemId)) return key;
+  }
+  return null;
+}
+
+function canEnterColumn(
+  assignment: BoardAssignment,
+  toStatus: BoardStatus,
+): { ok: true } | { ok: false; reason: "NEED_FLAVOUR" | "NEED_RETURN" } {
+  if (toStatus === "returned" && assignment.status !== "returned") {
+    return { ok: false, reason: "NEED_RETURN" };
+  }
+  if (
+    toStatus === "out" &&
+    assignment.status !== "out" &&
+    !assignmentHasFlavour(assignment)
+  ) {
+    return { ok: false, reason: "NEED_FLAVOUR" };
+  }
+  return { ok: true };
 }
 
 export default function HookahBoard({
@@ -128,256 +205,459 @@ export default function HookahBoard({
   }) => Promise<{ ok: boolean; code?: string; error?: string }>;
   onOpen: (id: number, prompt?: string) => void;
 }) {
-  const boardRef = useRef<HTMLDivElement>(null);
-  const [boardError, setBoardError] = useState("");
+  const [itemsById, setItemsById] = useState(() =>
+    itemsByIdFromAssignments(assignments),
+  );
+  const [columns, setColumns] = useState(() =>
+    columnsFromAssignments(assignments),
+  );
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [overColumn, setOverColumn] = useState<BoardStatus | null>(null);
+  const [boardError, setBoardError] = useState("");
   const [busy, setBusy] = useState(false);
-  const dragMoved = useRef(false);
+
+  const columnsRef = useRef(columns);
+  const itemsByIdRef = useRef(itemsById);
   const busyRef = useRef(false);
 
-  const grouped = useMemo(() => {
-    const map: Record<BoardStatus, BoardAssignment[]> = {
-      staged: [],
-      out: [],
-      returned: [],
-    };
-    const sorted = [...assignments].sort((a, b) => {
-      const ao = a.sortOrder ?? 0;
-      const bo = b.sortOrder ?? 0;
-      if (ao !== bo) return ao - bo;
-      return a.id - b.id;
-    });
-    for (const a of sorted) {
-      if (a.status === "staged" || a.status === "out" || a.status === "returned") {
-        map[a.status].push(a);
+  columnsRef.current = columns;
+  itemsByIdRef.current = itemsById;
+
+  // Sync from server when not mid-drag / mid-save
+  useEffect(() => {
+    if (activeId != null || busy) return;
+    setItemsById(itemsByIdFromAssignments(assignments));
+    setColumns(columnsFromAssignments(assignments));
+  }, [assignments, activeId, busy]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 180, tolerance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const pointerCollisions = pointerWithin(args);
+    const intersections =
+      pointerCollisions.length > 0 ? pointerCollisions : rectIntersection(args);
+
+    let overId = getFirstCollision(intersections, "id");
+    if (overId == null) {
+      return closestCorners(args);
+    }
+
+    if (isColumnId(overId)) {
+      const containerItems = columnsRef.current[overId];
+      if (containerItems.length > 0) {
+        overId = closestCorners({
+          ...args,
+          droppableContainers: args.droppableContainers.filter((container) =>
+            containerItems.includes(Number(container.id)),
+          ),
+        })[0]?.id;
       }
     }
-    return map;
-  }, [assignments]);
 
-  const place = useCallback(
+    return overId != null ? [{ id: overId }] : [];
+  }, []);
+
+  const activeAssignment = useMemo(() => {
+    const id = activeId != null ? parseItemId(activeId) : null;
+    return id != null ? itemsById[id] ?? null : null;
+  }, [activeId, itemsById]);
+
+  const persistPlace = useCallback(
     async (
-      assignment: BoardAssignment,
+      assignmentId: number,
       toStatus: BoardStatus,
-      beforeAssignmentId: number | null,
+      orderedIds: number[],
+      snapshot: { columns: Columns; itemsById: Record<number, BoardAssignment> },
     ) => {
-      if (busyRef.current) return;
-
-      if (toStatus === "returned" && assignment.status !== "returned") {
-        onOpen(
-          assignment.id,
-          "Close out this hookah — choose returned, not returned, or returned with issue.",
-        );
-        return;
-      }
-
-      if (toStatus === "out" && !assignmentHasFlavour(assignment)) {
-        onOpen(
-          assignment.id,
-          "Assign a flavour, then send out to move this hookah onto the floor.",
-        );
-        return;
-      }
-
-      // Same slot no-op
-      if (assignment.status === toStatus) {
-        const col = grouped[toStatus];
-        const fromIdx = col.findIndex((a) => a.id === assignment.id);
-        const beforeIdx =
-          beforeAssignmentId == null
-            ? col.length
-            : col.findIndex((a) => a.id === beforeAssignmentId);
-        if (beforeIdx < 0) return;
-        // inserting before self or before next sibling = no change
-        if (beforeAssignmentId === assignment.id) return;
-        if (beforeIdx === fromIdx || beforeIdx === fromIdx + 1) return;
-        if (beforeAssignmentId == null && fromIdx === col.length - 1) return;
-      }
+      const beforeAssignmentId = (() => {
+        const idx = orderedIds.indexOf(assignmentId);
+        if (idx < 0 || idx === orderedIds.length - 1) return null;
+        return orderedIds[idx + 1] ?? null;
+      })();
 
       busyRef.current = true;
       setBusy(true);
       setBoardError("");
 
-      const state = boardRef.current
-        ? Flip.getState(boardRef.current.querySelectorAll("[data-flip-id]"))
-        : null;
-
       const result = await onBoardPlace({
-        assignmentId: assignment.id,
+        assignmentId,
         toStatus,
         beforeAssignmentId,
       });
 
       if (!result.ok) {
+        setColumns(snapshot.columns);
+        setItemsById(snapshot.itemsById);
+
         if (result.code === "NEED_FLAVOUR") {
           onOpen(
-            assignment.id,
+            assignmentId,
             "Assign a flavour, then send out to move this hookah onto the floor.",
           );
         } else if (result.code === "NEED_RETURN") {
           onOpen(
-            assignment.id,
+            assignmentId,
             "Close out this hookah — choose returned, not returned, or returned with issue.",
           );
         } else {
           setBoardError(result.error ?? "Couldn’t move hookah");
         }
-      } else if (state) {
-        requestAnimationFrame(() => {
-          Flip.from(state, {
-            duration: 0.45,
-            ease: "power2.out",
-            absolute: true,
-            stagger: 0.015,
-          });
-        });
       }
 
       busyRef.current = false;
       setBusy(false);
       setOverColumn(null);
     },
-    [grouped, onBoardPlace, onOpen],
+    [onBoardPlace, onOpen],
   );
 
-  useGSAP(
-    () => {
-      if (!boardRef.current) return;
+  function handleDragStart(event: DragStartEvent) {
+    setBoardError("");
+    setActiveId(event.active.id);
+  }
 
-      const tiles = gsap.utils.toArray<HTMLElement>(
-        boardRef.current.querySelectorAll("[data-assignment-id]"),
-      );
+  function handleDragOver(event: DragOverEvent) {
+    const { active, over } = event;
+    if (!over) {
+      setOverColumn(null);
+      return;
+    }
 
-      const draggables = Draggable.create(tiles, {
-        type: "x,y",
-        zIndexBoost: true,
-        edgeResistance: 0.85,
-        inertia: false,
-        dragClickables: true,
-        onPress() {
-          dragMoved.current = false;
-          setBoardError("");
-          (this.target as HTMLElement).classList.add("job-fleet-tile--dragging");
-          gsap.to(this.target, { scale: 1.04, duration: 0.15, ease: "power2.out" });
-        },
-        onDrag() {
-          if (Math.abs(this.x) + Math.abs(this.y) > 6) {
-            dragMoved.current = true;
-          }
-          const { column } = hitFromPoint(
-            this.pointerEvent?.clientX ?? 0,
-            this.pointerEvent?.clientY ?? 0,
-            this.target as Element,
-          );
-          setOverColumn(column);
-        },
-        onRelease() {
-          (this.target as HTMLElement).classList.remove("job-fleet-tile--dragging");
-        },
-        async onDragEnd() {
-          const target = this.target as HTMLElement;
-          const assignmentId = Number(target.dataset.assignmentId);
-          const assignment = assignments.find((a) => a.id === assignmentId);
-          const pointerX = this.pointerEvent?.clientX ?? 0;
-          const pointerY = this.pointerEvent?.clientY ?? 0;
-          const { column, beforeId } = hitFromPoint(pointerX, pointerY, target);
+    const activeItemId = parseItemId(active.id);
+    if (activeItemId == null) return;
 
-          setOverColumn(null);
+    const overContainer = findContainer(columnsRef.current, over.id);
+    setOverColumn(overContainer);
 
-          // Clear drag chrome immediately so the tile can't sit above the
-          // return/flavour modal (zIndexBoost leaves a huge inline z-index).
-          gsap.killTweensOf(target);
-          gsap.set(target, {
-            x: 0,
-            y: 0,
-            scale: 1,
-            clearProps: "zIndex,transform",
-          });
-          target.classList.remove("job-fleet-tile--dragging");
+    const activeContainer = findContainer(columnsRef.current, active.id);
+    if (!activeContainer || !overContainer || activeContainer === overContainer) {
+      return;
+    }
 
-          if (!assignment || !column) return;
+    const assignment = itemsByIdRef.current[activeItemId];
+    if (!assignment) return;
 
-          await place(
-            assignment,
-            column,
-            beforeId && beforeId !== assignment.id ? beforeId : null,
-          );
-        },
-      });
+    const gate = canEnterColumn(assignment, overContainer);
+    if (!gate.ok) return;
 
-      return () => {
-        draggables.forEach((d) => d.kill());
+    setColumns((prev) => {
+      const activeItems = prev[activeContainer];
+      const overItems = prev[overContainer];
+      const activeIndex = activeItems.indexOf(activeItemId);
+      if (activeIndex < 0) return prev;
+
+      let newIndex: number;
+      if (isColumnId(over.id)) {
+        newIndex = overItems.length + 1;
+      } else {
+        const overItemId = parseItemId(over.id);
+        const overIndex = overItemId != null ? overItems.indexOf(overItemId) : -1;
+        const isBelowOverItem =
+          over &&
+          active.rect.current.translated &&
+          active.rect.current.translated.top >
+            over.rect.top + over.rect.height;
+
+        const modifier = isBelowOverItem ? 1 : 0;
+        newIndex = overIndex >= 0 ? overIndex + modifier : overItems.length + 1;
+      }
+
+      return {
+        ...prev,
+        [activeContainer]: activeItems.filter((id) => id !== activeItemId),
+        [overContainer]: [
+          ...overItems.slice(0, newIndex),
+          activeItemId,
+          ...overItems.slice(newIndex),
+        ],
       };
-    },
-    {
-      scope: boardRef,
-      dependencies: [assignments, grouped, place],
-      revertOnUpdate: true,
-    },
-  );
+    });
+
+    setItemsById((prev) => ({
+      ...prev,
+      [activeItemId]: { ...prev[activeItemId], status: overContainer },
+    }));
+  }
+
+  function handleDragCancel() {
+    setActiveId(null);
+    setOverColumn(null);
+    setItemsById(itemsByIdFromAssignments(assignments));
+    setColumns(columnsFromAssignments(assignments));
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setActiveId(null);
+
+    const activeItemId = parseItemId(active.id);
+    if (activeItemId == null) {
+      setOverColumn(null);
+      return;
+    }
+
+    const snapshot = {
+      columns: columnsFromAssignments(assignments),
+      itemsById: itemsByIdFromAssignments(assignments),
+    };
+
+    const assignment = snapshot.itemsById[activeItemId];
+    if (!assignment) {
+      setOverColumn(null);
+      return;
+    }
+
+    let nextColumns = columnsRef.current;
+    const overContainer = over
+      ? findContainer(nextColumns, over.id)
+      : findContainer(nextColumns, active.id);
+
+    if (!over || !overContainer) {
+      handleDragCancel();
+      return;
+    }
+
+    const gate = canEnterColumn(assignment, overContainer);
+    if (!gate.ok) {
+      setColumns(snapshot.columns);
+      setItemsById(snapshot.itemsById);
+      setOverColumn(null);
+      if (gate.reason === "NEED_FLAVOUR") {
+        onOpen(
+          activeItemId,
+          "Assign a flavour, then send out to move this hookah onto the floor.",
+        );
+      } else {
+        onOpen(
+          activeItemId,
+          "Close out this hookah — choose returned, not returned, or returned with issue.",
+        );
+      }
+      return;
+    }
+
+    const activeContainer = findContainer(nextColumns, active.id) ?? overContainer;
+
+    // Same-column reorder on drop
+    if (activeContainer === overContainer && !isColumnId(over.id)) {
+      const overItemId = parseItemId(over.id);
+      if (overItemId != null && activeItemId !== overItemId) {
+        const list = nextColumns[overContainer];
+        const oldIndex = list.indexOf(activeItemId);
+        const newIndex = list.indexOf(overItemId);
+        if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
+          nextColumns = {
+            ...nextColumns,
+            [overContainer]: arrayMove(list, oldIndex, newIndex),
+          };
+          setColumns(nextColumns);
+        }
+      }
+    }
+
+    // Ensure status reflects destination
+    setItemsById((prev) => ({
+      ...prev,
+      [activeItemId]: { ...prev[activeItemId], status: overContainer },
+    }));
+
+    const orderedIds = nextColumns[overContainer];
+    const fromColumn = (() => {
+      for (const key of COLUMN_IDS) {
+        if (snapshot.columns[key].includes(activeItemId)) return key;
+      }
+      return assignment.status as BoardStatus;
+    })();
+
+    const fromOrder = snapshot.columns[fromColumn] ?? [];
+    const unchanged =
+      fromColumn === overContainer &&
+      fromOrder.length === orderedIds.length &&
+      fromOrder.every((id, i) => id === orderedIds[i]);
+
+    setOverColumn(null);
+
+    if (unchanged) return;
+
+    await persistPlace(activeItemId, overContainer, orderedIds, snapshot);
+  }
 
   return (
     <>
       <p className="job-fleet-hint" style={{ marginBottom: "0.65rem" }}>
-        Drag tiles between columns or between other tiles · drop anywhere, in any order · tap
-        to open details
+        Drag tiles between columns or between other tiles · drop anywhere, in any
+        order · tap to open details
       </p>
       {boardError ? <p className="login-error">{boardError}</p> : null}
       {busy ? <p className="list-meta">Updating board…</p> : null}
 
-      <div className="hookah-board-groups" ref={boardRef}>
-        {BOARD_GROUPS.map((group) => {
-          const items = grouped[group.key];
-          return (
-            <div
+      <DndContext
+        sensors={sensors}
+        collisionDetection={collisionDetection}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className="hookah-board-groups">
+          {BOARD_GROUPS.map((group) => (
+            <BoardColumn
               key={group.key}
-              className={[
-                "hookah-group",
-                `hookah-group--${group.key}`,
-                overColumn === group.key ? "hookah-group--drop-target" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              data-board-column={group.key}
-            >
-              <div className="hookah-group__head">
-                <div>
-                  <h3 className="hookah-group__title">{group.title}</h3>
-                  <p className="hookah-group__hint">{group.hint}</p>
-                </div>
-                <span className="hookah-group__count">{items.length}</span>
-              </div>
+              group={group}
+              itemIds={columns[group.key]}
+              itemsById={itemsById}
+              isOver={overColumn === group.key}
+              activeId={activeId}
+              onOpen={onOpen}
+            />
+          ))}
+        </div>
 
-              {items.length === 0 ? (
-                <p className="hookah-group__empty">{group.empty}</p>
-              ) : (
-                <div className="fleet-grid job-fleet-grid">
-                  {items.map((a) => (
-                    <HookahTile
-                      key={a.id}
-                      assignment={a}
-                      onOpen={() => {
-                        if (dragMoved.current) return;
-                        onOpen(a.id);
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+        <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
+          {activeAssignment ? (
+            <HookahTileContent
+              assignment={activeAssignment}
+              className="job-fleet-tile--dragging job-fleet-tile--overlay"
+            />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </>
   );
 }
 
-function HookahTile({
-  assignment: a,
+function BoardColumn({
+  group,
+  itemIds,
+  itemsById,
+  isOver,
+  activeId,
+  onOpen,
+}: {
+  group: (typeof BOARD_GROUPS)[number];
+  itemIds: number[];
+  itemsById: Record<number, BoardAssignment>;
+  isOver: boolean;
+  activeId: UniqueIdentifier | null;
+  onOpen: (id: number, prompt?: string) => void;
+}) {
+  const { setNodeRef, isOver: isOverDroppable } = useDroppable({
+    id: group.key,
+  });
+
+  const sortableIds = useMemo(() => itemIds.map(toItemId), [itemIds]);
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={[
+        "hookah-group",
+        `hookah-group--${group.key}`,
+        isOver || isOverDroppable ? "hookah-group--drop-target" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      data-board-column={group.key}
+    >
+      <div className="hookah-group__head">
+        <div>
+          <h3 className="hookah-group__title">{group.title}</h3>
+          <p className="hookah-group__hint">{group.hint}</p>
+        </div>
+        <span className="hookah-group__count">{itemIds.length}</span>
+      </div>
+
+      <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
+        {itemIds.length === 0 ? (
+          <p className="hookah-group__empty">{group.empty}</p>
+        ) : (
+          <div className="fleet-grid job-fleet-grid">
+            {itemIds.map((id) => {
+              const a = itemsById[id];
+              if (!a) return null;
+              return (
+                <SortableHookahTile
+                  key={id}
+                  assignment={a}
+                  isActive={activeId === toItemId(id)}
+                  onOpen={() => onOpen(id)}
+                />
+              );
+            })}
+          </div>
+        )}
+      </SortableContext>
+    </div>
+  );
+}
+
+function SortableHookahTile({
+  assignment,
+  isActive,
   onOpen,
 }: {
   assignment: BoardAssignment;
+  isActive: boolean;
   onOpen: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: toItemId(assignment.id) });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <HookahTileContent
+      ref={setNodeRef}
+      assignment={assignment}
+      style={style}
+      className={
+        isDragging || isActive ? "job-fleet-tile--ghost" : undefined
+      }
+      attributes={attributes}
+      listeners={listeners}
+      onOpen={onOpen}
+      suppressClick={isDragging || isActive}
+    />
+  );
+}
+
+function HookahTileContent({
+  assignment: a,
+  className,
+  style,
+  attributes,
+  listeners,
+  onOpen,
+  suppressClick,
+  ref,
+}: {
+  assignment: BoardAssignment;
+  className?: string;
+  style?: CSSProperties;
+  attributes?: DraggableAttributes;
+  listeners?: ReturnType<typeof useSortable>["listeners"];
+  onOpen?: () => void;
+  suppressClick?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }) {
   const overdue =
     a.status === "out" &&
@@ -388,9 +668,10 @@ function HookahTile({
 
   return (
     <button
+      ref={ref}
       type="button"
       data-assignment-id={a.id}
-      data-flip-id={`hookah-${a.id}`}
+      style={style}
       className={[
         "fleet-tile",
         "job-fleet-tile",
@@ -399,13 +680,10 @@ function HookahTile({
         a.issueFlag ? "job-fleet-tile--issue" : "",
         call ? `job-fleet-tile--call job-fleet-tile--call-${call.type}` : "",
         call?.status === "acknowledged" ? "job-fleet-tile--call-acked" : "",
+        className ?? "",
       ]
         .filter(Boolean)
         .join(" ")}
-      onClick={(e) => {
-        e.stopPropagation();
-        onOpen();
-      }}
       title={
         call
           ? `${callTypeLabel(call.type)}${call.message ? `: ${call.message}` : ""}${
@@ -413,6 +691,13 @@ function HookahTile({
             }`
           : undefined
       }
+      onClick={(e) => {
+        e.stopPropagation();
+        if (suppressClick || !onOpen) return;
+        onOpen();
+      }}
+      {...attributes}
+      {...listeners}
     >
       <div className="fleet-num">#{a.hookah.modelNumber}</div>
       <StatusBadge status={a.status} kind="assignment" />
