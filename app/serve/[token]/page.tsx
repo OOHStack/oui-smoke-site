@@ -20,6 +20,10 @@ type ActiveRequest = {
   status: string;
   flavourLabel?: string | null;
   priceCents?: number | null;
+  payPreference?: "phone" | "terminal" | null;
+  requestedGuestPayTier?: "standard" | "unlimited" | null;
+  checkoutUrl?: string | null;
+  paymentStatus?: string | null;
   createdAt: string;
   acknowledgedAt: string | null;
   acknowledgedBy?: string | null;
@@ -58,6 +62,15 @@ type ServePayload = {
   sentOutAt: string | null;
   sessionEnded: boolean;
   refillPriceCents: number;
+  refillChargeCents?: number;
+  standardUnitCents?: number;
+  unlimitedUnitCents?: number;
+  standardUnitChargeCents?: number;
+  unlimitedUnitChargeCents?: number;
+  canOrderUnit?: boolean;
+  hstRate?: number;
+  hstPercent?: string;
+  guestPayTier?: "standard" | "unlimited" | null;
   refillCount?: number;
   flavours: FlavourOption[];
   activeRequest: ActiveRequest | null;
@@ -81,6 +94,11 @@ const REQUEST_TYPES = [
     hint: "Same flavour or a new one",
   },
   {
+    type: "order_unit",
+    label: "Another hookah",
+    hint: "Add a second or third — pick flavour & plan",
+  },
+  {
     type: "issue",
     label: "Something’s off",
     hint: "Hose, draw, tip — we can help",
@@ -89,6 +107,11 @@ const REQUEST_TYPES = [
 
 function formatMoney(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
+}
+
+function withHstDisplay(exclusiveCents: number, hstRate = 0.13) {
+  if (exclusiveCents <= 0) return 0;
+  return exclusiveCents + Math.round(exclusiveCents * hstRate);
 }
 
 function formatElapsed(ms: number) {
@@ -100,13 +123,42 @@ function formatElapsed(ms: number) {
   return `${m}m ${String(s).padStart(2, "0")}s`;
 }
 
-function requestLabel(active: ActiveRequest) {
+function requestLabel(
+  active: ActiveRequest,
+  hstRate = 0.13,
+) {
   if (active.type === "coals") return "Fresh coals";
   if (active.type === "refill") {
     const flavour = active.flavourLabel ? ` · ${active.flavourLabel}` : "";
+    const exclusive = active.priceCents ?? 0;
     const price =
-      active.priceCents != null ? ` · ${formatMoney(active.priceCents)}` : "";
-    return `Refill${flavour}${price}`;
+      exclusive > 0
+        ? ` · ${formatMoney(withHstDisplay(exclusive, hstRate))} incl. HST`
+        : " · included";
+    const pay =
+      exclusive > 0
+        ? active.payPreference === "terminal"
+          ? " · terminal"
+          : active.payPreference === "phone"
+            ? " · phone"
+            : ""
+        : "";
+    return `Refill${flavour}${price}${pay}`;
+  }
+  if (active.type === "order_unit") {
+    const tier =
+      active.requestedGuestPayTier === "unlimited"
+        ? "Unlimited"
+        : active.requestedGuestPayTier === "standard"
+          ? "Standard"
+          : "Extra";
+    const flavour = active.flavourLabel ? ` · ${active.flavourLabel}` : "";
+    const exclusive = active.priceCents ?? 0;
+    const price =
+      exclusive > 0
+        ? ` · ${formatMoney(withHstDisplay(exclusive, hstRate))} incl. HST`
+        : "";
+    return `Another hookah · ${tier}${flavour}${price}`;
   }
   if (active.type === "issue") return "Issue";
   return "Help";
@@ -160,12 +212,39 @@ export default function GuestServePage() {
   const [note, setNote] = useState("");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [refillFlavourId, setRefillFlavourId] = useState("");
-  const [priceAgreed, setPriceAgreed] = useState(false);
+  const [orderTier, setOrderTier] = useState<"standard" | "unlimited" | "">(
+    "",
+  );
+  const [payPreference, setPayPreference] = useState<"phone" | "terminal" | null>(
+    null,
+  );
   const [now, setNow] = useState(() => Date.now());
   const [rating, setRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState("");
   const [feedbackBusy, setFeedbackBusy] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState("");
+  const [toast, setToast] = useState("");
+  const [toastBusy, setToastBusy] = useState(false);
+  const [statusFlash, setStatusFlash] = useState(false);
+  const prevRequestSig = useRef<string | null>(null);
+  const suppressResolveToast = useRef(false);
+
+  function showToast(message: string, busy = false) {
+    setToast(message);
+    setToastBusy(busy);
+  }
+
+  function flashStatus() {
+    setStatusFlash(true);
+    window.setTimeout(() => setStatusFlash(false), 900);
+    try {
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate?.(40);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -201,6 +280,59 @@ export default function GuestServePage() {
     return () => clearInterval(tick);
   }, [load]);
 
+  useEffect(() => {
+    if (!toast || toastBusy) return;
+    const t = window.setTimeout(() => setToast(""), 4500);
+    return () => window.clearTimeout(t);
+  }, [toast, toastBusy]);
+
+  useEffect(() => {
+    const active = data?.activeRequest;
+    const sig = active
+      ? `${active.id}:${active.status}:${active.paymentStatus ?? ""}:${active.payPreference ?? ""}`
+      : null;
+
+    if (prevRequestSig.current == null) {
+      prevRequestSig.current = sig;
+      return;
+    }
+    if (sig === prevRequestSig.current) return;
+
+    const prev = prevRequestSig.current;
+    prevRequestSig.current = sig;
+
+    if (prev && !sig) {
+      if (suppressResolveToast.current) {
+        suppressResolveToast.current = false;
+      } else {
+        showToast("All set — enjoy your smoke.");
+        flashStatus();
+      }
+      return;
+    }
+    if (!sig || !active) return;
+
+    const [, prevStatus, prevPay] = prev.split(":");
+
+    if (prevStatus === "open" && active.status === "acknowledged") {
+      showToast("Staff are on the way.");
+      flashStatus();
+    } else if (
+      (active.type === "refill" || active.type === "order_unit") &&
+      prevPay !== "succeeded" &&
+      active.paymentStatus === "succeeded"
+    ) {
+      showToast(
+        active.type === "order_unit"
+          ? "Payment confirmed — your next hookah is coming."
+          : "Payment confirmed — refill is in motion.",
+      );
+      flashStatus();
+    } else if (!prev && sig) {
+      flashStatus();
+    }
+  }, [data?.activeRequest]);
+
   useSse<ServePayload & { error?: string }>(
     token ? `/api/stream/serve/${encodeURIComponent(token)}` : null,
     (json) => {
@@ -225,10 +357,17 @@ export default function GuestServePage() {
 
   async function submit(
     type: string,
-    extras?: { message?: string; flavourId?: number; priceAgreed?: boolean },
+    extras?: {
+      message?: string;
+      flavourId?: number;
+      priceAgreed?: boolean;
+      payPreference?: "phone" | "terminal";
+      guestPayTier?: "standard" | "unlimited";
+    },
   ) {
     setSubmitting(true);
     setError("");
+    showToast("Sending your request…", true);
     try {
       const res = await fetch(`/api/serve/${token}`, {
         method: "POST",
@@ -238,18 +377,49 @@ export default function GuestServePage() {
           message: extras?.message || undefined,
           flavourId: extras?.flavourId,
           priceAgreed: extras?.priceAgreed,
+          payPreference: extras?.payPreference,
+          guestPayTier: extras?.guestPayTier,
         }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(json.error ?? "Couldn’t send request");
+        setToast("");
+        setToastBusy(false);
         await load();
         return;
       }
       setSelectedType(null);
       setNote("");
-      setPriceAgreed(false);
+      setPayPreference(null);
+      setOrderTier("");
+      if (type === "refill" || type === "order_unit") {
+        // keep flavour pick for next time
+      } else {
+        setRefillFlavourId(data?.flavourId ? String(data.flavourId) : "");
+      }
       await load();
+      showToast(
+        type === "refill"
+          ? "Refill requested — watching for staff updates."
+          : type === "order_unit"
+            ? "Extra hookah requested — watching for staff updates."
+          : type === "coals"
+            ? "Coals requested — we’ll update this page live."
+            : "Request sent — keep this page open for live updates.",
+      );
+      flashStatus();
+      if (typeof json.checkoutUrl === "string" && json.checkoutUrl) {
+        window.open(json.checkoutUrl, "_blank", "noopener,noreferrer");
+      }
+      if (
+        json.linkOk === false &&
+        (type === "refill" || type === "order_unit")
+      ) {
+        setError(
+          "Pay link didn’t open — you can retry or switch to terminal on the next screen.",
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -343,19 +513,61 @@ export default function GuestServePage() {
       setError("Choose a flavour for your refill");
       return;
     }
-    if (!priceAgreed) {
-      setError("Please agree to the refill price");
+    const needsPay = (data.refillPriceCents ?? 0) > 0;
+    if (needsPay && !payPreference) {
+      setError("Choose how you’d like to pay");
       return;
     }
-    submit("refill", { flavourId, priceAgreed: true, message: note || undefined });
+    submit("refill", {
+      flavourId,
+      priceAgreed: true,
+      payPreference: needsPay ? payPreference! : undefined,
+      message: note || undefined,
+    });
   }
 
   function openRefill() {
     setSelectedType("refill");
-    setPriceAgreed(false);
+    setPayPreference(null);
     setNote("");
     setError("");
     if (data?.flavourId) setRefillFlavourId(String(data.flavourId));
+  }
+
+  function openOrderUnit() {
+    setSelectedType("order_unit");
+    setOrderTier("");
+    setPayPreference(null);
+    setNote("");
+    setError("");
+    if (data?.flavourId) setRefillFlavourId(String(data.flavourId));
+  }
+
+  function handleOrderUnitSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!data) return;
+    if (orderTier !== "standard" && orderTier !== "unlimited") {
+      setError("Choose Standard or Unlimited");
+      return;
+    }
+    const flavourId = refillFlavourId
+      ? parseInt(refillFlavourId, 10)
+      : undefined;
+    if (!flavourId) {
+      setError("Choose a flavour for the new hookah");
+      return;
+    }
+    if (!payPreference) {
+      setError("Choose how you’d like to pay");
+      return;
+    }
+    submit("order_unit", {
+      flavourId,
+      guestPayTier: orderTier,
+      priceAgreed: true,
+      payPreference,
+      message: note || undefined,
+    });
   }
 
   if (loading) {
@@ -380,7 +592,27 @@ export default function GuestServePage() {
 
   const active = data.activeRequest;
   const onTheWay = active?.status === "acknowledged";
-  const priceLabel = formatMoney(data.refillPriceCents ?? 2500);
+  const hstRate = data.hstRate ?? 0.13;
+  const hstPct = data.hstPercent ?? String(Math.round(hstRate * 100));
+  const chargeCents =
+    data.refillChargeCents ??
+    withHstDisplay(data.refillPriceCents ?? 0, hstRate);
+  const priceLabel =
+    chargeCents > 0
+      ? `${formatMoney(chargeCents)} incl. HST`
+      : "Included";
+  const exclusiveLabel = formatMoney(data.refillPriceCents ?? 0);
+  const isUnlimited = data.guestPayTier === "unlimited" || data.refillPriceCents <= 0;
+  const isStandard = data.guestPayTier === "standard" || (!isUnlimited && data.refillPriceCents > 0);
+  const refillPaid =
+    (active?.type === "refill" || active?.type === "order_unit") &&
+    active.paymentStatus === "succeeded";
+  const refillCheckoutUrl =
+    (active?.type === "refill" || active?.type === "order_unit") &&
+    active.paymentStatus === "pending" &&
+    active.payPreference !== "terminal"
+      ? active.checkoutUrl
+      : null;
   const etaRemaining =
     onTheWay && active?.etaAt
       ? Math.max(0, Math.ceil((new Date(active.etaAt).getTime() - now) / 1000))
@@ -401,6 +633,159 @@ export default function GuestServePage() {
     (r) => !active || r.id !== active.id,
   );
 
+  const refillStatusCopy = (() => {
+    if (active?.type !== "refill") return null;
+    const host = active.acknowledgedBy?.trim() || null;
+    const free = (active.priceCents ?? 0) <= 0;
+    if (free) {
+      return onTheWay
+        ? host
+          ? `Your refill is included. ${host} is bringing a fresh head now.`
+          : "Your refill is included. A host is bringing a fresh head now."
+        : "Your refill is included — staff are preparing a fresh head. No payment needed.";
+    }
+    if (refillPaid) {
+      return onTheWay
+        ? host
+          ? `Payment confirmed. ${host} is bringing your fresh head now.`
+          : "Payment confirmed. A host is bringing your fresh head now."
+        : "Payment confirmed. Staff are preparing your refill — no need to pay again.";
+    }
+    if (active.payPreference === "terminal") {
+      return onTheWay
+        ? host
+          ? `${host} is coming with the payment terminal. Pay when they arrive.`
+          : "A host is coming with the payment terminal. Pay when they arrive."
+        : "We’ve got your refill. Staff will bring the terminal so you can pay in person.";
+    }
+    if (refillCheckoutUrl) {
+      return onTheWay
+        ? host
+          ? `${host} is on the way. Complete payment on your phone so we can mark this paid.`
+          : "A host is on the way. Complete payment on your phone so we can mark this paid."
+        : "We’ve got your refill. Tap Pay below — staff prep a fresh head while you checkout.";
+    }
+    if (active.payPreference === "phone" && !refillCheckoutUrl) {
+      return "Pay link didn’t open. Retry below, or switch to terminal so staff can collect in person.";
+    }
+    return onTheWay
+      ? host
+        ? `${host} is on the way with your refill.`
+        : "A host is on the way with your refill."
+      : "We’ve got your refill — staff are preparing a fresh head.";
+  })();
+
+  const orderUnitStatusCopy = (() => {
+    if (active?.type !== "order_unit") return null;
+    const host = active.acknowledgedBy?.trim() || null;
+    const tier =
+      active.requestedGuestPayTier === "unlimited"
+        ? "Unlimited"
+        : "Standard";
+    const flavour = active.flavourLabel || "your flavour";
+    if (refillPaid) {
+      return onTheWay
+        ? host
+          ? `Payment confirmed. ${host} is prepping another ${tier} hookah · ${flavour}.`
+          : `Payment confirmed. Staff are prepping another ${tier} hookah · ${flavour}.`
+        : `Payment confirmed. Staff will stage another ${tier} hookah · ${flavour}.`;
+    }
+    if (active.payPreference === "terminal") {
+      return onTheWay
+        ? host
+          ? `${host} is coming with the terminal for your extra ${tier} hookah.`
+          : "A host is coming with the terminal for your extra hookah."
+        : `We’ve got your order · ${tier} · ${flavour}. Staff will bring the terminal.`;
+    }
+    if (refillCheckoutUrl) {
+      return onTheWay
+        ? host
+          ? `${host} is on it. Complete payment on your phone for the extra hookah.`
+          : "A host is on it. Complete payment on your phone for the extra hookah."
+        : `We’ve got your order · ${tier} · ${flavour}. Tap Pay below while staff prep.`;
+    }
+    if (active.payPreference === "phone" && !refillCheckoutUrl) {
+      return "Pay link didn’t open. Retry below, or switch to terminal so staff can collect in person.";
+    }
+    return onTheWay
+      ? host
+        ? `${host} is preparing your extra hookah.`
+        : "A host is preparing your extra hookah."
+      : `We’ve got your order · ${tier} · ${flavour}.`;
+  })();
+
+  const standardUnitLabel = formatMoney(
+    data.standardUnitChargeCents ??
+      withHstDisplay(data.standardUnitCents ?? 8000, hstRate),
+  );
+  const unlimitedUnitLabel = formatMoney(
+    data.unlimitedUnitChargeCents ??
+      withHstDisplay(data.unlimitedUnitCents ?? 10000, hstRate),
+  );
+  const actionTypes = REQUEST_TYPES.filter(
+    (item) => item.type !== "order_unit" || data.canOrderUnit,
+  );
+
+  async function guestRequestAction(
+    action: "cancel_request" | "update_pay_preference" | "retry_checkout",
+    payPreference?: "phone" | "terminal",
+  ) {
+    setSubmitting(true);
+    setError("");
+    showToast(
+      action === "cancel_request"
+        ? "Cancelling request…"
+        : action === "retry_checkout"
+          ? "Retrying pay link…"
+          : payPreference === "terminal"
+            ? "Switching to terminal…"
+            : "Switching to phone pay…",
+      true,
+    );
+    try {
+      const res = await fetch(`/api/serve/${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, payPreference }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error ?? "Couldn’t update request");
+        setToast("");
+        setToastBusy(false);
+        await load();
+        return;
+      }
+      if (json.modelNumber != null) {
+        setData(json);
+      } else {
+        await load();
+      }
+      if (action === "cancel_request") {
+        suppressResolveToast.current = true;
+        showToast("Request cancelled.");
+      } else if (action === "retry_checkout") {
+        showToast(
+          json.linkOk === false
+            ? "Pay link still failed — try terminal."
+            : "Pay link ready — check the button below.",
+        );
+      } else if (payPreference === "terminal") {
+        showToast("Switched to terminal — staff will collect on the floor.");
+      } else {
+        showToast("Switched to phone pay.");
+      }
+      flashStatus();
+      if (typeof json.checkoutUrl === "string" && json.checkoutUrl) {
+        window.open(json.checkoutUrl, "_blank", "noopener,noreferrer");
+      }
+      if (json.linkOk === false) {
+        setError("Pay link still failed — try again or switch to terminal.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
   return (
     <div className="serve">
       <div className="serve__shell">
@@ -410,10 +795,28 @@ export default function GuestServePage() {
           <p className="serve__kicker">Guest service</p>
         </header>
 
+        {toast ? (
+          <p className={`serve__toast${toastBusy ? " serve__toast--busy" : ""}`}>
+            {toast}
+          </p>
+        ) : null}
+
         <section className="serve__hero">
           <p className="serve__eyebrow">Your hookah</p>
           <h1 className="serve__number">#{data.modelNumber}</h1>
           {data.flavour ? <p className="serve__flavour">{data.flavour}</p> : null}
+          {data.guestPayTier || data.refillPriceCents >= 0 ? (
+            <div
+              className={`serve__tier${isUnlimited ? " serve__tier--unlimited" : " serve__tier--standard"}`}
+            >
+              <strong>{isUnlimited ? "Unlimited" : isStandard ? "Standard" : "Your plan"}</strong>
+              <span>
+                {isUnlimited
+                  ? "Refills included · no charge"
+                  : `Refills ${exclusiveLabel} + ${hstPct}% HST (${priceLabel})`}
+              </span>
+            </div>
+          ) : null}
           {elapsed && !data.sessionEnded ? (
             <p className="serve__timer">
               With you for <strong>{elapsed}</strong>
@@ -522,30 +925,209 @@ export default function GuestServePage() {
           </div>
         ) : active ? (
           <div
-            className={`serve__status ${onTheWay ? "serve__status--way" : "serve__status--wait"}`}
+            className={`serve__status ${
+              refillPaid
+                ? "serve__status--paid"
+                : onTheWay
+                  ? "serve__status--way"
+                  : "serve__status--wait"
+            }${statusFlash ? " is-flash" : ""}`}
           >
-            <h2>{onTheWay ? "We’re on the way" : "Request received"}</h2>
+            {refillPaid ? (
+              <p className="serve__paid-badge">Payment received</p>
+            ) : null}
+            <h2>
+              {refillPaid
+                ? "You’re paid — we’re on it"
+                : onTheWay
+                  ? active.acknowledgedBy
+                    ? `${active.acknowledgedBy} is on the way`
+                    : "We’re on the way"
+                  : "Request received"}
+            </h2>
             <p>
               {active.type === "refill"
-                ? onTheWay
-                  ? "A host is bringing a fresh head and a payment terminal."
-                  : "We’ve got your refill — staff will bring a fresh head and a payment terminal."
+                ? refillStatusCopy
+                : active.type === "order_unit"
+                  ? orderUnitStatusCopy
                 : onTheWay
-                  ? "A host is coming to help — keep this page open."
+                  ? active.acknowledgedBy
+                    ? `${active.acknowledgedBy} claimed your request — keep this page open.`
+                    : "A host claimed your request — keep this page open."
                   : "We’ve got your request. Keep this page open for live updates."}
             </p>
+            <ol className="serve__loop" aria-label="Live request progress">
+              <li className="serve__loop-step is-done">
+                <span className="serve__loop-dot" aria-hidden />
+                <div>
+                  <strong>Request sent</strong>
+                  <span>Staff can see it on the floor</span>
+                </div>
+              </li>
+              <li
+                className={`serve__loop-step ${
+                  onTheWay || refillPaid
+                    ? "is-done"
+                    : "is-current"
+                }`}
+              >
+                <span className="serve__loop-dot" aria-hidden />
+                <div>
+                  <strong>Staff on the way</strong>
+                  <span>
+                    {onTheWay || refillPaid
+                      ? active.acknowledgedBy
+                        ? `${active.acknowledgedBy} is heading over`
+                        : "A host is heading over"
+                      : "Waiting for staff to pick this up"}
+                  </span>
+                </div>
+              </li>
+              {(active.type === "refill" || active.type === "order_unit") &&
+              (active.priceCents ?? 0) > 0 ? (
+                <li
+                  className={`serve__loop-step ${
+                    refillPaid
+                      ? "is-done"
+                      : onTheWay
+                        ? "is-current"
+                        : ""
+                  }`}
+                >
+                  <span className="serve__loop-dot" aria-hidden />
+                  <div>
+                    <strong>Payment</strong>
+                    <span>
+                      {refillPaid
+                        ? "Confirmed"
+                        : active.payPreference === "terminal"
+                          ? "Pay when staff arrive with the terminal"
+                          : "Pay on your phone, or switch to terminal"}
+                    </span>
+                  </div>
+                </li>
+              ) : null}
+              <li
+                className={`serve__loop-step ${
+                  refillPaid && onTheWay ? "is-current" : ""
+                }`}
+              >
+                <span className="serve__loop-dot" aria-hidden />
+                <div>
+                  <strong>
+                    {active.type === "order_unit"
+                      ? "Extra hookah out"
+                      : active.type === "refill"
+                        ? "Fresh head delivered"
+                        : "Complete"}
+                  </strong>
+                  <span>
+                    {active.type === "order_unit"
+                      ? "Staff stage a new unit and bring its QR"
+                      : "This clears when staff finish at your table"}
+                  </span>
+                </div>
+              </li>
+            </ol>
+            {refillPaid && active.priceCents != null && active.priceCents > 0 ? (
+              <p className="serve__paid-amount">
+                {formatMoney(
+                  withHstDisplay(active.priceCents, hstRate),
+                )}{" "}
+                incl. HST confirmed
+                {active.payPreference === "terminal" ? " with staff" : " via Square"}
+              </p>
+            ) : null}
             {etaLabel ? (
               <p className="serve__eta">
                 ETA · <strong>{etaLabel}</strong>
               </p>
             ) : null}
-            <div className="serve__pill">{requestLabel(active)}</div>
+            <div className="serve__pill">{requestLabel(active, hstRate)}</div>
+            {refillCheckoutUrl ? (
+              <a
+                className="serve__btn"
+                href={refillCheckoutUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ marginTop: 16, display: "inline-flex" }}
+              >
+                Pay{" "}
+                {active.priceCents != null
+                  ? `${formatMoney(withHstDisplay(active.priceCents, hstRate))} incl. HST`
+                  : priceLabel}{" "}
+                on your phone
+              </a>
+            ) : null}
+            {active.type === "refill" || active.type === "order_unit"
+              ? (active.priceCents ?? 0) > 0 && !refillPaid
+                ? (
+              <div className="serve__recover">
+                {active.payPreference === "phone" && !refillCheckoutUrl ? (
+                  <button
+                    type="button"
+                    className="serve__btn"
+                    disabled={submitting}
+                    onClick={() => void guestRequestAction("retry_checkout")}
+                  >
+                    Retry pay link
+                  </button>
+                ) : null}
+                {active.payPreference === "phone" ? (
+                  <button
+                    type="button"
+                    className="serve__btn serve__btn--ghost"
+                    disabled={submitting}
+                    onClick={() =>
+                      void guestRequestAction("update_pay_preference", "terminal")
+                    }
+                  >
+                    Switch to terminal
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="serve__btn serve__btn--ghost"
+                    disabled={submitting}
+                    onClick={() =>
+                      void guestRequestAction("update_pay_preference", "phone")
+                    }
+                  >
+                    Switch to phone pay
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="serve__btn serve__btn--ghost"
+                  disabled={submitting}
+                  onClick={() => void guestRequestAction("cancel_request")}
+                >
+                  Cancel request
+                </button>
+              </div>
+                )
+                : null
+              : null}
+            {(active.type === "refill" || active.type === "order_unit") &&
+            active.payPreference === "terminal" &&
+            !refillPaid ? (
+              <p className="serve__muted" style={{ marginTop: 12 }}>
+                No phone payment needed — pay when staff arrive with the terminal.
+              </p>
+            ) : null}
+            {refillPaid ? (
+              <p className="serve__muted" style={{ marginTop: 12 }}>
+                Staff can see this payment. Keep this page open for live updates.
+              </p>
+            ) : null}
           </div>
         ) : selectedType === "refill" ? (
           <form className="serve__note serve__refill" onSubmit={handleRefillSubmit}>
             <h2 className="serve__section-title">Request a refill</h2>
             <p className="serve__muted">
-              Pick the same flavour or switch. Staff will prep a new head and bring a payment terminal.
+              {isUnlimited
+                ? "Pick the same flavour or switch. Refills are included on Unlimited — no charge."
+                : `Pick the same flavour or switch. Standard refills are ${priceLabel}.`}
             </p>
 
             <label htmlFor="refill-flavour">Flavour</label>
@@ -573,19 +1155,39 @@ export default function GuestServePage() {
               );
             })()}
 
-            <div className="serve__price">
-              <span>Refill price</span>
-              <strong>{priceLabel}</strong>
-            </div>
+            {isUnlimited ? (
+              <div className="serve__price serve__price--included">
+                <span>This refill</span>
+                <strong>Included</strong>
+              </div>
+            ) : (
+              <>
+                <div className="serve__price">
+                  <span>Refill price</span>
+                  <strong>{priceLabel}</strong>
+                </div>
 
-            <label className="serve__agree">
-              <input
-                type="checkbox"
-                checked={priceAgreed}
-                onChange={(e) => setPriceAgreed(e.target.checked)}
-              />
-              <span>I agree to pay {priceLabel} for this refill</span>
-            </label>
+                <p className="serve__pay-label">How do you want to pay?</p>
+                <div className="serve__pay-choices" role="group" aria-label="Pay method">
+                  <button
+                    type="button"
+                    className={`serve__pay-choice${payPreference === "phone" ? " is-on" : ""}`}
+                    onClick={() => setPayPreference("phone")}
+                  >
+                    <strong>Pay on my phone</strong>
+                    <span>Get a Square link now — staff prep while you checkout</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`serve__pay-choice${payPreference === "terminal" ? " is-on" : ""}`}
+                    onClick={() => setPayPreference("terminal")}
+                  >
+                    <strong>Bring the terminal</strong>
+                    <span>Staff collect payment when they deliver your refill</span>
+                  </button>
+                </div>
+              </>
+            )}
 
             <label htmlFor="refill-note">Note (optional)</label>
             <textarea
@@ -604,7 +1206,7 @@ export default function GuestServePage() {
                 onClick={() => {
                   setSelectedType(null);
                   setNote("");
-                  setPriceAgreed(false);
+                  setPayPreference(null);
                   setError("");
                 }}
               >
@@ -613,9 +1215,127 @@ export default function GuestServePage() {
               <button
                 type="submit"
                 className="serve__btn"
-                disabled={submitting || !priceAgreed || !refillFlavourId}
+                disabled={
+                  submitting ||
+                  !refillFlavourId ||
+                  (!isUnlimited && !payPreference)
+                }
               >
-                Request refill
+                {isUnlimited
+                  ? "Request refill"
+                  : payPreference === "phone"
+                    ? "Request & pay on phone"
+                    : payPreference === "terminal"
+                      ? "Request · bring terminal"
+                      : "Request refill"}
+              </button>
+            </div>
+          </form>
+        ) : selectedType === "order_unit" ? (
+          <form
+            className="serve__note serve__refill"
+            onSubmit={handleOrderUnitSubmit}
+          >
+            <h2 className="serve__section-title">Order another hookah</h2>
+            <p className="serve__muted">
+              Pick Standard or Unlimited, then a flavour. Staff will stage a new
+              unit and bring its QR code.
+            </p>
+
+            <p className="serve__pay-label">Plan</p>
+            <div className="serve__pay-choices" role="group" aria-label="Plan">
+              <button
+                type="button"
+                className={`serve__pay-choice${orderTier === "standard" ? " is-on" : ""}`}
+                onClick={() => setOrderTier("standard")}
+              >
+                <strong>Standard · {standardUnitLabel}</strong>
+                <span>Incl. HST · refills extra</span>
+              </button>
+              <button
+                type="button"
+                className={`serve__pay-choice${orderTier === "unlimited" ? " is-on" : ""}`}
+                onClick={() => setOrderTier("unlimited")}
+              >
+                <strong>Unlimited · {unlimitedUnitLabel}</strong>
+                <span>Incl. HST · refills included</span>
+              </button>
+            </div>
+
+            <label htmlFor="order-flavour">Flavour</label>
+            <select
+              id="order-flavour"
+              value={refillFlavourId}
+              onChange={(e) => setRefillFlavourId(e.target.value)}
+              required
+            >
+              <option value="">Choose flavour…</option>
+              {data.flavours.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+
+            <p className="serve__pay-label">How do you want to pay?</p>
+            <div className="serve__pay-choices" role="group" aria-label="Pay method">
+              <button
+                type="button"
+                className={`serve__pay-choice${payPreference === "phone" ? " is-on" : ""}`}
+                onClick={() => setPayPreference("phone")}
+              >
+                <strong>Pay on my phone</strong>
+                <span>Get a Square link now — staff prep while you checkout</span>
+              </button>
+              <button
+                type="button"
+                className={`serve__pay-choice${payPreference === "terminal" ? " is-on" : ""}`}
+                onClick={() => setPayPreference("terminal")}
+              >
+                <strong>Bring the terminal</strong>
+                <span>Staff collect when they bring the new hookah</span>
+              </button>
+            </div>
+
+            <label htmlFor="order-note">Note (optional)</label>
+            <textarea
+              id="order-note"
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Table number, who it’s for…"
+              maxLength={280}
+            />
+
+            <div className="serve__note-actions">
+              <button
+                type="button"
+                className="serve__btn serve__btn--ghost"
+                onClick={() => {
+                  setSelectedType(null);
+                  setNote("");
+                  setPayPreference(null);
+                  setOrderTier("");
+                  setError("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="serve__btn"
+                disabled={
+                  submitting ||
+                  !orderTier ||
+                  !refillFlavourId ||
+                  !payPreference
+                }
+              >
+                {payPreference === "phone"
+                  ? "Order & pay on phone"
+                  : payPreference === "terminal"
+                    ? "Order · bring terminal"
+                    : "Order hookah"}
               </button>
             </div>
           </form>
@@ -627,7 +1347,7 @@ export default function GuestServePage() {
                 Tap below — we’ll see it instantly on the floor.
               </p>
               <div className="serve__grid">
-                {REQUEST_TYPES.map((item) => (
+                {actionTypes.map((item) => (
                   <button
                     key={item.type}
                     type="button"
@@ -639,13 +1359,23 @@ export default function GuestServePage() {
                         setError("");
                       } else if (item.type === "refill") {
                         openRefill();
+                      } else if (item.type === "order_unit") {
+                        openOrderUnit();
                       } else {
                         submit(item.type);
                       }
                     }}
                   >
                     <span className="serve__action-label">{item.label}</span>
-                    <span className="serve__action-hint">{item.hint}</span>
+                    <span className="serve__action-hint">
+                      {item.type === "refill"
+                        ? isUnlimited
+                          ? "Included on Unlimited — no charge"
+                          : `Standard · ${priceLabel} · phone or terminal`
+                        : item.type === "order_unit"
+                          ? `Standard ${standardUnitLabel} · Unlimited ${unlimitedUnitLabel}`
+                          : item.hint}
+                    </span>
                   </button>
                 ))}
               </div>

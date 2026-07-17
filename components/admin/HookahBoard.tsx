@@ -39,6 +39,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import Countdown from "@/components/admin/Countdown";
 import StatusBadge from "@/components/admin/StatusBadge";
+import { refillPayChip, unitPayChip } from "@/lib/ops/guest-pay";
 
 export type BoardFlavour = { id: number; name: string; active: boolean };
 export type BoardHookah = {
@@ -54,6 +55,9 @@ export type BoardCall = {
   status: string;
   flavourLabel?: string | null;
   priceCents?: number | null;
+  payPreference?: "phone" | "terminal" | null;
+  paymentStatus?: string | null;
+  checkoutUrl?: string | null;
   createdAt: string;
   acknowledgedAt: string | null;
 };
@@ -70,6 +74,7 @@ export type BoardAssignment = {
   issueFlag: boolean;
   guestToken: string | null;
   guestPayTier?: "standard" | "unlimited" | null;
+  unitPaymentStatus?: string | null;
   sentOutAt: string | null;
   returnNotes: string | null;
   returnOutcome: "returned" | "not_returned" | "returned_with_issue" | null;
@@ -90,7 +95,7 @@ const BOARD_GROUPS: Array<{
   {
     key: "staged",
     title: "Ready to send",
-    hint: "Drag freely · reorder anytime",
+    hint: "Set flavour here for prep · then send out",
     empty: "Drop hookahs here to stage",
   },
   {
@@ -593,7 +598,7 @@ export default function HookahBoard({
   return (
     <>
       <p className="job-fleet-hint" style={{ marginBottom: "0.65rem" }}>
-        Drag to move · tap to open · checkboxes for bulk actions per column
+        Drag to move · tap to open · Select all, then tap cards to multi-select
       </p>
       {boardError ? <p className="login-error">{boardError}</p> : null}
       {bulkMsg ? <p className="list-meta">{bulkMsg}</p> : null}
@@ -711,20 +716,14 @@ function BoardColumn({
         </div>
         <div className="hookah-group__head-aside">
           {itemIds.length > 0 ? (
-            <label className="hookah-group__select-all">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                ref={(el) => {
-                  if (el) {
-                    el.indeterminate = someSelected && !allSelected;
-                  }
-                }}
-                onChange={(e) => onSelectAll(e.target.checked)}
-                disabled={bulkBusy}
-              />
-              <span>All</span>
-            </label>
+            <button
+              type="button"
+              className={`hookah-group__select-all${allSelected ? " is-on" : ""}`}
+              disabled={bulkBusy}
+              onClick={() => onSelectAll(!allSelected)}
+            >
+              {allSelected ? "Clear all" : "Select all"}
+            </button>
           ) : null}
           <span className="hookah-group__count">{itemIds.length}</span>
         </div>
@@ -745,6 +744,26 @@ function BoardColumn({
               </button>
               {payAtEvent ? (
                 <>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    disabled={bulkBusy}
+                    onClick={() =>
+                      onBulk("send_out", { guestPayTier: "standard" })
+                    }
+                  >
+                    Send as Standard
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    disabled={bulkBusy}
+                    onClick={() =>
+                      onBulk("send_out", { guestPayTier: "unlimited" })
+                    }
+                  >
+                    Send as Unlimited
+                  </button>
                   <button
                     type="button"
                     className="btn btn-sm"
@@ -834,6 +853,8 @@ function BoardColumn({
                   assignment={a}
                   isActive={activeId === toItemId(id)}
                   selected={selected.has(id)}
+                  selectMode={someSelected}
+                  showUnitPay={payAtEvent}
                   onOpen={() => onOpen(id)}
                   onToggleSelected={() => onToggleSelected(id)}
                 />
@@ -850,12 +871,16 @@ function SortableHookahTile({
   assignment,
   isActive,
   selected,
+  selectMode,
+  showUnitPay,
   onOpen,
   onToggleSelected,
 }: {
   assignment: BoardAssignment;
   isActive: boolean;
   selected: boolean;
+  selectMode: boolean;
+  showUnitPay?: boolean;
   onOpen: () => void;
   onToggleSelected: () => void;
 }) {
@@ -887,6 +912,8 @@ function SortableHookahTile({
       attributes={attributes}
       listeners={listeners}
       selected={selected}
+      selectMode={selectMode}
+      showUnitPay={showUnitPay}
       onOpen={onOpen}
       onToggleSelected={onToggleSelected}
       suppressClick={isDragging || isActive}
@@ -901,6 +928,8 @@ function HookahTileContent({
   attributes,
   listeners,
   selected,
+  selectMode,
+  showUnitPay,
   onOpen,
   onToggleSelected,
   suppressClick,
@@ -912,10 +941,12 @@ function HookahTileContent({
   attributes?: DraggableAttributes;
   listeners?: ReturnType<typeof useSortable>["listeners"];
   selected?: boolean;
+  selectMode?: boolean;
+  showUnitPay?: boolean;
   onOpen?: () => void;
   onToggleSelected?: () => void;
   suppressClick?: boolean;
-  ref?: Ref<HTMLDivElement>;
+  ref?: Ref<HTMLButtonElement>;
 }) {
   const overdue =
     a.status === "out" &&
@@ -923,10 +954,12 @@ function HookahTileContent({
     new Date(a.nextCheckAt).getTime() < Date.now();
   const flavourName = a.flavour?.name ?? a.flavourLabel ?? null;
   const call = a.activeCall;
+  const label = a.hookah.label?.trim() || null;
 
   return (
-    <div
+    <button
       ref={ref}
+      type="button"
       data-assignment-id={a.id}
       style={style}
       className={[
@@ -941,69 +974,118 @@ function HookahTileContent({
       ]
         .filter(Boolean)
         .join(" ")}
+      aria-pressed={selected ? true : undefined}
       title={
         call
           ? `${callTypeLabel(call.type)}${call.message ? `: ${call.message}` : ""}${
               call.status === "acknowledged" ? " · on the way" : ""
             }`
-          : undefined
+          : selectMode
+            ? selected
+              ? "Selected — tap to deselect"
+              : "Tap to select"
+            : undefined
       }
+      onClick={(e) => {
+        e.stopPropagation();
+        if (suppressClick) return;
+        if (selectMode && onToggleSelected) {
+          onToggleSelected();
+          return;
+        }
+        onOpen?.();
+      }}
       {...attributes}
       {...listeners}
     >
-      {onToggleSelected ? (
-        <label
-          className="job-fleet-tile__check"
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <input
-            type="checkbox"
-            checked={!!selected}
-            onChange={onToggleSelected}
-            aria-label={`Select unit #${a.hookah.modelNumber}`}
-          />
-        </label>
+      <div className="fleet-num">#{a.hookah.modelNumber}</div>
+      {label ? <div className="job-fleet-tile__label">{label}</div> : null}
+      <StatusBadge status={a.status} kind="assignment" />
+      {a.guestPayTier ? (
+        <span className={`tier-chip tier-chip--${a.guestPayTier}`}>
+          {a.guestPayTier}
+        </span>
       ) : null}
-      <button
-        type="button"
-        className="job-fleet-tile__open"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (suppressClick || !onOpen) return;
-          onOpen();
-        }}
-      >
-        <div className="fleet-num">#{a.hookah.modelNumber}</div>
-        <StatusBadge status={a.status} kind="assignment" />
-        {a.guestPayTier ? (
-          <span className={`tier-chip tier-chip--${a.guestPayTier}`}>
-            {a.guestPayTier}
-          </span>
-        ) : null}
-        {flavourName ? <div className="list-meta">{flavourName}</div> : null}
-        {a.status === "out" && a.nextCheckAt ? (
-          <div className="job-fleet-tile__timer">
-            <Countdown target={a.nextCheckAt} />
-          </div>
-        ) : null}
-        {call ? (
-          <span className={`hookah-call-chip hookah-call-chip--${call.type}`}>
-            {call.status === "acknowledged"
-              ? "On the way"
-              : call.type === "refill" && call.flavourLabel
-                ? `Refill: ${call.flavourLabel}`
-                : callTypeLabel(call.type)}
-            {call.message && call.type !== "refill" ? (
-              <span className="hookah-call-chip__msg"> · {call.message}</span>
-            ) : null}
-          </span>
-        ) : null}
-        {a.issueFlag && !call ? (
-          <span className="hookah-chip hookah-chip--issue">Issue</span>
-        ) : null}
-      </button>
-    </div>
+      {showUnitPay && a.guestPayTier
+        ? (() => {
+            const chip = unitPayChip(a.unitPaymentStatus);
+            if (!chip) return null;
+            const tone =
+              a.unitPaymentStatus === "succeeded"
+                ? "paid"
+                : a.unitPaymentStatus === "pending"
+                  ? "awaiting"
+                  : "terminal";
+            return (
+              <span
+                className={`pay-chip pay-chip--${
+                  tone === "paid"
+                    ? "paid"
+                    : tone === "awaiting"
+                      ? "awaiting"
+                      : "terminal"
+                }`}
+              >
+                {chip}
+              </span>
+            );
+          })()
+        : null}
+      {flavourName ? (
+        <div className="list-meta job-fleet-tile__flavour">{flavourName}</div>
+      ) : a.status === "staged" ? (
+        <div className="list-meta job-fleet-tile__flavour job-fleet-tile__flavour--warn">
+          Set flavour for prep
+        </div>
+      ) : null}
+      {a.status === "out" && a.nextCheckAt ? (
+        <div className="job-fleet-tile__timer">
+          <Countdown target={a.nextCheckAt} />
+        </div>
+      ) : null}
+      {a.refillCount > 0 ? (
+        <div className="job-fleet-tile__meta">
+          {a.refillCount} refill{a.refillCount === 1 ? "" : "s"}
+        </div>
+      ) : null}
+      {call ? (
+        <span className={`hookah-call-chip hookah-call-chip--${call.type}`}>
+          {call.status === "acknowledged"
+            ? "On the way"
+            : call.type === "refill" && call.flavourLabel
+              ? `Refill: ${call.flavourLabel}`
+              : callTypeLabel(call.type)}
+          {call.message && call.type !== "refill" ? (
+            <span className="hookah-call-chip__msg"> · {call.message}</span>
+          ) : null}
+        </span>
+      ) : null}
+      {call?.type === "refill"
+        ? (() => {
+            const chip = refillPayChip({
+              priceCents: call.priceCents,
+              payPreference: call.payPreference,
+              paymentStatus: call.paymentStatus,
+            });
+            if (!chip) return null;
+            const tone =
+              chip.startsWith("PAID") || chip === "INCLUDED"
+                ? "paid"
+                : chip.includes("TERMINAL")
+                  ? "terminal"
+                  : "awaiting";
+            return (
+              <span
+                className={`pay-chip pay-chip--${tone === "paid" ? "paid" : tone === "terminal" ? "terminal" : "awaiting"}`}
+              >
+                {chip}
+              </span>
+            );
+          })()
+        : null}
+      {a.issueFlag && !call ? (
+        <span className="hookah-chip hookah-chip--issue">Issue</span>
+      ) : null}
+    </button>
   );
 }

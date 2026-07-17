@@ -12,8 +12,12 @@ import {
 } from "@/lib/job-balance";
 import {
   createTerminalCheckout,
-  isSquareTerminalConfigured,
 } from "@/lib/square";
+import {
+  isSquareTerminalReady,
+  resolveSquareTerminalDeviceId,
+} from "@/lib/square-status";
+import { getPricingForJob, withHstCents } from "@/lib/pricing";
 import { and, eq } from "drizzle-orm";
 
 export type TerminalCollectKind =
@@ -45,11 +49,15 @@ export async function pushJobPaymentToTerminal(opts: {
     }
   | { ok: false; reason: string }
 > {
-  if (!isSquareTerminalConfigured()) {
+  if (!(await isSquareTerminalReady())) {
+    return { ok: false, reason: "terminal_not_configured" };
+  }
+  const deviceId = await resolveSquareTerminalDeviceId();
+  if (!deviceId) {
     return { ok: false, reason: "terminal_not_configured" };
   }
 
-  const amountCents = Math.round(opts.amountCents);
+  let amountCents = Math.round(opts.amountCents);
   if (!Number.isFinite(amountCents) || amountCents < 100) {
     return { ok: false, reason: "amount_too_small" };
   }
@@ -57,6 +65,12 @@ export async function pushJobPaymentToTerminal(opts: {
   const db = getDb();
   const [job] = await db.select().from(jobs).where(eq(jobs.id, opts.jobId)).limit(1);
   if (!job) return { ok: false, reason: "job_not_found" };
+
+  // Floor guest charges are tax-exclusive in catalog; add HST at charge time.
+  if (opts.kind === "onsite_unit" || opts.kind === "refill") {
+    const pricing = await getPricingForJob(job);
+    amountCents = withHstCents(amountCents, pricing.hstRate);
+  }
 
   if (
     (opts.kind === "deposit" || opts.kind === "balance") &&
@@ -173,6 +187,7 @@ export async function pushJobPaymentToTerminal(opts: {
       paymentNote: note,
       referenceId: note.slice(0, 40),
       label: opts.label,
+      deviceId,
     });
 
     await db
@@ -220,7 +235,7 @@ export async function createJobTerminalCheckout(opts: {
   label?: string;
   createdBy?: string;
 }) {
-  if (!isSquareTerminalConfigured()) {
+  if (!(await isSquareTerminalReady())) {
     return { ok: false as const, reason: "terminal_not_configured" };
   }
 

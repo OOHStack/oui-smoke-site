@@ -8,6 +8,10 @@ export function createClientToken() {
   return randomBytes(18).toString("base64url");
 }
 
+export function createPrepToken() {
+  return randomBytes(18).toString("base64url");
+}
+
 export function getSiteUrl() {
   if (process.env.NEXT_PUBLIC_SITE_URL) {
     return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
@@ -27,4 +31,8 @@ export function guestServeUrl(token: string) {
 
 export function clientPortalUrl(token: string) {
   return `${getSiteUrl()}/client/${token}`;
+}
+
+export function prepPortalUrl(token: string) {
+  return `${getSiteUrl()}/prep/${token}`;
 }

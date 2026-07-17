@@ -291,7 +291,7 @@
       });
 
       gsap.set(
-        ".summer__eyebrow, .summer__title-line, .summer__lede, .summer__stats, .summer__compare, .summer__actions",
+        ".summer__eyebrow, .summer__title-line, .summer__lede, .summer__stats, .summer__compare, .summer__reel, .summer__actions",
         { autoAlpha: 0, y: 28 }
       );
       gsap.set(summerMark, { autoAlpha: 0, scale: 0.92, transformOrigin: "50% 50%" });
@@ -366,13 +366,36 @@
         .to(".summer__lede", { autoAlpha: 1, y: 0, duration: 0.65 }, 0.5)
         .to(".summer__stats", { autoAlpha: 1, y: 0, duration: 0.7 }, 0.6)
         .to(".summer__compare", { autoAlpha: 1, y: 0, duration: 0.55 }, 0.75)
-        .to(".summer__actions", { autoAlpha: 1, y: 0, duration: 0.55 }, 0.85)
+        .to(".summer__reel", { autoAlpha: 1, y: 0, duration: 0.65 }, 0.55)
+        .to(".summer__actions", { autoAlpha: 1, y: 0, duration: 0.55 }, 0.95)
         .add(() => {
           gsap.set(
-            ".summer__eyebrow, .summer__title-line, .summer__lede, .summer__stats, .summer__compare, .summer__actions",
+            ".summer__eyebrow, .summer__title-line, .summer__lede, .summer__stats, .summer__compare, .summer__reel, .summer__actions",
             { clearProps: "transform" }
           );
         });
+
+      const summerReel = summer.querySelector(".summer__reel-video");
+      if (summerReel) {
+        summerReel.muted = true;
+        summerReel.defaultMuted = true;
+        summerReel.setAttribute("muted", "");
+        summerReel.playsInline = true;
+        summerReel.loop = true;
+        ScrollTrigger.create({
+          trigger: summerReel,
+          start: "top 85%",
+          end: "bottom 15%",
+          onEnter: () => {
+            summerReel.play().catch(() => {});
+          },
+          onEnterBack: () => {
+            summerReel.play().catch(() => {});
+          },
+          onLeave: () => summerReel.pause(),
+          onLeaveBack: () => summerReel.pause(),
+        });
+      }
 
       document.querySelectorAll("[data-summer-count]").forEach((el) => {
         const end = Number(el.getAttribute("data-summer-count")) || 0;

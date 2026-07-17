@@ -199,7 +199,7 @@ export default function PartnerSheet() {
             <p className="partner-hero__lede">
               {isPackage
                 ? "Full-service delivery, setup, staff, and teardown for private celebrations across Toronto and the GTA."
-                : `We bring units and staff — guests pay $${pricing.onsiteUnitRate} (+$${refillPriceDollars} refills) or $${pricing.onsiteUnlimitedRate} unlimited. No host package deposit.`}
+                : `We bring units and staff — guests pay $${pricing.onsiteUnitRate} (+$${refillPriceDollars} refills) or $${pricing.onsiteUnlimitedRate} unlimited, plus HST. No host package deposit.`}
             </p>
             <a className="partner-hero__jump no-print" href="#estimate">
               {isPackage ? "Build an estimate" : "Plan staffing"}
@@ -246,7 +246,7 @@ export default function PartnerSheet() {
                   <li>We attend with units + staff</li>
                   <li>
                     Guests pay ${pricing.onsiteUnitRate} / unit · $
-                    {refillPriceDollars} refills
+                    {refillPriceDollars} refills (+ HST)
                   </li>
                   <li>
                     Or ${pricing.onsiteUnlimitedRate} / unit with unlimited refills
@@ -311,7 +311,7 @@ export default function PartnerSheet() {
                   ${pricing.onsiteUnitRate}
                 </strong>
                 <span className="partner-rates__meta">
-                  Per unit · ${refillPriceDollars} refills
+                  Per unit + HST · ${refillPriceDollars} + HST refills
                 </span>
               </div>
               <div className="partner-rates__tier">
@@ -320,7 +320,7 @@ export default function PartnerSheet() {
                   ${pricing.onsiteUnlimitedRate}
                 </strong>
                 <span className="partner-rates__meta">
-                  Per unit · unlimited refills
+                  Per unit + HST · unlimited refills
                 </span>
               </div>
             </div>
@@ -335,8 +335,8 @@ export default function PartnerSheet() {
             ) : (
               <>
                 Host pays nothing up front — guests settle on site at $
-                {pricing.onsiteUnitRate} or ${pricing.onsiteUnlimitedRate}. Extra staffing
-                hours quoted if needed.
+                {pricing.onsiteUnitRate} or ${pricing.onsiteUnlimitedRate} + HST.
+                Extra staffing hours quoted if needed.
               </>
             )}
           </p>

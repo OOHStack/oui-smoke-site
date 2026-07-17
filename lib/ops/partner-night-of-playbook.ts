@@ -13,6 +13,7 @@ export function getPartnerNightOfPlaybook(
   sections: PlaybookSection[];
 } {
   const refillDollars = pricing.refillPriceCents / 100;
+  const hstPct = Math.round(pricing.hstRate * 100);
   return {
     title: "Night-of — what to expect",
     subtitle: "On-site sales nights: guests pay on the floor; Oui staff run service.",
@@ -21,9 +22,9 @@ export function getPartnerNightOfPlaybook(
         id: "pricing",
         title: "Guest pricing",
         bullets: [
-          `Standard · $${pricing.onsiteUnitRate} per unit — refills $${refillDollars} each.`,
-          `Unlimited · $${pricing.onsiteUnlimitedRate} per unit — unlimited flavour refills for the night.`,
-          `Oui staff collect payment on the floor (Square terminal or cash). Hosts do not need to run a package deposit for on-site sales.`,
+          `Standard · $${pricing.onsiteUnitRate} + HST per unit — refills $${refillDollars} + HST each.`,
+          `Unlimited · $${pricing.onsiteUnlimitedRate} + HST per unit — unlimited flavour refills for the night.`,
+          `Oui staff collect payment on the floor (Square terminal or cash), including ${hstPct}% HST. Hosts do not need to run a package deposit for on-site sales.`,
         ],
       },
       {

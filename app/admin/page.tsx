@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth/session";
 import StatusBadge from "@/components/admin/StatusBadge";
 import DashboardMotion from "@/components/admin/DashboardMotion";
 import PartnerOnePagerCard from "@/components/admin/PartnerOnePagerCard";
+import PromoModeCard from "@/components/admin/PromoModeCard";
 
 function callLabel(type: string, flavourLabel: string | null, priceCents: number | null) {
   if (type === "refill") {
@@ -210,6 +211,7 @@ export default async function AdminDashboardPage() {
       </section>
 
       <PartnerOnePagerCard />
+      <PromoModeCard />
 
       <div className="dash-rails">
         <section className="dash-rail">

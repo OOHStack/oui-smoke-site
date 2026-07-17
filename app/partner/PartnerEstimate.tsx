@@ -375,12 +375,13 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
             <li>
               <span>Guest · standard</span>
               <span>
-                ${pricing.onsiteUnitRate} · ${refillPriceDollars} refills
+                ${pricing.onsiteUnitRate} + HST · ${refillPriceDollars} + HST
+                refills
               </span>
             </li>
             <li>
               <span>Guest · unlimited</span>
-              <span>${pricing.onsiteUnlimitedRate} / unit</span>
+              <span>${pricing.onsiteUnlimitedRate} + HST / unit</span>
             </li>
             <li className="partner-estimate__lines--muted">
               <span>Package deposit</span>
@@ -389,7 +390,8 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
           </ul>
           <p className="partner-estimate__intro">
             Guests choose ${pricing.onsiteUnitRate} with paid refills, or $
-            {pricing.onsiteUnlimitedRate} with unlimited refills for the night.
+            {pricing.onsiteUnlimitedRate} with unlimited refills for the night —
+            plus HST.
           </p>
           <p className="partner-estimate__note">
             We’ll confirm we can staff your date and venue before locking in.

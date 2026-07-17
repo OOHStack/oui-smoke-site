@@ -3,11 +3,14 @@
  * Module-level constants remain as fallbacks for client/static imports.
  */
 import { getDb } from "@/lib/db";
-import { siteSettings } from "@/lib/db/schema";
+import { jobs, siteSettings } from "@/lib/db/schema";
 import {
   DEFAULT_PRICING,
+  mergeJobPricing,
   normalizePricing,
+  parseJobPricingOverride,
   pricingToPublic,
+  type JobPricingOverride,
   type PricingConfig,
 } from "@/lib/pricing-config";
 import { eq } from "drizzle-orm";
@@ -16,7 +19,15 @@ export {
   DEFAULT_PRICING,
   normalizePricing,
   pricingToPublic,
+  hstCents,
+  withHstCents,
+  hstPercentLabel,
+  mergeJobPricing,
+  parseJobPricingOverride,
+  jobPricingOverrideCount,
+  JOB_PRICING_OVERRIDE_KEYS,
   type PricingConfig,
+  type JobPricingOverride,
 } from "@/lib/pricing-config";
 
 /** @deprecated Prefer getPricing() — kept for backward-compatible imports */
@@ -71,6 +82,37 @@ export async function getPricing(): Promise<PricingConfig> {
   } catch {
     return { ...DEFAULT_PRICING };
   }
+}
+
+/** Global catalog merged with optional job.pricingJson overrides. */
+export async function getPricingForJob(
+  jobOrId:
+    | number
+    | {
+        id?: number;
+        pricingJson?: unknown;
+      }
+    | null
+    | undefined,
+): Promise<PricingConfig> {
+  const global = await getPricing();
+  if (jobOrId == null) return global;
+
+  if (typeof jobOrId === "number") {
+    try {
+      const db = getDb();
+      const [row] = await db
+        .select({ pricingJson: jobs.pricingJson })
+        .from(jobs)
+        .where(eq(jobs.id, jobOrId))
+        .limit(1);
+      return mergeJobPricing(global, row?.pricingJson);
+    } catch {
+      return global;
+    }
+  }
+
+  return mergeJobPricing(global, jobOrId.pricingJson);
 }
 
 export async function updatePricing(

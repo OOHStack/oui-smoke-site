@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { jobEvents, jobs, payments } from "@/lib/db/schema";
+import { hookahs, jobEvents, jobHookahs, jobs, payments } from "@/lib/db/schema";
 import { maybeAutoSendBalance } from "@/lib/auto-balance";
 import { notifyDepositPaid } from "@/lib/email/workflow";
 import {
@@ -7,7 +7,34 @@ import {
   jobDueCents,
   jobPaidCents,
 } from "@/lib/job-balance";
-import { eq } from "drizzle-orm";
+import {
+  guestRefillServiceRequestIdFromKey,
+  notifyStaffPushForServiceRequest,
+} from "@/lib/push";
+import { and, eq, sql } from "drizzle-orm";
+
+/** Sum succeeded tip rows onto jobs.tipCents (source of truth for tip split). */
+export async function syncJobTipCents(jobId: number): Promise<number> {
+  const db = getDb();
+  const tipTotal = await db
+    .select({
+      sum: sql<number>`coalesce(sum(${payments.amountCents}), 0)`,
+    })
+    .from(payments)
+    .where(
+      and(
+        eq(payments.jobId, jobId),
+        eq(payments.kind, "tip"),
+        eq(payments.status, "succeeded"),
+      ),
+    );
+  const tipCents = Number(tipTotal[0]?.sum ?? 0);
+  await db
+    .update(jobs)
+    .set({ tipCents, updatedAt: new Date() })
+    .where(eq(jobs.id, jobId));
+  return tipCents;
+}
 
 /** Mark a ledger row paid and advance draft jobs to confirmed on deposit. */
 export async function markPaymentSucceeded(opts: {
@@ -39,6 +66,73 @@ export async function markPaymentSucceeded(opts: {
     })
     .where(eq(payments.id, row.id))
     .returning();
+
+  const dollars = (row.amountCents / 100).toFixed(2);
+
+  // Guest refill: ledger + floor note + staff push (no package emails).
+  if (row.kind === "refill") {
+    await db.insert(jobEvents).values({
+      jobId: row.jobId,
+      jobHookahId: row.jobHookahId,
+      type: "note",
+      message: `Square refill paid — $${dollars} ${row.currency}${
+        row.label ? ` · ${row.label}` : ""
+      }`,
+      createdBy: "square",
+    });
+
+    try {
+      let modelLabel = "";
+      if (row.jobHookahId) {
+        const [unit] = await db
+          .select({ modelNumber: hookahs.modelNumber })
+          .from(jobHookahs)
+          .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
+          .where(eq(jobHookahs.id, row.jobHookahId))
+          .limit(1);
+        if (unit) modelLabel = `#${unit.modelNumber}`;
+      }
+      void notifyStaffPushForServiceRequest(
+        guestRefillServiceRequestIdFromKey(row.idempotencyKey),
+        {
+          title: `Refill paid${modelLabel ? ` · ${modelLabel}` : ""}`,
+          body: `$${dollars} received via Square${row.label ? ` · ${row.label}` : ""}. Deliver when ready.`,
+          url: `/admin/jobs/${row.jobId}`,
+          tag: `refill-paid-${row.id}`,
+        },
+      );
+    } catch (err) {
+      console.error("refill paid push failed", err);
+    }
+
+    return { ok: true as const, payment: updated, already: false };
+  }
+
+  // Tip / onsite / other guest charges: ledger note only (no package emails).
+  if (row.kind === "tip") {
+    const tipCents = await syncJobTipCents(row.jobId);
+    await db.insert(jobEvents).values({
+      jobId: row.jobId,
+      jobHookahId: row.jobHookahId,
+      type: "note",
+      message: `Square tip paid — $${dollars} ${row.currency} · tip total $${(tipCents / 100).toFixed(2)}`,
+      createdBy: "square",
+    });
+    return { ok: true as const, payment: updated, already: false };
+  }
+
+  if (row.kind === "onsite_unit" || row.kind === "other") {
+    await db.insert(jobEvents).values({
+      jobId: row.jobId,
+      jobHookahId: row.jobHookahId,
+      type: "note",
+      message: `Square ${row.kind === "other" ? "extra hookah" : "guest unit"} paid — $${dollars} ${row.currency}${
+        row.label ? ` · ${row.label}` : ""
+      }`,
+      createdBy: "square",
+    });
+    return { ok: true as const, payment: updated, already: false };
+  }
 
   const [job] = await db.select().from(jobs).where(eq(jobs.id, row.jobId)).limit(1);
   let becameConfirmed = false;
@@ -74,7 +168,6 @@ export async function markPaymentSucceeded(opts: {
   const balanceCents = jobBalanceCents(dueCents, paidCents);
   const paidInFull = dueCents > 0 && balanceCents <= 0;
 
-  const dollars = (row.amountCents / 100).toFixed(2);
   await db.insert(jobEvents).values({
     jobId: row.jobId,
     type: "note",
@@ -84,7 +177,7 @@ export async function markPaymentSucceeded(opts: {
     createdBy: "square",
   });
 
-  if (job) {
+  if (job && (row.kind === "deposit" || row.kind === "balance")) {
     await notifyDepositPaid({
       job: {
         ...job,
@@ -139,4 +232,55 @@ export async function markPaymentFailed(opts: {
     .where(eq(payments.id, row.id));
 
   return { ok: true as const };
+}
+
+/** Mark a succeeded ledger row as refunded (full refund for v1). */
+export async function markPaymentRefunded(opts: {
+  paymentId: number;
+  squarePaymentId?: string | null;
+  reason?: string;
+  createdBy?: string;
+}) {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(payments)
+    .where(eq(payments.id, opts.paymentId))
+    .limit(1);
+
+  if (!row) return { ok: false as const, error: "Payment not found" };
+  if (row.status === "refunded") {
+    return { ok: true as const, payment: row, already: true };
+  }
+  if (row.status !== "succeeded") {
+    return { ok: false as const, error: "Only succeeded payments can be refunded" };
+  }
+
+  const now = new Date();
+  const [updated] = await db
+    .update(payments)
+    .set({
+      status: "refunded",
+      squarePaymentId: opts.squarePaymentId || row.squarePaymentId,
+      updatedAt: now,
+    })
+    .where(eq(payments.id, row.id))
+    .returning();
+
+  const dollars = (row.amountCents / 100).toFixed(2);
+  await db.insert(jobEvents).values({
+    jobId: row.jobId,
+    jobHookahId: row.jobHookahId,
+    type: "note",
+    message: `Refund recorded · ${row.kind} · $${dollars} ${row.currency}${
+      opts.reason ? ` · ${opts.reason}` : ""
+    }`,
+    createdBy: opts.createdBy || "square",
+  });
+
+  if (row.kind === "tip") {
+    await syncJobTipCents(row.jobId);
+  }
+
+  return { ok: true as const, payment: updated, already: false };
 }

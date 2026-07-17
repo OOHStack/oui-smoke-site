@@ -135,3 +135,81 @@ export function pricingToPublic(p: PricingConfig) {
     },
   };
 }
+
+/** Integer-cent HST on an exclusive subtotal. */
+export function hstCents(
+  subtotalCents: number,
+  rate: number = DEFAULT_PRICING.hstRate,
+): number {
+  const base = Math.max(0, Math.round(subtotalCents));
+  if (base <= 0 || rate <= 0) return 0;
+  return Math.round(base * rate);
+}
+
+/** Exclusive subtotal + HST (what Square / cash should collect). */
+export function withHstCents(
+  subtotalCents: number,
+  rate: number = DEFAULT_PRICING.hstRate,
+): number {
+  const base = Math.max(0, Math.round(subtotalCents));
+  if (base <= 0) return 0;
+  return base + hstCents(base, rate);
+}
+
+/** e.g. 0.13 → "13" for labels. */
+export function hstPercentLabel(rate: number = DEFAULT_PRICING.hstRate): string {
+  const pct = Math.round(rate * 10000) / 100;
+  return Number.isInteger(pct)
+    ? String(pct)
+    : pct.toFixed(2).replace(/\.?0+$/, "");
+}
+
+/** Floor fields that can be overridden per job. */
+export const JOB_PRICING_OVERRIDE_KEYS = [
+  "onsiteUnitRate",
+  "onsiteUnlimitedRate",
+  "refillPriceCents",
+  "hstRate",
+] as const;
+
+export type JobPricingOverrideKey = (typeof JOB_PRICING_OVERRIDE_KEYS)[number];
+export type JobPricingOverride = Partial<
+  Pick<PricingConfig, JobPricingOverrideKey>
+>;
+
+/** Keep only known job override keys with finite numbers. */
+export function parseJobPricingOverride(
+  raw: unknown,
+): JobPricingOverride {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const src = raw as Record<string, unknown>;
+  const out: JobPricingOverride = {};
+  for (const key of JOB_PRICING_OVERRIDE_KEYS) {
+    if (src[key] === undefined || src[key] === null || src[key] === "") continue;
+    const n = typeof src[key] === "number" ? src[key] : Number(src[key]);
+    if (!Number.isFinite(n)) continue;
+    if (key === "refillPriceCents") {
+      out.refillPriceCents = Math.max(0, Math.round(n));
+    } else if (key === "hstRate") {
+      out.hstRate = Math.min(1, Math.max(0, n));
+    } else if (key === "onsiteUnitRate") {
+      out.onsiteUnitRate = Math.max(0, n);
+    } else if (key === "onsiteUnlimitedRate") {
+      out.onsiteUnlimitedRate = Math.max(0, n);
+    }
+  }
+  return out;
+}
+
+export function jobPricingOverrideCount(override: JobPricingOverride): number {
+  return JOB_PRICING_OVERRIDE_KEYS.filter((k) => override[k] !== undefined).length;
+}
+
+export function mergeJobPricing(
+  global: PricingConfig,
+  override: unknown,
+): PricingConfig {
+  const patch = parseJobPricingOverride(override);
+  if (jobPricingOverrideCount(patch) === 0) return global;
+  return normalizePricing({ ...global, ...patch });
+}

@@ -1,6 +1,9 @@
 import { requireApiSession } from "@/lib/auth/api";
 import { getDb } from "@/lib/db";
 import { hookahs, jobHookahs, jobs, serviceRequests } from "@/lib/db/schema";
+import { onsiteUnitPaymentMap } from "@/lib/ops/onsite-pay";
+import { guestRefillPaymentMap } from "@/lib/refill-payment-link";
+import { isSquareTerminalReady } from "@/lib/square-status";
 import { createSseResponse } from "@/lib/sse";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
@@ -15,6 +18,7 @@ async function loadLiveFloor() {
       id: jobs.id,
       title: jobs.title,
       clientName: jobs.clientName,
+      paymentModel: jobs.paymentModel,
     })
     .from(jobs)
     .where(inArray(jobs.status, ["active", "confirmed"]));
@@ -32,6 +36,7 @@ async function loadLiveFloor() {
             nextCheckAt: jobHookahs.nextCheckAt,
             issueFlag: jobHookahs.issueFlag,
             flavourLabel: jobHookahs.flavourLabel,
+            guestPayTier: jobHookahs.guestPayTier,
             hookahModel: hookahs.modelNumber,
             hookahLabel: hookahs.label,
           })
@@ -42,22 +47,28 @@ async function loadLiveFloor() {
           )
           .orderBy(asc(jobHookahs.nextCheckAt));
 
+  const unitPay = await onsiteUnitPaymentMap(outRows.map((r) => r.assignmentId));
+
   const items = outRows.map((row) => {
     const job = jobMap.get(row.jobId);
+    const pay = unitPay.get(row.assignmentId);
     return {
       assignmentId: row.assignmentId,
       jobId: row.jobId,
       jobTitle: job?.title ?? "",
       clientName: job?.clientName ?? "",
+      paymentModel: job?.paymentModel ?? null,
       hookahModel: row.hookahModel,
       hookahLabel: row.hookahLabel,
       flavourName: row.flavourLabel || null,
+      guestPayTier: row.guestPayTier,
       nextCheckAt: row.nextCheckAt,
       issueFlag: row.issueFlag,
+      unitPaymentStatus: pay?.status ?? null,
     };
   });
 
-  const calls = await db
+  const callRows = await db
     .select({
       id: serviceRequests.id,
       type: serviceRequests.type,
@@ -65,10 +76,14 @@ async function loadLiveFloor() {
       message: serviceRequests.message,
       flavourLabel: serviceRequests.flavourLabel,
       priceCents: serviceRequests.priceCents,
+      payPreference: serviceRequests.payPreference,
+      requestedGuestPayTier: serviceRequests.requestedGuestPayTier,
       jobId: serviceRequests.jobId,
       assignmentId: serviceRequests.jobHookahId,
       modelNumber: hookahs.modelNumber,
       jobTitle: jobs.title,
+      acknowledgedBy: serviceRequests.acknowledgedBy,
+      acknowledgedAt: serviceRequests.acknowledgedAt,
     })
     .from(serviceRequests)
     .innerJoin(jobs, eq(jobs.id, serviceRequests.jobId))
@@ -78,7 +93,24 @@ async function loadLiveFloor() {
     .orderBy(desc(serviceRequests.createdAt))
     .limit(50);
 
-  return { items, calls };
+  const payMap = await guestRefillPaymentMap(
+    callRows
+      .filter((c) => c.type === "refill" || c.type === "order_unit")
+      .map((c) => c.id),
+  );
+
+  const calls = callRows.map((c) => {
+    const pay = payMap.get(c.id);
+    return {
+      ...c,
+      paymentStatus: pay?.paymentStatus ?? null,
+      checkoutUrl: pay?.checkoutUrl ?? null,
+    };
+  });
+
+  const terminalReady = await isSquareTerminalReady();
+
+  return { items, calls, terminalReady };
 }
 
 export async function GET(request: Request) {

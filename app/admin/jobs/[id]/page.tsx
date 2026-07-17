@@ -10,17 +10,23 @@ import HookahBoard from "@/components/admin/HookahBoard";
 import GuestLedger from "@/components/admin/GuestLedger";
 import { PasswordField } from "@/components/admin/PasswordField";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
+import { RefillCollectActions } from "@/components/admin/RefillCollectActions";
 import { useSse } from "@/lib/hooks/useSse";
 import { paymentModelLabel } from "@/lib/payment-model";
 import { formatCadCents } from "@/lib/job-balance";
 import {
   defaultRefillCentsForTier,
+  refillPayStaffCopy,
+  unitPayChip,
   type GuestPayTier,
 } from "@/lib/ops/guest-pay";
 import { resolveTipSplit } from "@/lib/ops/tip-split";
 import TipSplitEditor from "@/components/admin/TipSplitEditor";
 import {
   DEFAULT_PRICING,
+  jobPricingOverrideCount,
+  parseJobPricingOverride,
+  type JobPricingOverride,
   type PricingConfig,
 } from "@/lib/pricing";
 
@@ -36,8 +42,12 @@ type ActiveCall = {
   flavourLabel?: string | null;
   priceCents?: number | null;
   priceAgreed?: boolean | null;
+  payPreference?: "phone" | "terminal" | null;
+  paymentStatus?: string | null;
+  checkoutUrl?: string | null;
   createdAt: string;
   acknowledgedAt: string | null;
+  acknowledgedBy?: string | null;
 };
 
 type Assignment = {
@@ -53,12 +63,14 @@ type Assignment = {
   issueFlag: boolean;
   guestToken: string | null;
   guestPayTier?: GuestPayTier | null;
+  unitPaymentStatus?: string | null;
   guestRating?: number | null;
   guestComment?: string | null;
   guestFeedbackAt?: string | null;
   sentOutAt: string | null;
   returnNotes: string | null;
   returnOutcome: "returned" | "not_returned" | "returned_with_issue" | null;
+  outNotes?: string | null;
   hookah: Hookah;
   flavour: Flavour | null;
   activeCall: ActiveCall | null;
@@ -138,6 +150,9 @@ type Job = {
   outcomeNotes: string | null;
   clientToken?: string | null;
   clientPortalUrl?: string | null;
+  pricingJson?: Record<string, unknown> | null;
+  pricingOverrides?: JobPricingOverride;
+  hasCustomPricing?: boolean;
 };
 
 function toLocalInput(iso: string | null | undefined) {
@@ -186,6 +201,7 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [events, setEvents] = useState<JobEvent[]>([]);
+  const [terminalReady, setTerminalReady] = useState(true);
   const [payments, setPayments] = useState<
     Array<{
       id: number;
@@ -198,6 +214,9 @@ export default function JobDetailPage() {
   >([]);
   const [ledgerBusyId, setLedgerBusyId] = useState<number | null>(null);
   const [tipSplitBusy, setTipSplitBusy] = useState(false);
+  const [tipCollectBusy, setTipCollectBusy] = useState(false);
+  const [sessionRole, setSessionRole] = useState<"admin" | "staff" | null>(null);
+  const isAdmin = sessionRole === "admin";
   const [flavours, setFlavours] = useState<Flavour[]>([]);
   const [availableHookahs, setAvailableHookahs] = useState<Hookah[]>([]);
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
@@ -210,6 +229,16 @@ export default function JobDetailPage() {
   const [editBusy, setEditBusy] = useState(false);
   const [guestRatesOpen, setGuestRatesOpen] = useState(false);
   const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
+  const [catalogPricing, setCatalogPricing] =
+    useState<PricingConfig>(DEFAULT_PRICING);
+  const [hasCustomPricing, setHasCustomPricing] = useState(false);
+  const [ratesDraft, setRatesDraft] = useState({
+    onsiteUnitRate: String(DEFAULT_PRICING.onsiteUnitRate),
+    onsiteUnlimitedRate: String(DEFAULT_PRICING.onsiteUnlimitedRate),
+    refillDollars: String(DEFAULT_PRICING.refillPriceCents / 100),
+    hstPercent: String(Math.round(DEFAULT_PRICING.hstRate * 100)),
+  });
+  const [ratesBusy, setRatesBusy] = useState(false);
   const [editError, setEditError] = useState("");
   const [editForm, setEditForm] = useState({
     title: "",
@@ -242,33 +271,80 @@ export default function JobDetailPage() {
 
   const overdueNotified = useRef<Set<number>>(new Set());
   const prevOverdue = useRef<Set<number>>(new Set());
+  /** Ignore SSE while a load() is in flight; drop superseded loads. */
+  const loadsInFlight = useRef(0);
+  const loadSeq = useRef(0);
+  const jobIdNum = Number(jobId);
+  const jobStreamUrl = Number.isFinite(jobIdNum)
+    ? `/api/stream/jobs/${jobIdNum}`
+    : null;
 
   const load = useCallback(async () => {
-    const [jobRes, photosRes] = await Promise.all([
-      fetch(`/api/jobs/${jobId}`),
-      fetch(`/api/jobs/${jobId}/photos`),
-    ]);
-    if (!jobRes.ok) {
-      setError("Failed to load job");
+    const seq = ++loadSeq.current;
+    loadsInFlight.current += 1;
+    try {
+      const [jobRes, photosRes] = await Promise.all([
+        fetch(`/api/jobs/${jobId}`, { cache: "no-store" }),
+        fetch(`/api/jobs/${jobId}/photos`, { cache: "no-store" }),
+      ]);
+      if (!jobRes.ok) {
+        if (seq === loadSeq.current) {
+          setError("Failed to load job");
+          setLoading(false);
+        }
+        return;
+      }
+      const data = await jobRes.json();
+      if (seq !== loadSeq.current) return;
+      const {
+        assignments: a,
+        events: ev,
+        payments: payRows,
+        terminalReady: tr,
+        snapshotAt: _sa,
+        ...jobData
+      } = data;
+      setJob(jobData as Job);
+      setAssignments(a ?? []);
+      setEvents(ev ?? []);
+      setPayments(payRows ?? []);
+      if (typeof tr === "boolean") setTerminalReady(tr);
+      if (data.pricing && typeof data.pricing === "object") {
+        const p = data.pricing as PricingConfig & {
+          refillPriceDollars?: number;
+          guestRebookPromo?: unknown;
+        };
+        const {
+          refillPriceDollars: _d,
+          guestRebookPromo: _g,
+          ...rest
+        } = p;
+        setPricing({ ...DEFAULT_PRICING, ...rest });
+      }
+      if (typeof data.hasCustomPricing === "boolean") {
+        setHasCustomPricing(data.hasCustomPricing);
+      } else {
+        setHasCustomPricing(
+          jobPricingOverrideCount(
+            parseJobPricingOverride(jobData.pricingJson),
+          ) > 0,
+        );
+      }
+      if (photosRes.ok) {
+        const photoData = await photosRes.json();
+        if (seq === loadSeq.current) {
+          setPhotos(photoData.photos ?? []);
+        }
+      }
+      setOutcome({
+        actualDollars: centsToDollars(jobData.actualCents),
+        tipDollars: centsToDollars(jobData.tipCents),
+        outcomeNotes: jobData.outcomeNotes ?? "",
+      });
       setLoading(false);
-      return;
+    } finally {
+      loadsInFlight.current = Math.max(0, loadsInFlight.current - 1);
     }
-    const data = await jobRes.json();
-    const { assignments: a, events: ev, payments: payRows, ...jobData } = data;
-    setJob(jobData as Job);
-    setAssignments(a ?? []);
-    setEvents(ev ?? []);
-    setPayments(payRows ?? []);
-    if (photosRes.ok) {
-      const photoData = await photosRes.json();
-      setPhotos(photoData.photos ?? []);
-    }
-    setOutcome({
-      actualDollars: centsToDollars(jobData.actualCents),
-      tipDollars: centsToDollars(jobData.tipCents),
-      outcomeNotes: jobData.outcomeNotes ?? "",
-    });
-    setLoading(false);
   }, [jobId]);
 
   async function deletePhoto(photoId: number) {
@@ -351,6 +427,12 @@ export default function JobDetailPage() {
 
   useEffect(() => {
     load();
+    fetch("/api/auth/session")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.role === "admin" || d?.role === "staff") setSessionRole(d.role);
+      })
+      .catch(() => {});
     fetch("/api/flavours?active=1")
       .then((r) => r.json())
       .then((d) => setFlavours(d.flavours ?? d))
@@ -383,7 +465,12 @@ export default function JobDetailPage() {
             guestRebookPromo: _g,
             ...rest
           } = p;
-          setPricing({ ...DEFAULT_PRICING, ...rest });
+          const catalog = { ...DEFAULT_PRICING, ...rest };
+          setCatalogPricing(catalog);
+          // Only seed effective pricing from catalog before first job load.
+          setPricing((prev) =>
+            prev === DEFAULT_PRICING ? catalog : prev,
+          );
         }
       } catch {
         /* keep fallback */
@@ -407,26 +494,34 @@ export default function JobDetailPage() {
         jobHookahId: number | null;
         label?: string | null;
       }>;
+      terminalReady?: boolean;
+      snapshotAt?: number;
     };
     error?: string;
-  }>(
-    Number.isFinite(jobId) ? `/api/stream/jobs/${jobId}` : null,
-    (data) => {
-      if (!data.job || data.error) return;
-      const { assignments: a, events: ev, payments: payRows, ...jobData } =
-        data.job;
-      setJob(jobData as Job);
-      setAssignments(a ?? []);
-      setEvents(ev ?? []);
-      if (payRows) setPayments(payRows);
-      setOutcome({
-        actualDollars: centsToDollars(jobData.actualCents),
-        tipDollars: centsToDollars(jobData.tipCents),
-        outcomeNotes: jobData.outcomeNotes ?? "",
-      });
-      setLoading(false);
-    },
-  );
+  }>(jobStreamUrl, (data) => {
+    if (!data.job || data.error) return;
+    // Don't let a stream tick overwrite a fresher in-flight load().
+    if (loadsInFlight.current > 0) return;
+    const {
+      assignments: a,
+      events: ev,
+      payments: payRows,
+      terminalReady: tr,
+      snapshotAt: _sa,
+      ...jobData
+    } = data.job;
+    setJob((prev) => ({ ...(prev ?? ({} as Job)), ...(jobData as Job) }));
+    setAssignments(a ?? []);
+    setEvents(ev ?? []);
+    if (payRows) setPayments(payRows);
+    if (typeof tr === "boolean") setTerminalReady(tr);
+    setOutcome({
+      actualDollars: centsToDollars(jobData.actualCents),
+      tipDollars: centsToDollars(jobData.tipCents),
+      outcomeNotes: jobData.outcomeNotes ?? "",
+    });
+    setLoading(false);
+  });
 
   useEffect(() => {
     const now = Date.now();
@@ -462,17 +557,23 @@ export default function JobDetailPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (res.ok) await load();
-    else setError("Update failed");
+    if (res.ok) {
+      setError("");
+      await load();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setError(d.error ?? "Update failed — try again");
+    }
   }
 
-  async function hookahAction(body: Record<string, unknown>) {
+  async function hookahAction(body: Record<string, unknown>): Promise<boolean> {
     const res = await fetch(`/api/jobs/${jobId}/hookahs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     if (res.ok) {
+      setError("");
       await load();
       // Refresh fleet so newly unavailable / free units stay accurate
       fetch("/api/hookahs")
@@ -482,16 +583,19 @@ export default function JobDetailPage() {
           setAvailableHookahs(list.filter((h: Hookah) => h.status === "available"));
         })
         .catch(() => {});
-    } else {
-      const d = await res.json().catch(() => ({}));
-      setError(d.error ?? "Action failed");
+      return true;
     }
+    const d = await res.json().catch(() => ({}));
+    setError(d.error ?? "Action failed — try again");
+    return false;
   }
 
   async function saveOutcome() {
     await patchJob({
       actualCents: dollarsToCents(outcome.actualDollars),
-      tipCents: dollarsToCents(outcome.tipDollars) ?? 0,
+      ...(isAdmin
+        ? { tipCents: dollarsToCents(outcome.tipDollars) ?? 0 }
+        : {}),
       outcomeNotes: outcome.outcomeNotes,
     });
   }
@@ -549,6 +653,12 @@ export default function JobDetailPage() {
 
   useEffect(() => {
     if (!guestRatesOpen) return;
+    setRatesDraft({
+      onsiteUnitRate: String(pricing.onsiteUnitRate),
+      onsiteUnlimitedRate: String(pricing.onsiteUnlimitedRate),
+      refillDollars: String(pricing.refillPriceCents / 100),
+      hstPercent: String(Math.round(pricing.hstRate * 100)),
+    });
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setGuestRatesOpen(false);
     }
@@ -559,7 +669,51 @@ export default function JobDetailPage() {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [guestRatesOpen]);
+  }, [guestRatesOpen, pricing]);
+
+  async function saveJobRates() {
+    setRatesBusy(true);
+    setError("");
+    try {
+      const onsiteUnitRate = Number(ratesDraft.onsiteUnitRate);
+      const onsiteUnlimitedRate = Number(ratesDraft.onsiteUnlimitedRate);
+      const refillDollars = Number(ratesDraft.refillDollars);
+      const hstPercent = Number(ratesDraft.hstPercent);
+      if (
+        ![onsiteUnitRate, onsiteUnlimitedRate, refillDollars, hstPercent].every(
+          (n) => Number.isFinite(n) && n >= 0,
+        )
+      ) {
+        setError("Enter valid rates (0 or more)");
+        return;
+      }
+      if (hstPercent > 100) {
+        setError("HST % must be 100 or less");
+        return;
+      }
+      const override: JobPricingOverride = {
+        onsiteUnitRate,
+        onsiteUnlimitedRate,
+        refillPriceCents: Math.round(refillDollars * 100),
+        hstRate: hstPercent / 100,
+      };
+      await patchJob({ pricingOverrides: override });
+      setGuestRatesOpen(false);
+    } finally {
+      setRatesBusy(false);
+    }
+  }
+
+  async function resetJobRates() {
+    setRatesBusy(true);
+    setError("");
+    try {
+      await patchJob({ pricingOverrides: null });
+      setGuestRatesOpen(false);
+    } finally {
+      setRatesBusy(false);
+    }
+  }
 
   async function saveEdit(e: FormEvent) {
     e.preventDefault();
@@ -680,13 +834,15 @@ export default function JobDetailPage() {
           <Link href={`/admin/jobs/${jobId}/payments`} className="btn btn-sm">
             Payments
           </Link>
-          <button
-            type="button"
-            className="btn btn-sm btn-danger-ghost"
-            onClick={openReset}
-          >
-            Reset
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              className="btn btn-sm btn-danger-ghost"
+              onClick={openReset}
+            >
+              Reset
+            </button>
+          ) : null}
           <select
             className="inline-select"
             value={job.status}
@@ -698,16 +854,25 @@ export default function JobDetailPage() {
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            className="btn btn-sm btn-danger-ghost"
-            onClick={() => void deleteJob()}
-          >
-            Delete
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              className="btn btn-sm btn-danger-ghost"
+              onClick={() => void deleteJob()}
+            >
+              Delete
+            </button>
+          ) : null}
         </div>
       </div>
       {portalMsg ? <p className="list-meta">{portalMsg}</p> : null}
+      {!terminalReady && job.paymentModel === "pay_at_event" ? (
+        <p className="terminal-ready-banner">
+          Square Terminal not ready — pair a device in{" "}
+          <Link href="/admin/settings">Settings → Square</Link> before pushing
+          charges.
+        </p>
+      ) : null}
 
       <div className="job-console-header panel">
         <div className="job-console-meta">
@@ -764,7 +929,9 @@ export default function JobDetailPage() {
             hookahs={availableHookahs}
             flavours={flavours}
             assignedHookahIds={assignments.map((a) => a.hookah.id)}
-            onAddMany={(payload) => hookahAction({ action: "add_many", ...payload })}
+            onAddMany={async (payload) => {
+              await hookahAction({ action: "add_many", ...payload });
+            }}
           />
         </div>
 
@@ -777,6 +944,7 @@ export default function JobDetailPage() {
             flavours={flavours}
             paymentModel={job.paymentModel}
             pricing={pricing}
+            terminalReady={terminalReady}
             onAction={hookahAction}
             onRefresh={load}
           />
@@ -877,8 +1045,8 @@ export default function JobDetailPage() {
         )}
       </section>
 
-      <div className="grid-2">
-        <section className="panel">
+      <div className="grid-2 grid-2--outcome">
+        <section className="panel panel--stretch">
           <h2 className="panel-title">Activity log</h2>
           <div className="event-log">
             {events.length === 0 ? (
@@ -899,8 +1067,27 @@ export default function JobDetailPage() {
           </div>
         </section>
 
-        <section className="panel">
-          <h2 className="panel-title">Pricing &amp; outcome</h2>
+        <section className="panel panel--outcome">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: "0.75rem",
+              flexWrap: "wrap",
+            }}
+          >
+            <h2 className="panel-title" style={{ margin: 0 }}>
+              Pricing &amp; outcome
+            </h2>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setGuestRatesOpen(true)}
+            >
+              {hasCustomPricing ? "Edit job rates · custom" : "Edit job rates"}
+            </button>
+          </div>
           <div className="job-pricing-summary money-story__grid money-story__grid--3">
             <div>
               <span>Quoted</span>
@@ -1000,7 +1187,10 @@ export default function JobDetailPage() {
               tipSplitJson={job.tipSplitJson}
               busyId={ledgerBusyId}
               tipSplitBusy={tipSplitBusy}
+              tipCollectBusy={tipCollectBusy}
+              canEditTips={isAdmin}
               pricing={pricing}
+              terminalReady={terminalReady}
               onApplySuggestedActual={(cents) => {
                 setOutcome((o) => ({
                   ...o,
@@ -1014,6 +1204,34 @@ export default function JobDetailPage() {
                   await load();
                 } finally {
                   setTipSplitBusy(false);
+                }
+              }}
+              onCollectTip={async (amountDollars, channel) => {
+                setTipCollectBusy(true);
+                try {
+                  const res = await fetch(`/api/jobs/${jobId}/payments`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      kind: "tip",
+                      channel,
+                      amountDollars,
+                    }),
+                  });
+                  const d = await res.json().catch(() => ({}));
+                  if (!res.ok) {
+                    alert(d.error ?? "Couldn’t collect tip");
+                    return false;
+                  }
+                  if (channel === "terminal") {
+                    alert(
+                      "Tip sent to Square Terminal — complete the charge on the device.",
+                    );
+                  }
+                  await load();
+                  return true;
+                } finally {
+                  setTipCollectBusy(false);
                 }
               }}
               onMarkPaid={async (assignmentId, channel) => {
@@ -1073,10 +1291,17 @@ export default function JobDetailPage() {
                   type="number"
                   step="0.01"
                   value={outcome.tipDollars}
+                  disabled={!isAdmin}
+                  title={isAdmin ? undefined : "Admin only"}
                   onChange={(e) =>
                     setOutcome((o) => ({ ...o, tipDollars: e.target.value }))
                   }
                 />
+                {!isAdmin ? (
+                  <p className="list-meta" style={{ marginTop: 4 }}>
+                    Tip edits are admin-only
+                  </p>
+                ) : null}
               </div>
             </div>
             {(() => {
@@ -1102,7 +1327,7 @@ export default function JobDetailPage() {
                 </div>
               );
             })()}
-            {job.paymentModel !== "pay_at_event" ? (
+            {job.paymentModel !== "pay_at_event" && isAdmin ? (
               <TipSplitEditor
                 tipCents={dollarsToCents(outcome.tipDollars) ?? 0}
                 staffNames={job.staffNames}
@@ -1152,7 +1377,7 @@ export default function JobDetailPage() {
             <div className="hookah-modal__body">
               <div className="hookah-modal__head">
                 <h2 id="guest-rates-title" className="hookah-modal__title">
-                  Guest pay rates
+                  Job rates
                 </h2>
                 <button
                   type="button"
@@ -1164,48 +1389,131 @@ export default function JobDetailPage() {
                 </button>
               </div>
               <p className="page-sub" style={{ margin: "0 0 1rem" }}>
-                On-site sales — guests choose a unit rate on the floor. No host
-                package deposit.
+                Rates for this job only. Leave catalog defaults, or set custom
+                Standard / Unlimited / refill / HST for the floor and guest QR.
+                {hasCustomPricing ? (
+                  <>
+                    {" "}
+                    <strong>Custom rates are active.</strong>
+                  </>
+                ) : (
+                  <> Catalog rates are in use.</>
+                )}
               </p>
-              <div className="guest-rates-modal__tiers">
-                <div className="guest-rates-modal__tier">
-                  <span className="guest-rates-modal__label">Standard</span>
-                  <strong className="guest-rates-modal__price">
-                    ${pricing.onsiteUnitRate}
-                  </strong>
-                  <span className="guest-rates-modal__meta">
-                    Per unit · ${pricing.refillPriceCents / 100} refills
-                  </span>
+              <div className="form" style={{ gap: "0.75rem" }}>
+                <div className="form-row form-row-2">
+                  <div className="field">
+                    <label htmlFor="job-rate-standard">Standard ($)</label>
+                    <input
+                      id="job-rate-standard"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={ratesDraft.onsiteUnitRate}
+                      onChange={(e) =>
+                        setRatesDraft((d) => ({
+                          ...d,
+                          onsiteUnitRate: e.target.value,
+                        }))
+                      }
+                    />
+                    <p className="list-meta" style={{ marginTop: 4 }}>
+                      Catalog ${catalogPricing.onsiteUnitRate}
+                    </p>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="job-rate-unlimited">Unlimited ($)</label>
+                    <input
+                      id="job-rate-unlimited"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={ratesDraft.onsiteUnlimitedRate}
+                      onChange={(e) =>
+                        setRatesDraft((d) => ({
+                          ...d,
+                          onsiteUnlimitedRate: e.target.value,
+                        }))
+                      }
+                    />
+                    <p className="list-meta" style={{ marginTop: 4 }}>
+                      Catalog ${catalogPricing.onsiteUnlimitedRate}
+                    </p>
+                  </div>
                 </div>
-                <div className="guest-rates-modal__tier">
-                  <span className="guest-rates-modal__label">Unlimited</span>
-                  <strong className="guest-rates-modal__price">
-                    ${pricing.onsiteUnlimitedRate}
-                  </strong>
-                  <span className="guest-rates-modal__meta">
-                    Per unit · unlimited refills
-                  </span>
+                <div className="form-row form-row-2">
+                  <div className="field">
+                    <label htmlFor="job-rate-refill">Standard refill ($)</label>
+                    <input
+                      id="job-rate-refill"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={ratesDraft.refillDollars}
+                      onChange={(e) =>
+                        setRatesDraft((d) => ({
+                          ...d,
+                          refillDollars: e.target.value,
+                        }))
+                      }
+                    />
+                    <p className="list-meta" style={{ marginTop: 4 }}>
+                      Catalog ${catalogPricing.refillPriceCents / 100} · Unlimited
+                      refills stay free
+                    </p>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="job-rate-hst">HST (%)</label>
+                    <input
+                      id="job-rate-hst"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={ratesDraft.hstPercent}
+                      onChange={(e) =>
+                        setRatesDraft((d) => ({
+                          ...d,
+                          hstPercent: e.target.value,
+                        }))
+                      }
+                    />
+                    <p className="list-meta" style={{ marginTop: 4 }}>
+                      Catalog {Math.round(catalogPricing.hstRate * 100)}%
+                    </p>
+                  </div>
                 </div>
               </div>
               <p className="list-meta" style={{ margin: "1rem 0 0" }}>
-                Refill add-on is {formatCadCents(pricing.refillPriceCents)} when guests
-                take the standard rate.
+                Amounts are before HST. Square and cash collect rate + HST.
               </p>
               <div className="hookah-modal__btn-stack" style={{ marginTop: "1rem" }}>
                 <button
                   type="button"
                   className="btn btn-primary hookah-modal__btn-main"
-                  onClick={() => setGuestRatesOpen(false)}
+                  disabled={ratesBusy}
+                  onClick={() => void saveJobRates()}
                 >
-                  Got it
+                  {ratesBusy ? "Saving…" : "Save job rates"}
                 </button>
-                <Link
-                  href={`/admin/jobs/${jobId}/payments`}
+                {hasCustomPricing ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={ratesBusy}
+                    onClick={() => void resetJobRates()}
+                  >
+                    Reset to catalog
+                  </button>
+                ) : null}
+                <button
+                  type="button"
                   className="btn btn-ghost"
+                  disabled={ratesBusy}
                   onClick={() => setGuestRatesOpen(false)}
                 >
-                  Open payments
-                </Link>
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
@@ -1654,7 +1962,9 @@ function AddHookahForm({
               </div>
 
               <p className="hookah-modal__prompt">
-                Select units for this job and optionally set flavours before staging.
+                Select units and set flavour before staging so the prep board
+                knows what to pack. You can still change flavour on Ready to
+                send before send-out.
               </p>
 
               {formError ? <p className="login-error">{formError}</p> : null}
@@ -1711,14 +2021,15 @@ function AddHookahForm({
                   <section className="hookah-modal__section">
                     <h3 className="hookah-modal__section-title">Bulk flavour</h3>
                     <p className="hookah-modal__hint">
-                      Set one flavour for every selected unit, or assign per hookah below.
+                      Recommended: set flavour now so prep can pack. Or assign
+                      per hookah below / on Ready to send.
                     </p>
                     <div className="add-hookah-modal__bulk">
                       <select
                         value={bulkFlavourId}
                         onChange={(e) => setBulkFlavourId(e.target.value)}
                       >
-                        <option value="">No flavour yet…</option>
+                        <option value="">Choose flavour for prep…</option>
                         {activeFlavours.map((f) => (
                           <option key={f.id} value={f.id}>
                             {f.name}
@@ -1748,7 +2059,7 @@ function AddHookahForm({
                               }))
                             }
                           >
-                            <option value="">No flavour yet…</option>
+                            <option value="">Choose flavour…</option>
                             {activeFlavours.map((f) => (
                               <option key={f.id} value={f.id}>
                                 {f.name}
@@ -1798,6 +2109,7 @@ function JobHookahBoard({
   flavours,
   paymentModel,
   pricing,
+  terminalReady = true,
   onAction,
   onRefresh,
 }: {
@@ -1806,7 +2118,10 @@ function JobHookahBoard({
   flavours: Flavour[];
   paymentModel?: Job["paymentModel"];
   pricing: PricingConfig;
-  onAction: (body: Record<string, unknown>) => void | Promise<void>;
+  terminalReady?: boolean;
+  onAction: (
+    body: Record<string, unknown>,
+  ) => boolean | Promise<boolean> | void | Promise<void>;
   onRefresh: () => void | Promise<void>;
 }) {
   const [modalId, setModalId] = useState<number | null>(null);
@@ -1860,6 +2175,9 @@ function JobHookahBoard({
       if (payload.bulkAction === "set_guest_pay_tier") {
         body.guestPayTier = payload.guestPayTier;
       }
+      if (payload.bulkAction === "send_out" && payload.guestPayTier) {
+        body.guestPayTier = payload.guestPayTier;
+      }
       if (payload.bulkAction === "return") {
         body.outcome = payload.outcome ?? "returned";
       }
@@ -1909,6 +2227,7 @@ function JobHookahBoard({
           flavours={flavours}
           paymentModel={paymentModel}
           pricing={pricing}
+          terminalReady={terminalReady}
           prompt={modalPrompt}
           onAction={onAction}
           onRefresh={onRefresh}
@@ -1927,6 +2246,7 @@ function HookahModal({
   flavours,
   paymentModel,
   pricing,
+  terminalReady = true,
   prompt,
   onAction,
   onRefresh,
@@ -1936,8 +2256,11 @@ function HookahModal({
   flavours: Flavour[];
   paymentModel?: Job["paymentModel"];
   pricing: PricingConfig;
+  terminalReady?: boolean;
   prompt?: string;
-  onAction: (body: Record<string, unknown>) => void | Promise<void>;
+  onAction: (
+    body: Record<string, unknown>,
+  ) => boolean | Promise<boolean> | void | Promise<void>;
   onRefresh: () => void | Promise<void>;
   onClose: () => void;
 }) {
@@ -1949,6 +2272,9 @@ function HookahModal({
     a.flavourId ? String(a.flavourId) : "",
   );
   const [formError, setFormError] = useState("");
+  const [formOk, setFormOk] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+  const [checkLogged, setCheckLogged] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [qrUrl, setQrUrl] = useState("");
@@ -1958,6 +2284,8 @@ function HookahModal({
   useEffect(() => {
     setNote("");
     setFormError("");
+    setFormOk("");
+    setCheckLogged(false);
     setFlavourId(a.flavourId ? String(a.flavourId) : "");
     const guestRefillFlavour =
       a.activeCall?.type === "refill" && a.activeCall.flavourId
@@ -1968,6 +2296,15 @@ function HookahModal({
     );
     setQrOpen(false);
   }, [a.id, a.flavourId, a.activeCall?.id, a.activeCall?.flavourId, a.activeCall?.type]);
+
+  useEffect(() => {
+    if (!formOk && !checkLogged) return;
+    const t = window.setTimeout(() => {
+      setFormOk("");
+      setCheckLogged(false);
+    }, 4000);
+    return () => window.clearTimeout(t);
+  }, [formOk, checkLogged]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -2001,6 +2338,14 @@ function HookahModal({
   const refillPrice =
     guestRefill?.priceCents ??
     defaultRefillCentsForTier(a.guestPayTier ?? null, pricing);
+  const unitChip =
+    paymentModel === "pay_at_event" && a.guestPayTier
+      ? unitPayChip(a.unitPaymentStatus)
+      : null;
+  const unitUnpaid =
+    paymentModel === "pay_at_event" &&
+    !!a.guestPayTier &&
+    a.unitPaymentStatus !== "succeeded";
 
   function assertReadyToSend(): boolean {
     if (!flavourId && !assignmentHasFlavour(a)) {
@@ -2016,8 +2361,25 @@ function HookahModal({
 
   async function run(body: Record<string, unknown>, close = false) {
     setFormError("");
-    await onAction(body);
-    if (close) onClose();
+    setFormOk("");
+    setActionBusy(true);
+    try {
+      const result = await onAction(body);
+      const ok = result !== false;
+      if (!ok) {
+        setFormError("Action failed — try again");
+        return false;
+      }
+      if (body.action === "check") {
+        setNote("");
+        setCheckLogged(true);
+        setFormOk("Check logged — next timer reset");
+      }
+      if (close) onClose();
+      return true;
+    } finally {
+      setActionBusy(false);
+    }
   }
 
   async function showGuestQr() {
@@ -2080,6 +2442,21 @@ function HookahModal({
                   {a.guestPayTier}
                 </span>
               ) : null}
+              {unitChip
+                ? (() => {
+                    const tone =
+                      a.unitPaymentStatus === "succeeded"
+                        ? "paid"
+                        : a.unitPaymentStatus === "pending"
+                          ? "awaiting"
+                          : "terminal";
+                    return (
+                      <span className={`pay-chip pay-chip--${tone}`}>
+                        {unitChip}
+                      </span>
+                    );
+                  })()
+                : null}
               {overdue ? <span className="hookah-chip hookah-chip--overdue">Overdue</span> : null}
               {a.issueFlag ? <span className="hookah-chip hookah-chip--issue">Issue</span> : null}
             </div>
@@ -2091,14 +2468,15 @@ function HookahModal({
 
         {prompt ? <p className="hookah-modal__prompt">{prompt}</p> : null}
         {formError ? <p className="login-error">{formError}</p> : null}
+        {formOk ? <p className="collect-toast">{formOk}</p> : null}
 
         {paymentModel === "pay_at_event" ? (
           <section className="hookah-modal__section">
             <h3 className="hookah-modal__section-title">Guest pay tier</h3>
             <p className="hookah-modal__hint">
-              Required before send-out. Standard charges $
-              {pricing.refillPriceCents / 100}{" "}
-              refills; Unlimited does not.
+              Required before send-out. Catalog rates exclude HST — Square adds{" "}
+              {Math.round(pricing.hstRate * 100)}% at charge. Standard refills $
+              {pricing.refillPriceCents / 100} + HST; Unlimited refills included.
             </p>
             <div className="guest-tier-picker__row">
               <button
@@ -2114,7 +2492,7 @@ function HookahModal({
                   })
                 }
               >
-                Standard · ${pricing.onsiteUnitRate}
+                Standard · ${pricing.onsiteUnitRate} + HST
               </button>
               <button
                 type="button"
@@ -2129,63 +2507,177 @@ function HookahModal({
                   })
                 }
               >
-                Unlimited · ${pricing.onsiteUnlimitedRate}
+                Unlimited · ${pricing.onsiteUnlimitedRate} + HST
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {unitUnpaid ? (
+          <section className="hookah-modal__section">
+            <h3 className="hookah-modal__section-title">Collect unit</h3>
+            <p className="hookah-modal__hint">
+              Charge the guest for this hookah before or as you send it out.
+            </p>
+            <div className="hookah-modal__btn-row">
+              <button
+                type="button"
+                className="btn btn-ok hookah-modal__btn-main"
+                disabled={!terminalReady || a.unitPaymentStatus === "pending"}
+                title={
+                  terminalReady
+                    ? undefined
+                    : "Pair a Square Terminal in Settings → Square"
+                }
+                onClick={() =>
+                  run({
+                    action: "mark_onsite_paid",
+                    assignmentId: a.id,
+                    channel: "terminal",
+                  })
+                }
+              >
+                {a.unitPaymentStatus === "pending"
+                  ? "Terminal pending…"
+                  : "Push unit to terminal"}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() =>
+                  run({
+                    action: "mark_onsite_paid",
+                    assignmentId: a.id,
+                    channel: "manual",
+                  })
+                }
+              >
+                Mark unit paid
               </button>
             </div>
           </section>
         ) : null}
 
         {a.activeCall ? (
-          <div className={`hookah-call-banner hookah-call-banner--${a.activeCall.type}`}>
-            <div>
-              <div className="hookah-call-banner__title">
-                {a.activeCall.type === "refill"
-                  ? "Guest refill request"
-                  : `Guest needs ${callTypeLabel(a.activeCall.type).toLowerCase()}`}
-                {a.activeCall.status === "acknowledged" ? " · you’re headed over" : ""}
-              </div>
-              {a.activeCall.type === "refill" ? (
-                <p className="hookah-call-banner__msg">
-                  {a.activeCall.flavourLabel || "Flavour TBD"}
-                  {" · "}
-                  {formatMoney(
+          <div
+            className={`hookah-call-banner hookah-call-banner--${a.activeCall.type}${
+              a.activeCall.type === "refill"
+                ? (() => {
+                    const tone = refillPayStaffCopy({
+                      priceCents: a.activeCall!.priceCents,
+                      payPreference: a.activeCall!.payPreference,
+                      paymentStatus: a.activeCall!.paymentStatus,
+                    }).tone;
+                    if (tone === "paid" || tone === "included") {
+                      return " hookah-call-banner--paid";
+                    }
+                    if (tone === "terminal") return " hookah-call-banner--terminal";
+                    if (tone === "awaiting") return " hookah-call-banner--awaiting";
+                    return "";
+                  })()
+                : ""
+            }`}
+          >
+            {a.activeCall.type === "refill" ? (
+              <>
+                {(() => {
+                  const pay = refillPayStaffCopy({
+                    priceCents: a.activeCall.priceCents,
+                    payPreference: a.activeCall.payPreference,
+                    paymentStatus: a.activeCall.paymentStatus,
+                  });
+                  const amountCents =
                     a.activeCall.priceCents ??
-                      defaultRefillCentsForTier(a.guestPayTier ?? null, pricing),
-                  )}
-                  {a.activeCall.priceAgreed ? " · guest agreed" : ""}
-                  {" — prep a new head and take the payment terminal."}
-                </p>
-              ) : a.activeCall.message ? (
-                <p className="hookah-call-banner__msg">“{a.activeCall.message}”</p>
-              ) : (
+                    defaultRefillCentsForTier(a.guestPayTier ?? null, pricing);
+                  return (
+                    <div className="hookah-pay-status">
+                      <span
+                        className={`hookah-pay-status__label ${
+                          pay.tone === "paid" || pay.tone === "included"
+                            ? "is-paid"
+                            : pay.tone === "awaiting"
+                              ? "is-awaiting"
+                              : pay.tone === "terminal"
+                                ? "is-terminal"
+                                : "is-cash"
+                        }`}
+                      >
+                        {pay.label}
+                      </span>
+                      <strong className="hookah-pay-status__amount">
+                        {amountCents <= 0
+                          ? "Included"
+                          : `${formatMoney(amountCents)} + HST`}
+                      </strong>
+                      <span className="hookah-pay-status__detail">{pay.detail}</span>
+                    </div>
+                  );
+                })()}
                 <p className="hookah-call-banner__msg">
-                  No note attached — they requested {callTypeLabel(a.activeCall.type).toLowerCase()}.
+                  Refill · {a.activeCall.flavourLabel || "Flavour TBD"}
+                  {a.activeCall.status === "acknowledged" ? " · claimed" : ""}
                 </p>
-              )}
-            </div>
+              </>
+            ) : (
+              <div>
+                <div className="hookah-call-banner__title">
+                  Guest needs {callTypeLabel(a.activeCall.type).toLowerCase()}
+                  {a.activeCall.status === "acknowledged" ? " · claimed" : ""}
+                </div>
+                {a.activeCall.message ? (
+                  <p className="hookah-call-banner__msg">“{a.activeCall.message}”</p>
+                ) : (
+                  <p className="hookah-call-banner__msg">
+                    No note attached — they requested{" "}
+                    {callTypeLabel(a.activeCall.type).toLowerCase()}.
+                  </p>
+                )}
+              </div>
+            )}
             <div className="hookah-call-banner__actions">
               {a.activeCall.status === "open" ? (
                 <button
                   type="button"
                   className="btn btn-sm btn-ok"
                   onClick={async () => {
-                    await fetch(`/api/service-requests/${a.activeCall!.id}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ action: "acknowledge" }),
-                    });
+                    const res = await fetch(
+                      `/api/service-requests/${a.activeCall!.id}`,
+                      {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "acknowledge" }),
+                      },
+                    );
+                    if (!res.ok) {
+                      const d = await res.json().catch(() => ({}));
+                      setFormError(d.error ?? "Couldn’t claim call — try again");
+                      return;
+                    }
+                    setFormError("");
                     await onRefresh();
                   }}
                 >
-                  We’re on the way
+                  I’m on it
                 </button>
               ) : null}
               {a.activeCall.type === "refill" ? (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-ok"
-                  onClick={() =>
-                    run({
+                <RefillCollectActions
+                  priceCents={a.activeCall.priceCents}
+                  paymentStatus={a.activeCall.paymentStatus}
+                  payPreference={a.activeCall.payPreference}
+                  checkoutUrl={a.activeCall.checkoutUrl}
+                  terminalReady={terminalReady}
+                  onPushTerminal={() => {
+                    void run({
+                      action: "push_refill_terminal",
+                      assignmentId: a.id,
+                      serviceRequestId: a.activeCall!.id,
+                      amountCents: a.activeCall!.priceCents ?? refillPrice,
+                      flavourLabel: a.activeCall!.flavourLabel ?? undefined,
+                    });
+                  }}
+                  onDeliver={(collectChannel) => {
+                    void run({
                       action: "deliver_refill",
                       assignmentId: a.id,
                       serviceRequestId: a.activeCall!.id,
@@ -2193,14 +2685,16 @@ function HookahModal({
                       flavourLabel: a.activeCall!.flavourLabel ?? undefined,
                       priceCents:
                         a.activeCall!.priceCents ??
-                        defaultRefillCentsForTier(a.guestPayTier ?? null, pricing),
+                        defaultRefillCentsForTier(
+                          a.guestPayTier ?? null,
+                          pricing,
+                        ),
                       source: "guest",
                       note: note || undefined,
-                    })
-                  }
-                >
-                  Delivered · paid
-                </button>
+                      ...(collectChannel ? { collectChannel } : {}),
+                    });
+                  }}
+                />
               ) : (
                 <button
                   type="button"
@@ -2269,14 +2763,49 @@ function HookahModal({
               <div className="hookah-card__fields">
                 <label className="hookah-field">
                   <span>Flavour</span>
-                  <select value={flavourId} onChange={(e) => setFlavourId(e.target.value)}>
-                    <option value="">Choose flavour…</option>
-                    {flavours.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="hookah-field__with-chip">
+                    <select
+                      value={flavourId}
+                      onChange={(e) => setFlavourId(e.target.value)}
+                    >
+                      <option value="">Choose flavour…</option>
+                      {flavours.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className={`chip${
+                        flavourId &&
+                        flavourId !== String(a.flavourId ?? "")
+                          ? " active"
+                          : ""
+                      }`}
+                      disabled={
+                        actionBusy ||
+                        !flavourId ||
+                        flavourId === String(a.flavourId ?? "")
+                      }
+                      onClick={() => {
+                        void (async () => {
+                          const ok = await run({
+                            action: "set_flavour",
+                            assignmentId: a.id,
+                            flavourId: parseInt(flavourId, 10),
+                          });
+                          if (ok) {
+                            setFormOk(
+                              "Flavour set — shows on prep board (still Ready to send)",
+                            );
+                          }
+                        })();
+                      }}
+                    >
+                      Set flavour
+                    </button>
+                  </div>
                 </label>
                 <label className="hookah-field">
                   <span>Note for the send-out (optional)</span>
@@ -2292,25 +2821,80 @@ function HookahModal({
             <section className="hookah-modal__section">
               <h3 className="hookah-modal__section-title">Actions</h3>
               <div className="hookah-modal__btn-stack">
-                <button
-                  type="button"
-                  className="btn btn-ok hookah-modal__btn-main"
-                  disabled={!canSendOutFully}
-                  onClick={() => {
-                    if (!assertReadyToSend()) return;
-                    run(
-                      {
-                        action: "send_out",
-                        assignmentId: a.id,
-                        flavourId: flavourId ? parseInt(flavourId, 10) : undefined,
-                        note: note || undefined,
-                      },
-                      true,
-                    );
-                  }}
-                >
-                  Send to floor
-                </button>
+                {needsGuestTier && !a.guestPayTier ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-ok hookah-modal__btn-main"
+                      disabled={!canSendOut}
+                      onClick={() => {
+                        if (!flavourId && !assignmentHasFlavour(a)) {
+                          setFormError("Choose a flavour before sending to the floor");
+                          return;
+                        }
+                        run(
+                          {
+                            action: "send_out",
+                            assignmentId: a.id,
+                            guestPayTier: "standard",
+                            flavourId: flavourId
+                              ? parseInt(flavourId, 10)
+                              : undefined,
+                            note: note || undefined,
+                          },
+                          true,
+                        );
+                      }}
+                    >
+                      Send as Standard · ${pricing.onsiteUnitRate} + HST
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ok hookah-modal__btn-main"
+                      disabled={!canSendOut}
+                      onClick={() => {
+                        if (!flavourId && !assignmentHasFlavour(a)) {
+                          setFormError("Choose a flavour before sending to the floor");
+                          return;
+                        }
+                        run(
+                          {
+                            action: "send_out",
+                            assignmentId: a.id,
+                            guestPayTier: "unlimited",
+                            flavourId: flavourId
+                              ? parseInt(flavourId, 10)
+                              : undefined,
+                            note: note || undefined,
+                          },
+                          true,
+                        );
+                      }}
+                    >
+                      Send as Unlimited · ${pricing.onsiteUnlimitedRate} + HST
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-ok hookah-modal__btn-main"
+                    disabled={!canSendOutFully}
+                    onClick={() => {
+                      if (!assertReadyToSend()) return;
+                      run(
+                        {
+                          action: "send_out",
+                          assignmentId: a.id,
+                          flavourId: flavourId ? parseInt(flavourId, 10) : undefined,
+                          note: note || undefined,
+                        },
+                        true,
+                      );
+                    }}
+                  >
+                    Send to floor
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn-ghost"
@@ -2341,16 +2925,23 @@ function HookahModal({
               <div className="hookah-modal__btn-row">
                 <button
                   type="button"
-                  className="btn btn-ok hookah-modal__btn-main"
+                  className={`btn btn-ok hookah-modal__btn-main ${
+                    checkLogged ? "is-logged" : ""
+                  }`}
+                  disabled={actionBusy}
                   onClick={() =>
-                    run({
+                    void run({
                       action: "check",
                       assignmentId: a.id,
                       note: note || undefined,
                     })
                   }
                 >
-                  Log check
+                  {actionBusy
+                    ? "Logging…"
+                    : checkLogged
+                      ? "Check logged ✓"
+                      : "Log check"}
                 </button>
               </div>
             </section>
@@ -2358,8 +2949,15 @@ function HookahModal({
             <section className="hookah-modal__section">
               <h3 className="hookah-modal__section-title">Deliver refill</h3>
               <p className="hookah-modal__hint">
-                Prep the new head at the station, then bring it back with the payment terminal.
-                Same flavour or a change — both are tracked.
+                {guestRefill
+                  ? (guestRefill.priceCents ?? 0) <= 0
+                    ? "Prep the new head — this refill is included (no payment)."
+                    : guestRefill.paymentStatus === "succeeded"
+                      ? "Prep the new head — guest already paid. Deliver when ready."
+                      : guestRefill.payPreference === "terminal"
+                        ? "Prep the new head, bring the terminal, collect payment, then deliver."
+                        : "Prep the new head. Guest is paying on their phone — wait for Paid, or collect on terminal/cash if needed."
+                  : "Prep the new head at the station, then bring it back. Same flavour or a change — both are tracked."}
               </p>
               <div className="hookah-card__fields">
                 <label className="hookah-field">
@@ -2379,33 +2977,82 @@ function HookahModal({
                 </label>
                 <div className="hookah-modal__price-row">
                   <span>Charge</span>
-                  <strong>{formatMoney(refillPrice)}</strong>
+                  <strong>
+                    {refillPrice <= 0
+                      ? "Included"
+                      : `${formatMoney(refillPrice)} + HST`}
+                  </strong>
                 </div>
               </div>
-              <button
-                type="button"
-                className="btn btn-ok hookah-modal__btn-main"
-                disabled={!refillFlavourId && !guestRefill}
-                onClick={() => {
-                  if (!refillFlavourId && !guestRefill?.flavourId) {
-                    setFormError("Choose the refill flavour");
-                    return;
-                  }
-                  run({
-                    action: "deliver_refill",
-                    assignmentId: a.id,
-                    flavourId: refillFlavourId
-                      ? parseInt(refillFlavourId, 10)
-                      : guestRefill?.flavourId ?? undefined,
-                    priceCents: refillPrice,
-                    source: guestRefill ? "guest" : "staff",
-                    serviceRequestId: guestRefill?.id,
-                    note: note || undefined,
-                  });
-                }}
-              >
-                {guestRefill ? "Deliver guest refill · paid" : "Deliver refill · paid"}
-              </button>
+              {refillPrice <= 0 ||
+              guestRefill?.paymentStatus === "succeeded" ? (
+                <button
+                  type="button"
+                  className="btn btn-ok hookah-modal__btn-main"
+                  disabled={!refillFlavourId && !guestRefill}
+                  onClick={() => {
+                    if (!refillFlavourId && !guestRefill?.flavourId) {
+                      setFormError("Choose the refill flavour");
+                      return;
+                    }
+                    run({
+                      action: "deliver_refill",
+                      assignmentId: a.id,
+                      flavourId: refillFlavourId
+                        ? parseInt(refillFlavourId, 10)
+                        : guestRefill?.flavourId ?? undefined,
+                      priceCents: refillPrice,
+                      source: guestRefill ? "guest" : "staff",
+                      serviceRequestId: guestRefill?.id,
+                      note: note || undefined,
+                    });
+                  }}
+                >
+                  {guestRefill ? "Deliver guest refill" : "Deliver refill"}
+                </button>
+              ) : (
+                <div style={{ marginTop: "0.35rem" }}>
+                  <RefillCollectActions
+                    priceCents={refillPrice}
+                    paymentStatus={guestRefill?.paymentStatus}
+                    payPreference={guestRefill?.payPreference}
+                    checkoutUrl={guestRefill?.checkoutUrl}
+                    terminalReady={terminalReady}
+                    onPushTerminal={
+                      guestRefill
+                        ? () => {
+                            void run({
+                              action: "push_refill_terminal",
+                              assignmentId: a.id,
+                              serviceRequestId: guestRefill.id,
+                              amountCents: refillPrice,
+                              flavourLabel:
+                                guestRefill.flavourLabel ?? undefined,
+                            });
+                          }
+                        : undefined
+                    }
+                    onDeliver={(collectChannel) => {
+                      if (!refillFlavourId && !guestRefill?.flavourId) {
+                        setFormError("Choose the refill flavour");
+                        return;
+                      }
+                      void run({
+                        action: "deliver_refill",
+                        assignmentId: a.id,
+                        flavourId: refillFlavourId
+                          ? parseInt(refillFlavourId, 10)
+                          : guestRefill?.flavourId ?? undefined,
+                        priceCents: refillPrice,
+                        source: guestRefill ? "guest" : "staff",
+                        serviceRequestId: guestRefill?.id,
+                        note: note || undefined,
+                        ...(collectChannel ? { collectChannel } : {}),
+                      });
+                    }}
+                  />
+                </div>
+              )}
             </section>
 
             <section className="hookah-modal__section">

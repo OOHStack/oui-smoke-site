@@ -1,5 +1,8 @@
 import { Resend } from "resend";
-import { CONTACT_EMAIL, CONTACT_FROM } from "@/lib/brand-contact";
+import {
+  CONTACT_FROM,
+  OPS_INBOX_EMAIL,
+} from "@/lib/brand-contact";
 
 let client: Resend | null = null;
 
@@ -25,13 +28,13 @@ export function getOpsNotifyEmail() {
   const raw =
     process.env.OPS_NOTIFY_EMAIL ||
     process.env.RESEND_OPS_EMAIL ||
-    CONTACT_EMAIL;
+    OPS_INBOX_EMAIL;
   const email = raw.trim().toLowerCase();
   if (isBlockedRecipient(email)) {
     console.warn(
-      `OPS_NOTIFY_EMAIL blocked (oohstack) — using ${CONTACT_EMAIL}`,
+      `OPS_NOTIFY_EMAIL blocked (oohstack) — using ${OPS_INBOX_EMAIL}`,
     );
-    return CONTACT_EMAIL;
+    return OPS_INBOX_EMAIL;
   }
   return email;
 }
@@ -85,7 +88,7 @@ export async function sendEmail(input: SendEmailInput): Promise<boolean> {
       html: input.html,
       text: input.text,
       replyTo: isBlockedRecipient(replyTo.toLowerCase())
-        ? CONTACT_EMAIL
+        ? OPS_INBOX_EMAIL
         : replyTo,
     });
     if (error) {

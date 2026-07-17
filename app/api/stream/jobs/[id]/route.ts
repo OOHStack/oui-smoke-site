@@ -1,6 +1,11 @@
 import { requireApiSession } from "@/lib/auth/api";
 import { getDb } from "@/lib/db";
 import { jobEvents, jobHookahs, jobs, payments, serviceRequests } from "@/lib/db/schema";
+import { clientPortalUrl } from "@/lib/guest";
+import { summarizeJobMoney } from "@/lib/job-balance";
+import { onsiteUnitPaymentMap } from "@/lib/ops/onsite-pay";
+import { guestRefillPaymentMap } from "@/lib/refill-payment-link";
+import { isSquareTerminalReady } from "@/lib/square-status";
 import { createSseResponse } from "@/lib/sse";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -32,8 +37,11 @@ async function loadJobSnapshot(id: number) {
       flavourLabel: serviceRequests.flavourLabel,
       priceCents: serviceRequests.priceCents,
       priceAgreed: serviceRequests.priceAgreed,
+      payPreference: serviceRequests.payPreference,
+      requestedGuestPayTier: serviceRequests.requestedGuestPayTier,
       createdAt: serviceRequests.createdAt,
       acknowledgedAt: serviceRequests.acknowledgedAt,
+      acknowledgedBy: serviceRequests.acknowledgedBy,
     })
     .from(serviceRequests)
     .where(
@@ -43,10 +51,31 @@ async function loadJobSnapshot(id: number) {
       ),
     );
 
-  const callByAssignment = new Map(activeCalls.map((c) => [c.jobHookahId, c]));
+  const payMap = await guestRefillPaymentMap(
+    activeCalls
+      .filter((c) => c.type === "refill" || c.type === "order_unit")
+      .map((c) => c.id),
+  );
+
+  const callByAssignment = new Map(
+    activeCalls.map((c) => {
+      const pay = payMap.get(c.id);
+      return [
+        c.jobHookahId,
+        {
+          ...c,
+          paymentStatus: pay?.paymentStatus ?? null,
+          checkoutUrl: pay?.checkoutUrl ?? null,
+        },
+      ] as const;
+    }),
+  );
+
+  const unitPay = await onsiteUnitPaymentMap(assignments.map((a) => a.id));
   const assignmentsWithCalls = assignments.map((a) => ({
     ...a,
     activeCall: callByAssignment.get(a.id) ?? null,
+    unitPaymentStatus: unitPay.get(a.id)?.status ?? null,
   }));
 
   const events = await db
@@ -62,9 +91,13 @@ async function loadJobSnapshot(id: number) {
 
   return {
     ...job,
+    clientPortalUrl: job.clientToken ? clientPortalUrl(job.clientToken) : null,
     assignments: assignmentsWithCalls,
     events,
     payments: paymentRows,
+    paymentSummary: summarizeJobMoney(job, paymentRows),
+    terminalReady: await isSquareTerminalReady(),
+    snapshotAt: Date.now(),
   };
 }
 

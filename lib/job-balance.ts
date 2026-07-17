@@ -38,15 +38,24 @@ export function jobDueCents(job: JobMoneyLike): number {
   return 0;
 }
 
+/** Package ledger kinds that count toward quote/balance (not tips or floor sales). */
+const PACKAGE_PAYMENT_KINDS = new Set(["deposit", "balance", "other"]);
+
 export function jobPaidCents(payments: PaymentLike[]): number {
   return payments
-    .filter((p) => p.status === "succeeded")
+    .filter(
+      (p) =>
+        p.status === "succeeded" && PACKAGE_PAYMENT_KINDS.has(p.kind),
+    )
     .reduce((sum, p) => sum + p.amountCents, 0);
 }
 
 export function jobPendingCents(payments: PaymentLike[]): number {
   return payments
-    .filter((p) => p.status === "pending")
+    .filter(
+      (p) =>
+        p.status === "pending" && PACKAGE_PAYMENT_KINDS.has(p.kind),
+    )
     .reduce((sum, p) => sum + p.amountCents, 0);
 }
 

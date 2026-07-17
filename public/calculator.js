@@ -31,7 +31,7 @@
     email: document.getElementById("calc-email"),
   };
 
-  const HST = 0.13;
+  let HST = 0.13;
   const BRANDING_MIN = 4;
   const MIN_PACKAGE = 450;
   const EXTRA_HOUR = 150;
@@ -289,7 +289,7 @@
       ),
       "",
       `Subtotal: ${moneyExact(result.subtotal)}`,
-      `Est. HST (13%): ${moneyExact(result.hst)}`,
+      `Est. HST (${Math.round(HST * 100)}%): ${moneyExact(result.hst)}`,
       `Estimated total: ${moneyExact(result.total)}`,
       nudge
         ? `\nNote: Adding ${nudge.needed} more hookah(s) unlocks ${money(nudge.next.rate)}/hookah.`
@@ -399,6 +399,17 @@
       first.focus();
     }
   });
+
+  fetch("/api/pricing")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      const rate = data?.pricing?.hstRate;
+      if (typeof rate === "number" && rate >= 0 && rate <= 1) {
+        HST = rate;
+        render();
+      }
+    })
+    .catch(() => {});
 
   render();
 })();

@@ -14,8 +14,19 @@ import { maybeAutoSendDeposit } from "@/lib/auto-deposit";
 import { summarizeJobMoney } from "@/lib/job-balance";
 import { normalizePaymentModel } from "@/lib/payment-model";
 import { jobEvents, jobHookahs, jobs, payments, serviceRequests } from "@/lib/db/schema";
+import { onsiteUnitPaymentMap } from "@/lib/ops/onsite-pay";
+import {
+  getPricingForJob,
+  jobPricingOverrideCount,
+  parseJobPricingOverride,
+  pricingToPublic,
+} from "@/lib/pricing";
+import { guestRefillPaymentMap } from "@/lib/refill-payment-link";
+import { isSquareTerminalReady } from "@/lib/square-status";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -56,8 +67,10 @@ export async function GET(_request: Request, context: RouteContext) {
       flavourLabel: serviceRequests.flavourLabel,
       priceCents: serviceRequests.priceCents,
       priceAgreed: serviceRequests.priceAgreed,
+      payPreference: serviceRequests.payPreference,
       createdAt: serviceRequests.createdAt,
       acknowledgedAt: serviceRequests.acknowledgedAt,
+      acknowledgedBy: serviceRequests.acknowledgedBy,
     })
     .from(serviceRequests)
     .where(
@@ -67,13 +80,33 @@ export async function GET(_request: Request, context: RouteContext) {
       ),
     );
 
+  const payMap = await guestRefillPaymentMap(
+    activeCalls.filter((c) => c.type === "refill").map((c) => c.id),
+  );
+
   const callByAssignment = new Map(
-    activeCalls.map((c) => [c.jobHookahId, c]),
+    activeCalls.map((c) => {
+      const pay = payMap.get(c.id);
+      return [
+        c.jobHookahId,
+        {
+          ...c,
+          paymentStatus: pay?.paymentStatus ?? null,
+          checkoutUrl: pay?.checkoutUrl ?? null,
+        },
+      ] as const;
+    }),
   );
 
   const assignmentsWithCalls = assignments.map((a) => ({
     ...a,
     activeCall: callByAssignment.get(a.id) ?? null,
+  }));
+
+  const unitPay = await onsiteUnitPaymentMap(assignments.map((a) => a.id));
+  const assignmentsEnriched = assignmentsWithCalls.map((a) => ({
+    ...a,
+    unitPaymentStatus: unitPay.get(a.id)?.status ?? null,
   }));
 
   const events = await db
@@ -87,14 +120,29 @@ export async function GET(_request: Request, context: RouteContext) {
     .from(payments)
     .where(eq(payments.jobId, id));
 
-  return NextResponse.json({
-    ...job,
-    clientPortalUrl: job.clientToken ? clientPortalUrl(job.clientToken) : null,
-    assignments: assignmentsWithCalls,
-    events,
-    payments: paymentRows,
-    paymentSummary: summarizeJobMoney(job, paymentRows),
-  });
+  const pricing = await getPricingForJob(job);
+  const pricingOverrides = parseJobPricingOverride(job.pricingJson);
+
+  return NextResponse.json(
+    {
+      ...job,
+      clientPortalUrl: job.clientToken ? clientPortalUrl(job.clientToken) : null,
+      assignments: assignmentsEnriched,
+      events,
+      payments: paymentRows,
+      paymentSummary: summarizeJobMoney(job, paymentRows),
+      pricing: pricingToPublic(pricing),
+      pricingOverrides,
+      hasCustomPricing: jobPricingOverrideCount(pricingOverrides) > 0,
+      terminalReady: await isSquareTerminalReady(),
+      snapshotAt: Date.now(),
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    },
+  );
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -133,6 +181,15 @@ export async function PATCH(request: Request, context: RouteContext) {
         ...updated,
         clientPortalUrl: clientPortalUrl(token),
       });
+    }
+
+    const tipFieldsTouched =
+      body.tipCents !== undefined || body.tipSplitJson !== undefined;
+    if (tipFieldsTouched && session.role !== "admin") {
+      return NextResponse.json(
+        { error: "Only admins can edit tips" },
+        { status: 403 },
+      );
     }
 
     const updates: Partial<typeof jobs.$inferInsert> = {};
@@ -180,6 +237,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (body.status !== undefined) updates.status = body.status;
     if (body.paymentModel !== undefined) {
       updates.paymentModel = normalizePaymentModel(body.paymentModel);
+    }
+    if (body.pricingJson !== undefined || body.pricingOverrides !== undefined) {
+      const raw =
+        body.pricingJson !== undefined
+          ? body.pricingJson
+          : body.pricingOverrides;
+      if (raw === null) {
+        updates.pricingJson = {};
+      } else {
+        updates.pricingJson = parseJobPricingOverride(raw);
+      }
     }
 
     if (body.status === "active") {
@@ -236,6 +304,24 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
+    if (updates.pricingJson !== undefined) {
+      const nextOverrides = parseJobPricingOverride(job.pricingJson);
+      const count = jobPricingOverrideCount(nextOverrides);
+      await db.insert(jobEvents).values({
+        jobId: id,
+        type: "note",
+        message:
+          count > 0
+            ? `Job rates updated · Standard $${nextOverrides.onsiteUnitRate ?? "catalog"} · Unlimited $${nextOverrides.onsiteUnlimitedRate ?? "catalog"} · refill $${
+                nextOverrides.refillPriceCents != null
+                  ? (nextOverrides.refillPriceCents / 100).toFixed(0)
+                  : "catalog"
+              }`
+            : "Job rates reset to catalog defaults",
+        createdBy: session.name,
+      });
+    }
+
     // Auto-send deposit when a package quote is first saved / updated
     let autoDeposit: Awaited<ReturnType<typeof maybeAutoSendDeposit>> | null =
       null;
@@ -247,8 +333,14 @@ export async function PATCH(request: Request, context: RouteContext) {
       autoDeposit = await maybeAutoSendDeposit(id, "quote");
     }
 
+    const pricing = await getPricingForJob(job);
+    const pricingOverrides = parseJobPricingOverride(job.pricingJson);
+
     return NextResponse.json({
       ...job,
+      pricing: pricingToPublic(pricing),
+      pricingOverrides,
+      hasCustomPricing: jobPricingOverrideCount(pricingOverrides) > 0,
       autoDeposit: autoDeposit
         ? { sent: autoDeposit.sent, reason: autoDeposit.reason }
         : undefined,

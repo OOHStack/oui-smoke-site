@@ -22,7 +22,8 @@ import {
   isGuestPayTier,
   type GuestPayTier,
 } from "@/lib/ops/guest-pay";
-import { getPricing } from "@/lib/pricing";
+import { getPricingForJob, withHstCents } from "@/lib/pricing";
+import { findGuestRefillPayment } from "@/lib/refill-payment-link";
 import { randomUUID } from "crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -332,13 +333,21 @@ export async function POST(request: Request, context: RouteContext) {
           }
 
           if (job.paymentModel === "pay_at_event" && !assignment.guestPayTier) {
-            return NextResponse.json(
-              {
-                error: "Choose Standard or Unlimited guest pay before sending out",
-                code: "NEED_GUEST_TIER",
-              },
-              { status: 409 },
-            );
+            if (isGuestPayTier(body.guestPayTier)) {
+              await db
+                .update(jobHookahs)
+                .set({ guestPayTier: body.guestPayTier })
+                .where(eq(jobHookahs.id, assignmentId));
+              assignment.guestPayTier = body.guestPayTier;
+            } else {
+              return NextResponse.json(
+                {
+                  error: "Choose Standard or Unlimited guest pay before sending out",
+                  code: "NEED_GUEST_TIER",
+                },
+                { status: 409 },
+              );
+            }
           }
 
           const now = new Date();
@@ -353,6 +362,9 @@ export async function POST(request: Request, context: RouteContext) {
               returnedAt: null,
               nextCheckAt,
               guestToken,
+              ...(assignment.guestPayTier
+                ? { guestPayTier: assignment.guestPayTier }
+                : {}),
             })
             .where(eq(jobHookahs.id, assignmentId));
 
@@ -502,13 +514,21 @@ export async function POST(request: Request, context: RouteContext) {
         }
 
         if (job.paymentModel === "pay_at_event" && !assignment.guestPayTier) {
-          return NextResponse.json(
-            {
-              error: "Choose Standard or Unlimited guest pay before sending out",
-              code: "NEED_GUEST_TIER",
-            },
-            { status: 409 },
-          );
+          if (isGuestPayTier(body.guestPayTier)) {
+            await db
+              .update(jobHookahs)
+              .set({ guestPayTier: body.guestPayTier })
+              .where(eq(jobHookahs.id, assignmentId));
+            assignment.guestPayTier = body.guestPayTier;
+          } else {
+            return NextResponse.json(
+              {
+                error: "Choose Standard or Unlimited guest pay before sending out",
+                code: "NEED_GUEST_TIER",
+              },
+              { status: 409 },
+            );
+          }
         }
 
         const now = new Date();
@@ -531,6 +551,9 @@ export async function POST(request: Request, context: RouteContext) {
             outNotes: note ? note : assignment.outNotes,
             guestToken,
             sortOrder,
+            ...(assignment.guestPayTier
+              ? { guestPayTier: assignment.guestPayTier }
+              : {}),
           })
           .where(eq(jobHookahs.id, assignmentId))
           .returning();
@@ -785,13 +808,19 @@ export async function POST(request: Request, context: RouteContext) {
           typeof body.serviceRequestId === "number" ? body.serviceRequestId : null;
         const note = typeof body.note === "string" ? body.note.trim() : "";
         const source = body.source === "guest" ? "guest" : "staff";
-        const pricing = await getPricing();
+        const pricing = await getPricingForJob(jobId);
         const defaultPrice = defaultRefillCentsForTier(
           assignment.guestPayTier as GuestPayTier | null,
           pricing,
         );
         const priceCents =
           typeof body.priceCents === "number" ? body.priceCents : defaultPrice;
+        const collectChannel =
+          body.collectChannel === "cash" ||
+          body.collectChannel === "terminal" ||
+          body.collectChannel === "already_paid"
+            ? (body.collectChannel as "cash" | "terminal" | "already_paid")
+            : null;
 
         if (serviceRequestId) {
           const [req] = await db
@@ -836,6 +865,69 @@ export async function POST(request: Request, context: RouteContext) {
         const now = new Date();
         const nextCheckAt = new Date(now.getTime() + job.checkIntervalMinutes * 60_000);
 
+        // Gate unpaid charged refills before mutating assignment / ledger
+        let terminalPushId: number | null = null;
+        if (priceCents > 0) {
+          const guestPayPre = serviceRequestId
+            ? await findGuestRefillPayment(serviceRequestId)
+            : null;
+          if (guestPayPre?.status !== "succeeded") {
+            if (!collectChannel) {
+              return NextResponse.json(
+                {
+                  error: "Choose how you collected payment",
+                  code: "NEED_COLLECT_CHANNEL",
+                },
+                { status: 409 },
+              );
+            }
+            if (collectChannel === "already_paid") {
+              return NextResponse.json(
+                {
+                  error: "Payment isn’t confirmed yet",
+                  code: "PAYMENT_NOT_CONFIRMED",
+                },
+                { status: 409 },
+              );
+            }
+            if (collectChannel === "terminal") {
+              if (guestPayPre?.status === "pending") {
+                await db
+                  .update(payments)
+                  .set({ status: "cancelled", updatedAt: now })
+                  .where(eq(payments.id, guestPayPre.id));
+              }
+              const { pushJobPaymentToTerminal } = await import(
+                "@/lib/terminal-checkout"
+              );
+              const result = await pushJobPaymentToTerminal({
+                jobId,
+                kind: "refill",
+                amountCents: priceCents,
+                label: `Refill · ${flavourLabel} + HST`,
+                jobHookahId: assignmentId,
+                createdBy: session.name,
+              });
+              if (!result.ok) {
+                return NextResponse.json(
+                  {
+                    error:
+                      result.reason === "terminal_not_configured"
+                        ? "Set Terminal device in Settings → Square"
+                        : result.reason,
+                    code: "TERMINAL_PUSH_FAILED",
+                  },
+                  {
+                    status:
+                      result.reason === "terminal_not_configured" ? 503 : 400,
+                  },
+                );
+              }
+              terminalPushId = result.paymentId;
+            }
+          }
+        }
+
         const [updated] = await db
           .update(jobHookahs)
           .set({
@@ -873,17 +965,35 @@ export async function POST(request: Request, context: RouteContext) {
           .returning();
 
         if (priceCents > 0) {
-          await db.insert(payments).values({
-            jobId,
-            jobHookahId: assignmentId,
-            kind: "refill",
-            status: "succeeded",
-            amountCents: priceCents,
-            label: `Refill · ${flavourLabel}`,
-            idempotencyKey: `refill-${refillRow.id}`,
-            createdBy: session.name,
-            paidAt: now,
-          });
+          const guestPay = serviceRequestId
+            ? await findGuestRefillPayment(serviceRequestId)
+            : null;
+
+          if (guestPay?.status === "succeeded" || terminalPushId != null) {
+            // Square / Terminal already tracking — don't invent cash.
+          } else {
+            // cash invent
+            if (guestPay?.status === "pending") {
+              await db
+                .update(payments)
+                .set({ status: "cancelled", updatedAt: now })
+                .where(eq(payments.id, guestPay.id));
+            }
+
+            await db.insert(payments).values({
+              jobId,
+              jobHookahId: assignmentId,
+              kind: "refill",
+              status: "succeeded",
+              amountCents: withHstCents(priceCents, pricing.hstRate),
+              label: `Refill · ${flavourLabel} + HST`,
+              idempotencyKey: guestPay
+                ? `refill-cash-${refillRow.id}`
+                : `refill-${refillRow.id}`,
+              createdBy: session.name,
+              paidAt: now,
+            });
+          }
         }
 
         if (serviceRequestId) {
@@ -901,13 +1011,19 @@ export async function POST(request: Request, context: RouteContext) {
 
         const same =
           previousLabel.trim().toLowerCase() === flavourLabel.trim().toLowerCase();
+        const charged =
+          priceCents > 0
+            ? withHstCents(priceCents, pricing.hstRate)
+            : 0;
         await db.insert(jobEvents).values({
           jobId,
           jobHookahId: assignmentId,
           type: "refill",
           message: note
             ? `Refill delivered (${same ? "same" : "new"}: ${flavourLabel}) — ${note}`
-            : `Refill delivered (${same ? "same" : "new"}: ${flavourLabel}) · $${(priceCents / 100).toFixed(2)}`,
+            : charged > 0
+              ? `Refill delivered (${same ? "same" : "new"}: ${flavourLabel}) · $${(charged / 100).toFixed(2)} incl. HST`
+              : `Refill delivered (${same ? "same" : "new"}: ${flavourLabel}) · included`,
           createdBy: session.name,
         });
 
@@ -921,8 +1037,25 @@ export async function POST(request: Request, context: RouteContext) {
         }
 
         const updates: Partial<typeof jobHookahs.$inferInsert> = {};
-        if (body.flavourId !== undefined) updates.flavourId = body.flavourId;
-        if (body.flavourLabel !== undefined) updates.flavourLabel = body.flavourLabel;
+        if (typeof body.flavourId === "number") {
+          updates.flavourId = body.flavourId;
+          if (body.flavourId > 0) {
+            const [flav] = await db
+              .select({ id: flavours.id, name: flavours.name })
+              .from(flavours)
+              .where(eq(flavours.id, body.flavourId))
+              .limit(1);
+            if (!flav) {
+              return NextResponse.json({ error: "Flavour not found" }, { status: 400 });
+            }
+            updates.flavourLabel = flav.name;
+          } else {
+            updates.flavourId = null;
+            updates.flavourLabel = "";
+          }
+        } else if (typeof body.flavourLabel === "string") {
+          updates.flavourLabel = body.flavourLabel;
+        }
 
         if (Object.keys(updates).length === 0) {
           return NextResponse.json({ error: "flavourId or flavourLabel required" }, { status: 400 });
@@ -938,11 +1071,12 @@ export async function POST(request: Request, context: RouteContext) {
           return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
         }
 
+        const label = updated.flavourLabel?.trim() || "cleared";
         await db.insert(jobEvents).values({
           jobId,
           jobHookahId: assignmentId,
           type: "note",
-          message: "Flavour updated",
+          message: `Flavour set · ${label}`,
           createdBy: session.name,
         });
 
@@ -1075,6 +1209,96 @@ export async function POST(request: Request, context: RouteContext) {
         return NextResponse.json(updated);
       }
 
+      case "push_refill_terminal": {
+        const assignmentId = body.assignmentId;
+        if (typeof assignmentId !== "number") {
+          return NextResponse.json({ error: "assignmentId required" }, { status: 400 });
+        }
+
+        const [assignment] = await db
+          .select()
+          .from(jobHookahs)
+          .where(and(eq(jobHookahs.id, assignmentId), eq(jobHookahs.jobId, jobId)))
+          .limit(1);
+
+        if (!assignment) {
+          return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+        }
+
+        const serviceRequestId =
+          typeof body.serviceRequestId === "number" ? body.serviceRequestId : null;
+        let flavourLabel =
+          typeof body.flavourLabel === "string" ? body.flavourLabel.trim() : "";
+        const pricing = await getPricingForJob(jobId);
+        let amountCents =
+          typeof body.amountCents === "number"
+            ? Math.round(body.amountCents)
+            : defaultRefillCentsForTier(
+                assignment.guestPayTier as GuestPayTier | null,
+                pricing,
+              );
+
+        if (serviceRequestId) {
+          const [req] = await db
+            .select()
+            .from(serviceRequests)
+            .where(eq(serviceRequests.id, serviceRequestId))
+            .limit(1);
+          if (req && req.jobHookahId === assignmentId) {
+            flavourLabel = req.flavourLabel || flavourLabel;
+            if (typeof req.priceCents === "number") amountCents = req.priceCents;
+            if (req.payPreference === "phone") {
+              const guestPay = await findGuestRefillPayment(serviceRequestId);
+              if (guestPay?.status === "pending") {
+                await db
+                  .update(payments)
+                  .set({ status: "cancelled", updatedAt: new Date() })
+                  .where(eq(payments.id, guestPay.id));
+              }
+              await db
+                .update(serviceRequests)
+                .set({ payPreference: "terminal" })
+                .where(eq(serviceRequests.id, serviceRequestId));
+            }
+          }
+        }
+
+        if (amountCents < 100) {
+          return NextResponse.json(
+            { error: "No charge to push — refill is included" },
+            { status: 400 },
+          );
+        }
+
+        const { pushJobPaymentToTerminal } = await import(
+          "@/lib/terminal-checkout"
+        );
+        const result = await pushJobPaymentToTerminal({
+          jobId,
+          kind: "refill",
+          amountCents,
+          label: `Refill · ${flavourLabel || assignment.flavourLabel || "flavour"} + HST`,
+          jobHookahId: assignmentId,
+          createdBy: session.name,
+        });
+        if (!result.ok) {
+          return NextResponse.json(
+            {
+              error:
+                result.reason === "terminal_not_configured"
+                  ? "Set Terminal device in Settings → Square"
+                  : result.reason,
+            },
+            { status: result.reason === "terminal_not_configured" ? 503 : 400 },
+          );
+        }
+        return NextResponse.json({
+          ok: true,
+          paymentId: result.paymentId,
+          terminalCheckoutId: result.terminalCheckoutId,
+        });
+      }
+
       case "mark_onsite_paid": {
         const assignmentId = body.assignmentId;
         if (typeof assignmentId !== "number") {
@@ -1114,12 +1338,13 @@ export async function POST(request: Request, context: RouteContext) {
           return NextResponse.json({ ok: true, alreadyPaid: true });
         }
 
-        const pricing = await getPricing();
-        const amountCents = guestPayTierUnitCents(
+        const pricing = await getPricingForJob(jobId);
+        const exclusiveCents = guestPayTierUnitCents(
           assignment.guestPayTier,
           pricing,
         );
-        const label = guestPayTierLabel(assignment.guestPayTier, pricing);
+        const amountCents = withHstCents(exclusiveCents, pricing.hstRate);
+        const label = `${guestPayTierLabel(assignment.guestPayTier, pricing)} + HST`;
 
         if (body.channel === "terminal") {
           const { pushJobPaymentToTerminal } = await import(
@@ -1128,7 +1353,7 @@ export async function POST(request: Request, context: RouteContext) {
           const result = await pushJobPaymentToTerminal({
             jobId,
             kind: "onsite_unit",
-            amountCents,
+            amountCents: exclusiveCents,
             label,
             jobHookahId: assignmentId,
             createdBy: session.name,
@@ -1208,24 +1433,8 @@ export async function POST(request: Request, context: RouteContext) {
           })
           .returning();
 
-        const tipTotal = await db
-          .select({
-            sum: sql<number>`coalesce(sum(${payments.amountCents}), 0)`,
-          })
-          .from(payments)
-          .where(
-            and(
-              eq(payments.jobId, jobId),
-              eq(payments.kind, "tip"),
-              eq(payments.status, "succeeded"),
-            ),
-          );
-
-        const tipCents = Number(tipTotal[0]?.sum ?? 0);
-        await db
-          .update(jobs)
-          .set({ tipCents, updatedAt: now })
-          .where(eq(jobs.id, jobId));
+        const { syncJobTipCents } = await import("@/lib/payments");
+        const tipCents = await syncJobTipCents(jobId);
 
         await db.insert(jobEvents).values({
           jobId,
@@ -1236,6 +1445,58 @@ export async function POST(request: Request, context: RouteContext) {
         });
 
         return NextResponse.json({ payment: row, tipCents });
+      }
+
+      case "collect_tip_terminal": {
+        const amountCents =
+          typeof body.amountCents === "number"
+            ? Math.round(body.amountCents)
+            : typeof body.amountDollars === "number"
+              ? Math.round(body.amountDollars * 100)
+              : NaN;
+        if (!Number.isFinite(amountCents) || amountCents < 100) {
+          return NextResponse.json(
+            { error: "Tip must be at least $1.00" },
+            { status: 400 },
+          );
+        }
+
+        const assignmentId =
+          typeof body.assignmentId === "number" ? body.assignmentId : null;
+        const { pushJobPaymentToTerminal } = await import(
+          "@/lib/terminal-checkout"
+        );
+        const result = await pushJobPaymentToTerminal({
+          jobId,
+          kind: "tip",
+          amountCents,
+          label: assignmentId
+            ? `Tip · unit #${assignmentId}`
+            : "Tip",
+          jobHookahId: assignmentId,
+          createdBy: session.name,
+        });
+        if (!result.ok) {
+          return NextResponse.json(
+            {
+              error:
+                result.reason === "terminal_not_configured"
+                  ? "Set Terminal device in Settings → Square"
+                  : result.reason,
+            },
+            {
+              status:
+                result.reason === "terminal_not_configured" ? 503 : 400,
+            },
+          );
+        }
+        return NextResponse.json({
+          ok: true,
+          channel: "terminal",
+          paymentId: result.paymentId,
+          terminalCheckoutId: result.terminalCheckoutId,
+          amountCents: result.amountCents,
+        });
       }
 
       case "ensure_guest_token": {

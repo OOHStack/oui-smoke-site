@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { getSiteUrl } from "@/lib/guest";
 
 export type SquareMoney = {
@@ -26,17 +26,40 @@ export function isSquareConfigured() {
   );
 }
 
-/** Terminal checkouts need a paired device id (Square Dashboard → Terminal). */
+/** Env-only Terminal device id (Dashboard / Vercel). Prefer resolveSquareTerminalDeviceId for runtime. */
+export function getEnvSquareTerminalDeviceId() {
+  return process.env.SQUARE_TERMINAL_DEVICE_ID?.trim() || null;
+}
+
+/** Sync check — env device id only. Prefer isSquareTerminalReady() when DB override matters. */
 export function isSquareTerminalConfigured() {
-  return Boolean(
-    isSquareConfigured() && process.env.SQUARE_TERMINAL_DEVICE_ID?.trim(),
-  );
+  return Boolean(isSquareConfigured() && getEnvSquareTerminalDeviceId());
 }
 
 export function getSquareTerminalDeviceId() {
-  const id = process.env.SQUARE_TERMINAL_DEVICE_ID?.trim();
+  const id = getEnvSquareTerminalDeviceId();
   if (!id) throw new Error("SQUARE_TERMINAL_DEVICE_ID is not set");
   return id;
+}
+
+export function getSquareEnvironment(): "production" | "sandbox" {
+  return (process.env.SQUARE_ENVIRONMENT || "sandbox").toLowerCase() ===
+    "production"
+    ? "production"
+    : "sandbox";
+}
+
+export function isSquareWebhookConfigured() {
+  return Boolean(process.env.SQUARE_WEBHOOK_SIGNATURE_KEY?.trim()) ||
+    process.env.SQUARE_WEBHOOK_SKIP_VERIFY === "1";
+}
+
+/** Mask secrets for admin UI — never return full tokens. */
+export function maskSecret(value: string | null | undefined, keep = 4): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.length <= keep) return "••••";
+  return `${"•".repeat(Math.min(12, trimmed.length - keep))}${trimmed.slice(-keep)}`;
 }
 
 /** Square rejects reserved / fake domains — only pass real buyer emails through. */
@@ -117,6 +140,10 @@ export async function createDepositPaymentLink(input: {
     checkout_options: {
       redirect_url: input.redirectUrl || `${getSiteUrl()}/pay/thanks`,
       ask_for_shipping_address: false,
+      accepted_payment_methods: {
+        apple_pay: true,
+        google_pay: true,
+      },
     },
     payment_note: input.paymentNote,
     ...(input.buyerEmail
@@ -164,7 +191,10 @@ export async function createTerminalCheckout(input: {
   paymentNote: string;
   referenceId?: string;
   label?: string;
+  /** Paired Terminal API device id — falls back to env if omitted. */
+  deviceId?: string | null;
 }): Promise<SquareTerminalCheckout> {
+  const deviceId = input.deviceId?.trim() || getSquareTerminalDeviceId();
   const body = {
     idempotency_key: input.idempotencyKey.slice(0, 64),
     checkout: {
@@ -173,7 +203,7 @@ export async function createTerminalCheckout(input: {
         currency: input.currency || "CAD",
       },
       device_options: {
-        device_id: getSquareTerminalDeviceId(),
+        device_id: deviceId,
         skip_receipt_screen: false,
       },
       reference_id: (input.referenceId || input.paymentNote).slice(0, 40),
@@ -201,6 +231,93 @@ export async function createTerminalCheckout(input: {
     id: checkout.id,
     status: checkout.status,
     paymentIds: checkout.payment_ids,
+  };
+}
+
+export type SquarePaymentRecord = {
+  id: string;
+  status: string | null;
+  amountCents: number;
+  tipCents: number;
+  currency: string | null;
+  orderId: string | null;
+  note: string | null;
+  createdAt: string | null;
+  refundedCents: number;
+};
+
+export async function getSquarePayment(
+  paymentId: string,
+): Promise<SquarePaymentRecord | null> {
+  try {
+    const data = await squareFetch<{
+      payment?: {
+        id?: string;
+        status?: string;
+        amount_money?: { amount?: number; currency?: string };
+        tip_money?: { amount?: number };
+        order_id?: string;
+        note?: string;
+        created_at?: string;
+        refunded_money?: { amount?: number };
+      };
+    }>(`/v2/payments/${encodeURIComponent(paymentId)}`);
+    const p = data.payment;
+    if (!p?.id) return null;
+    return {
+      id: p.id,
+      status: p.status ?? null,
+      amountCents: Number(p.amount_money?.amount ?? 0),
+      tipCents: Number(p.tip_money?.amount ?? 0),
+      currency: p.amount_money?.currency ?? null,
+      orderId: p.order_id ?? null,
+      note: p.note ?? null,
+      createdAt: p.created_at ?? null,
+      refundedCents: Number(p.refunded_money?.amount ?? 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Full or partial refund against a completed Square payment. */
+export async function createSquareRefund(input: {
+  idempotencyKey: string;
+  paymentId: string;
+  amountCents: number;
+  currency?: string;
+  reason?: string;
+}): Promise<{ id: string; status: string | null; amountCents: number }> {
+  const amountCents = Math.round(input.amountCents);
+  if (!Number.isFinite(amountCents) || amountCents < 1) {
+    throw new Error("Refund amount must be at least 1 cent");
+  }
+
+  const data = await squareFetch<{
+    refund?: {
+      id?: string;
+      status?: string;
+      amount_money?: { amount?: number };
+    };
+  }>("/v2/refunds", {
+    method: "POST",
+    body: JSON.stringify({
+      idempotency_key: input.idempotencyKey.slice(0, 45),
+      payment_id: input.paymentId,
+      amount_money: {
+        amount: amountCents,
+        currency: input.currency || "CAD",
+      },
+      reason: (input.reason || "Oui Smoke refund").slice(0, 192),
+    }),
+  });
+
+  const refund = data.refund;
+  if (!refund?.id) throw new Error("Square did not return a refund");
+  return {
+    id: refund.id,
+    status: refund.status ?? null,
+    amountCents: Number(refund.amount_money?.amount ?? amountCents),
   };
 }
 
@@ -241,4 +358,182 @@ export function parsePaymentNoteId(note: string | null | undefined): number | nu
   if (!m) return null;
   const id = Number(m[1]);
   return Number.isFinite(id) ? id : null;
+}
+
+export type SquareDeviceCode = {
+  id: string;
+  name: string | null;
+  code: string | null;
+  status: string | null;
+  deviceId: string | null;
+  locationId: string | null;
+  productType: string | null;
+  pairBy: string | null;
+  createdAt: string | null;
+};
+
+export type SquareDeviceSummary = {
+  id: string;
+  status: string | null;
+  name: string | null;
+  deviceType: string | null;
+};
+
+/** Create a Terminal API pairing code (valid ~5 minutes until used). */
+export async function createSquareDeviceCode(input?: {
+  name?: string;
+  locationId?: string;
+}): Promise<SquareDeviceCode> {
+  const data = await squareFetch<{
+    device_code?: {
+      id?: string;
+      name?: string;
+      code?: string;
+      status?: string;
+      device_id?: string;
+      location_id?: string;
+      product_type?: string;
+      pair_by?: string;
+      created_at?: string;
+    };
+  }>("/v2/devices/codes", {
+    method: "POST",
+    body: JSON.stringify({
+      idempotency_key: randomUUID(),
+      device_code: {
+        name: (input?.name || "Oui Floor Terminal").slice(0, 80),
+        product_type: "TERMINAL_API",
+        location_id: input?.locationId || getSquareLocationId(),
+      },
+    }),
+  });
+
+  const dc = data.device_code;
+  if (!dc?.id) throw new Error("Square did not return a device code");
+  return mapDeviceCode(dc);
+}
+
+export async function getSquareDeviceCode(id: string): Promise<SquareDeviceCode | null> {
+  try {
+    const data = await squareFetch<{
+      device_code?: Parameters<typeof mapDeviceCode>[0];
+    }>(`/v2/devices/codes/${encodeURIComponent(id)}`);
+    return data.device_code ? mapDeviceCode(data.device_code) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function listSquareDeviceCodes(): Promise<SquareDeviceCode[]> {
+  const data = await squareFetch<{
+    device_codes?: Array<Parameters<typeof mapDeviceCode>[0]>;
+  }>("/v2/devices/codes");
+  return (data.device_codes ?? []).map(mapDeviceCode);
+}
+
+export async function listSquareDevices(): Promise<SquareDeviceSummary[]> {
+  const data = await squareFetch<{
+    devices?: Array<{
+      id?: string;
+      status?: string;
+      attributes?: {
+        name?: string;
+        type?: string;
+        device_type?: string;
+      };
+    }>;
+  }>("/v2/devices");
+  return (data.devices ?? []).map((d) => ({
+    id: d.id || "",
+    status: d.status ?? null,
+    name: d.attributes?.name ?? null,
+    deviceType: d.attributes?.type ?? d.attributes?.device_type ?? null,
+  })).filter((d) => d.id);
+}
+
+export async function getSquareLocationSummary(locationId?: string) {
+  const id = locationId || getSquareLocationId();
+  const data = await squareFetch<{
+    location?: {
+      id?: string;
+      name?: string;
+      status?: string;
+      currency?: string;
+      business_name?: string;
+      country?: string;
+      type?: string;
+    };
+  }>(`/v2/locations/${encodeURIComponent(id)}`);
+  const loc = data.location;
+  if (!loc?.id) throw new Error("Square location not found");
+  return {
+    id: loc.id,
+    name: loc.name ?? null,
+    status: loc.status ?? null,
+    currency: loc.currency ?? null,
+    businessName: loc.business_name ?? null,
+    country: loc.country ?? null,
+    type: loc.type ?? null,
+  };
+}
+
+/** Probe whether a device id is authorized for Terminal checkouts (cancels immediately if created). */
+export async function probeSquareTerminalDevice(deviceId: string): Promise<{
+  ok: boolean;
+  detail: string;
+  checkoutId?: string;
+}> {
+  try {
+    const checkout = await createTerminalCheckout({
+      idempotencyKey: randomUUID(),
+      amountCents: 100,
+      paymentNote: "oui:probe",
+      referenceId: "oui-probe",
+      deviceId,
+    });
+    if (checkout.id) {
+      try {
+        await squareFetch(`/v2/terminals/checkouts/${checkout.id}/cancel`, {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+      } catch {
+        /* best-effort cancel */
+      }
+    }
+    return {
+      ok: true,
+      detail: "Device accepted a Terminal checkout",
+      checkoutId: checkout.id,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      detail: err instanceof Error ? err.message : "Probe failed",
+    };
+  }
+}
+
+function mapDeviceCode(dc: {
+  id?: string;
+  name?: string;
+  code?: string;
+  status?: string;
+  device_id?: string;
+  location_id?: string;
+  product_type?: string;
+  pair_by?: string;
+  created_at?: string;
+}): SquareDeviceCode {
+  return {
+    id: dc.id || "",
+    name: dc.name ?? null,
+    code: dc.code ?? null,
+    status: dc.status ?? null,
+    deviceId: dc.device_id ?? null,
+    locationId: dc.location_id ?? null,
+    productType: dc.product_type ?? null,
+    pairBy: dc.pair_by ?? null,
+    createdAt: dc.created_at ?? null,
+  };
 }

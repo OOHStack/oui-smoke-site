@@ -1,5 +1,5 @@
 import { del } from "@vercel/blob";
-import { requireApiSession } from "@/lib/auth/api";
+import { requireApiAdmin } from "@/lib/auth/api";
 import { verifySessionPassword } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import {
@@ -22,7 +22,7 @@ type RouteContext = { params: Promise<{ id: string }> };
  * (details, packing notes, staged assignments + flavours, client portal token).
  */
 export async function POST(request: Request, context: RouteContext) {
-  const { session, error } = await requireApiSession();
+  const { session, error } = await requireApiAdmin();
   if (error || !session) return error!;
 
   const { id: idParam } = await context.params;

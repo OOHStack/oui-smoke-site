@@ -12,6 +12,8 @@ export type PaymentSettingsValues = {
   autoDepositOnQuote: boolean;
   autoBalanceEnabled: boolean;
   autoBalanceDaysBefore: number;
+  /** Overrides SQUARE_TERMINAL_DEVICE_ID when set (ops Settings → Square). */
+  squareTerminalDeviceId: string | null;
 };
 
 export const FALLBACK_PAYMENT_SETTINGS: PaymentSettingsValues = {
@@ -20,12 +22,19 @@ export const FALLBACK_PAYMENT_SETTINGS: PaymentSettingsValues = {
   autoDepositOnQuote: true,
   autoBalanceEnabled: true,
   autoBalanceDaysBefore: 7,
+  squareTerminalDeviceId: null,
 };
 
 function clampDays(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return 7;
   return Math.min(60, Math.max(0, Math.round(n)));
+}
+
+function normalizeTerminalDeviceId(value: unknown): string | null {
+  if (value == null) return null;
+  const trimmed = String(value).trim();
+  return trimmed ? trimmed.slice(0, 120) : null;
 }
 
 export async function getPaymentSettings(): Promise<PaymentSettingsValues> {
@@ -49,6 +58,9 @@ export async function getPaymentSettings(): Promise<PaymentSettingsValues> {
     autoBalanceDaysBefore: clampDays(
       row.autoBalanceDaysBefore ?? FALLBACK_PAYMENT_SETTINGS.autoBalanceDaysBefore,
     ),
+    squareTerminalDeviceId: normalizeTerminalDeviceId(
+      row.squareTerminalDeviceId,
+    ),
   };
 }
 
@@ -68,6 +80,10 @@ export async function updatePaymentSettings(
     autoBalanceDaysBefore: clampDays(
       patch.autoBalanceDaysBefore ?? current.autoBalanceDaysBefore,
     ),
+    squareTerminalDeviceId:
+      patch.squareTerminalDeviceId !== undefined
+        ? normalizeTerminalDeviceId(patch.squareTerminalDeviceId)
+        : current.squareTerminalDeviceId,
   };
 
   await db
@@ -79,6 +95,7 @@ export async function updatePaymentSettings(
       autoDepositOnQuote: next.autoDepositOnQuote,
       autoBalanceEnabled: next.autoBalanceEnabled,
       autoBalanceDaysBefore: next.autoBalanceDaysBefore,
+      squareTerminalDeviceId: next.squareTerminalDeviceId,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -89,6 +106,7 @@ export async function updatePaymentSettings(
         autoDepositOnQuote: next.autoDepositOnQuote,
         autoBalanceEnabled: next.autoBalanceEnabled,
         autoBalanceDaysBefore: next.autoBalanceDaysBefore,
+        squareTerminalDeviceId: next.squareTerminalDeviceId,
         updatedAt: new Date(),
       },
     });

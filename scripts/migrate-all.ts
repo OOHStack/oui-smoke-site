@@ -22,6 +22,9 @@ async function main() {
     CREATE TYPE service_request_type AS ENUM ('coals', 'refill', 'issue', 'other');
   EXCEPTION WHEN duplicate_object THEN null; END $$`;
   await sql`DO $$ BEGIN
+    ALTER TYPE service_request_type ADD VALUE IF NOT EXISTS 'order_unit';
+  EXCEPTION WHEN duplicate_object THEN null; END $$`;
+  await sql`DO $$ BEGIN
     CREATE TYPE service_request_status AS ENUM ('open', 'acknowledged', 'resolved', 'cancelled');
   EXCEPTION WHEN duplicate_object THEN null; END $$`;
   await sql`
@@ -53,6 +56,11 @@ async function main() {
   await sql`ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS flavour_label text DEFAULT ''`;
   await sql`ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS price_cents integer`;
   await sql`ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS price_agreed boolean NOT NULL DEFAULT false`;
+  await sql`DO $$ BEGIN
+    CREATE TYPE refill_pay_preference AS ENUM ('phone', 'terminal');
+  EXCEPTION WHEN duplicate_object THEN null; END $$`;
+  await sql`ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS pay_preference refill_pay_preference`;
+  await sql`ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS acknowledged_by_user_id integer`;
   await sql`CREATE TABLE IF NOT EXISTS hookah_refills (
     id serial PRIMARY KEY,
     job_id integer NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -120,6 +128,9 @@ async function main() {
     )
   `;
   console.log("✓ push_subscriptions");
+
+  await sql`ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS ops_user_id integer`;
+  console.log("✓ push_subscriptions.ops_user_id");
 
   // --- ops users ---
   await sql`DO $$ BEGIN
@@ -296,6 +307,10 @@ async function main() {
     ADD COLUMN IF NOT EXISTS auto_balance_days_before integer NOT NULL DEFAULT 7
   `;
   await sql`
+    ALTER TABLE payment_settings
+    ADD COLUMN IF NOT EXISTS square_terminal_device_id text
+  `;
+  await sql`
     INSERT INTO payment_settings (id)
     VALUES (1)
     ON CONFLICT (id) DO NOTHING
@@ -312,7 +327,15 @@ async function main() {
   EXCEPTION WHEN duplicate_object THEN null; END $$`;
   await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS square_terminal_checkout_id text`;
   await sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tip_split_json text DEFAULT ''`;
-  console.log("✓ guest pay tier + onsite_unit + terminal + tip split");
+  await sql`DO $$ BEGIN
+    ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'refunded';
+  EXCEPTION WHEN duplicate_object THEN null; END $$`;
+  await sql`DO $$ BEGIN
+    ALTER TYPE service_request_type ADD VALUE IF NOT EXISTS 'order_unit';
+  EXCEPTION WHEN duplicate_object THEN null; END $$`;
+  await sql`ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS requested_guest_pay_tier guest_pay_tier`;
+  await sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pricing_json jsonb NOT NULL DEFAULT '{}'::jsonb`;
+  console.log("✓ guest pay tier + onsite_unit + terminal + tip split + refunded + order_unit + job pricing");
 
   // --- site settings (Control Center rates + default check interval) ---
   await sql`
@@ -351,7 +374,46 @@ async function main() {
     )
     ON CONFLICT (id) DO NOTHING
   `;
+  await sql`ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS prep_token text`;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS site_settings_prep_token_unique
+    ON site_settings (prep_token)
+  `;
   console.log("✓ site_settings");
+
+  // --- site media (marketing assets on Blob) ---
+  await sql`
+    CREATE TABLE IF NOT EXISTS site_media (
+      id serial PRIMARY KEY,
+      key text NOT NULL UNIQUE,
+      label text NOT NULL DEFAULT '',
+      url text NOT NULL,
+      content_type text NOT NULL DEFAULT 'video/mp4',
+      pathname text DEFAULT '',
+      section text DEFAULT '',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    INSERT INTO site_media (key, label, url, content_type, pathname, section)
+    VALUES (
+      'summer_promo_reel',
+      'SSS Golf Tournament ''25',
+      'https://47tgviux3a8j2k6m.public.blob.vercel-storage.com/site/sss-golf-tourney-2025.mp4',
+      'video/mp4',
+      'site/sss-golf-tourney-2025.mp4',
+      'summer'
+    )
+    ON CONFLICT (key) DO UPDATE SET
+      label = EXCLUDED.label,
+      url = EXCLUDED.url,
+      content_type = EXCLUDED.content_type,
+      pathname = EXCLUDED.pathname,
+      section = EXCLUDED.section,
+      updated_at = now()
+  `;
+  console.log("✓ site_media");
 
   // --- verify ---
   console.log("\nVerifying schema…");
@@ -364,6 +426,7 @@ async function main() {
     "payments",
     "payment_settings",
     "site_settings",
+    "site_media",
   ];
   const requiredColumns: Record<string, string[]> = {
     job_hookahs: [
@@ -376,7 +439,15 @@ async function main() {
       "guest_feedback_at",
       "guest_pay_tier",
     ],
-    service_requests: ["flavour_id", "flavour_label", "price_cents", "price_agreed"],
+    service_requests: [
+      "flavour_id",
+      "flavour_label",
+      "price_cents",
+      "price_agreed",
+      "pay_preference",
+      "acknowledged_by_user_id",
+    ],
+    push_subscriptions: ["ops_user_id"],
     job_photos: [
       "consent_agreed",
       "social_handle",

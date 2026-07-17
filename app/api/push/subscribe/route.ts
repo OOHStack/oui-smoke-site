@@ -39,6 +39,7 @@ export async function POST(request: Request) {
           auth,
           userAgent,
           createdBy: session.name,
+          opsUserId: session.userId,
           updatedAt: now,
         })
         .where(eq(pushSubscriptions.id, existing.id))
@@ -54,6 +55,7 @@ export async function POST(request: Request) {
         auth,
         userAgent,
         createdBy: session.name,
+        opsUserId: session.userId,
       })
       .returning();
 

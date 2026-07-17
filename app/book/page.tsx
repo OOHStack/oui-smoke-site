@@ -220,7 +220,7 @@ function BookForm() {
           <li>
             No package deposit — guests pay ${pricing.onsiteUnitRate} (+$
             {refillDollars} refills) or ${pricing.onsiteUnlimitedRate}{" "}
-            unlimited per unit.
+            unlimited per unit, plus HST.
           </li>
           <li>We’ll send timing and floor details once confirmed.</li>
         </ol>
@@ -286,7 +286,7 @@ function BookForm() {
             <span>
               We attend your event and sell to guests at ${pricing.onsiteUnitRate}{" "}
               (+${refillDollars} refills) or ${pricing.onsiteUnlimitedRate}{" "}
-              unlimited. No package deposit from you.
+              unlimited, plus HST. No package deposit from you.
             </span>
           </span>
         </label>
@@ -406,7 +406,7 @@ function BookForm() {
               </li>
             ) : null}
             <li>
-              <span>HST (13%)</span>
+              <span>HST ({Math.round(pricing.hstRate * 100)}%)</span>
               <span>{formatCad(estimate.hst)}</span>
             </li>
           </ul>
@@ -428,16 +428,18 @@ function BookForm() {
             <li>
               <span>Standard unit</span>
               <span>
-                ${pricing.onsiteUnitRate} · ${refillDollars} refills
+                ${pricing.onsiteUnitRate} + HST · ${refillDollars} + HST
+                refills
               </span>
             </li>
             <li>
               <span>Unlimited unit</span>
-              <span>${pricing.onsiteUnlimitedRate} / night</span>
+              <span>${pricing.onsiteUnlimitedRate} + HST / night</span>
             </li>
           </ul>
           <p className="book__estimate-note" style={{ margin: "0.65rem 0 0" }}>
-            No host package deposit. Guests choose a rate on the floor. We’ll
+            No host package deposit. Guests choose a rate on the floor; HST (
+            {Math.round(pricing.hstRate * 100)}%) is added at charge. We’ll
             confirm we can staff your date.
           </p>
         </aside>

@@ -14,7 +14,7 @@ import {
   type PricingConfig,
 } from "@/lib/pricing";
 
-type TabId = "account" | "rates" | "payments" | "team";
+type TabId = "account" | "rates" | "payments" | "square" | "team";
 
 type SessionInfo = {
   name: string;
@@ -38,12 +38,66 @@ type PaymentSettings = {
   autoDepositOnQuote: boolean;
   autoBalanceEnabled: boolean;
   autoBalanceDaysBefore: number;
+  squareTerminalDeviceId?: string | null;
+};
+
+type SquareStatus = {
+  checkedAt: string;
+  configured: boolean;
+  readyForLinks: boolean;
+  readyForTerminal: boolean;
+  environment: "production" | "sandbox";
+  accessToken: { present: boolean; masked: string | null };
+  webhook: {
+    signatureConfigured: boolean;
+    skipVerify: boolean;
+    notificationUrl: string;
+  };
+  location: {
+    configuredId: string | null;
+    live: {
+      id: string;
+      name: string | null;
+      status: string | null;
+      currency: string | null;
+      businessName: string | null;
+      country: string | null;
+      type: string | null;
+    } | null;
+    error: string | null;
+  };
+  terminal: {
+    envDeviceId: string | null;
+    dbDeviceId: string | null;
+    activeDeviceId: string | null;
+    activeSource: "database" | "env" | null;
+    probe: { ok: boolean; detail: string } | null;
+  };
+  devices: Array<{
+    id: string;
+    status: string | null;
+    name: string | null;
+    deviceType: string | null;
+  }>;
+  deviceCodes: Array<{
+    id: string;
+    name: string | null;
+    code: string | null;
+    status: string | null;
+    deviceId: string | null;
+    locationId: string | null;
+    productType: string | null;
+    pairBy: string | null;
+    createdAt: string | null;
+  }>;
+  apiError: string | null;
 };
 
 const TABS: { id: TabId; label: string; adminOnly?: boolean }[] = [
   { id: "account", label: "Account" },
   { id: "rates", label: "Rates", adminOnly: true },
   { id: "payments", label: "Payments", adminOnly: true },
+  { id: "square", label: "Square", adminOnly: true },
   { id: "team", label: "Team", adminOnly: true },
 ];
 
@@ -87,7 +141,12 @@ function stripPublicExtras(raw: Record<string, unknown>): PricingConfig {
 }
 
 function parseTab(value: string | null, isAdmin: boolean): TabId {
-  if (value === "rates" || value === "payments" || value === "team") {
+  if (
+    value === "rates" ||
+    value === "payments" ||
+    value === "square" ||
+    value === "team"
+  ) {
     return isAdmin ? value : "account";
   }
   return "account";
@@ -105,6 +164,14 @@ export default function SettingsHub() {
     null,
   );
   const [paymentDraft, setPaymentDraft] = useState<PaymentSettings | null>(null);
+  const [squareStatus, setSquareStatus] = useState<SquareStatus | null>(null);
+  const [squareBusy, setSquareBusy] = useState(false);
+  const [deviceIdDraft, setDeviceIdDraft] = useState("");
+  const [activePairCode, setActivePairCode] = useState<{
+    id: string;
+    code: string;
+    pairBy: string | null;
+  } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -204,16 +271,39 @@ export default function SettingsHub() {
     setPaymentDraft(data.settings);
   }, []);
 
+  const loadSquare = useCallback(async (probe = false) => {
+    const res = await fetch(
+      `/api/square/status${probe ? "?probe=1" : ""}`,
+    );
+    if (res.status === 403) {
+      setSquareStatus(null);
+      return;
+    }
+    if (!res.ok) {
+      setError("Failed to load Square status");
+      return;
+    }
+    const data = await res.json();
+    const status = data.status as SquareStatus;
+    setSquareStatus(status);
+    setDeviceIdDraft(status.terminal.activeDeviceId ?? "");
+  }, []);
+
   useEffect(() => {
     void (async () => {
       setLoading(true);
       const info = await loadSession();
       if (info?.role === "admin") {
-        await Promise.all([loadTeam(), loadRates(), loadPayments()]);
+        await Promise.all([
+          loadTeam(),
+          loadRates(),
+          loadPayments(),
+          loadSquare(),
+        ]);
       }
       setLoading(false);
     })();
-  }, [loadSession, loadTeam, loadRates, loadPayments]);
+  }, [loadSession, loadTeam, loadRates, loadPayments, loadSquare]);
 
   useEffect(() => {
     const raw = searchParams.get("tab");
@@ -349,6 +439,67 @@ export default function SettingsHub() {
     }
   }
 
+  async function runSquareAction(
+    action: string,
+    body: Record<string, unknown> = {},
+  ) {
+    if (!isAdmin) return;
+    setSquareBusy(true);
+    setError("");
+    setOkMsg("");
+    try {
+      const res = await fetch("/api/square/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...body }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Square action failed");
+        return;
+      }
+      if (data.status) {
+        setSquareStatus(data.status as SquareStatus);
+        setDeviceIdDraft(
+          (data.status as SquareStatus).terminal.activeDeviceId ?? "",
+        );
+      }
+      if (action === "create_device_code" && data.deviceCode?.code) {
+        setActivePairCode({
+          id: data.deviceCode.id,
+          code: data.deviceCode.code,
+          pairBy: data.deviceCode.pairBy ?? null,
+        });
+        setOkMsg(`Pairing code ${data.deviceCode.code} — enter it on the Square Terminal within 5 minutes.`);
+      } else if (action === "set_terminal_device") {
+        setOkMsg(
+          body.deviceId
+            ? "Active Terminal device saved"
+            : "Cleared Terminal device override (using env if set)",
+        );
+        setActivePairCode(null);
+      } else if (action === "probe") {
+        const probe = (data.status as SquareStatus | undefined)?.terminal.probe;
+        setOkMsg(
+          probe?.ok
+            ? "Terminal probe succeeded — device is ready"
+            : `Terminal probe failed: ${probe?.detail ?? "unknown"}`,
+        );
+      } else if (action === "refresh_device_code" && data.deviceCode) {
+        if (data.deviceCode.status === "PAIRED" && data.deviceCode.deviceId) {
+          setOkMsg(`Paired · device ${data.deviceCode.deviceId}`);
+          setActivePairCode(null);
+        } else {
+          setOkMsg(`Code status: ${data.deviceCode.status ?? "unknown"}`);
+        }
+      } else {
+        setOkMsg("Square status updated");
+      }
+    } finally {
+      setSquareBusy(false);
+    }
+  }
+
   async function createUser(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -407,7 +558,7 @@ export default function SettingsHub() {
           <h1 className="page-title">Control Center</h1>
           <p className="page-sub">
             Your account
-            {isAdmin ? " · rates · payments · team" : ""}
+            {isAdmin ? " · rates · payments · Square · team" : ""}
           </p>
         </div>
       </div>
@@ -1055,6 +1206,328 @@ export default function SettingsHub() {
             </form>
           ) : (
             <p className="empty">Loading payment defaults…</p>
+          )}
+        </section>
+      ) : null}
+
+      {tab === "square" && isAdmin ? (
+        <section className="panel">
+          <div className="square-status-head">
+            <div>
+              <h2 className="panel-title">Square</h2>
+              <p className="list-meta" style={{ marginBottom: 0 }}>
+                Connection health for payment links, webhooks, and Terminal
+                collect. Secrets stay on the server — only masked values are
+                shown.
+              </p>
+            </div>
+            <div className="square-status-actions">
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={squareBusy}
+                onClick={() => void loadSquare(false)}
+              >
+                Refresh
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={squareBusy || !squareStatus?.configured}
+                onClick={() => void runSquareAction("probe")}
+              >
+                Probe Terminal
+              </button>
+            </div>
+          </div>
+
+          {squareStatus ? (
+            <>
+              <div className="square-status-grid">
+                <div
+                  className={`square-status-card${squareStatus.readyForLinks ? " is-ok" : " is-bad"}`}
+                >
+                  <span className="square-status-card__label">Payment links</span>
+                  <strong>
+                    {squareStatus.readyForLinks ? "Ready" : "Not ready"}
+                  </strong>
+                  <em>{squareStatus.environment}</em>
+                </div>
+                <div
+                  className={`square-status-card${squareStatus.readyForTerminal ? " is-ok" : " is-warn"}`}
+                >
+                  <span className="square-status-card__label">Terminal</span>
+                  <strong>
+                    {squareStatus.readyForTerminal ? "Ready" : "Needs device"}
+                  </strong>
+                  <em>
+                    {squareStatus.terminal.activeSource
+                      ? `via ${squareStatus.terminal.activeSource}`
+                      : "no device id"}
+                  </em>
+                </div>
+                <div
+                  className={`square-status-card${squareStatus.webhook.signatureConfigured ? " is-ok" : " is-warn"}`}
+                >
+                  <span className="square-status-card__label">Webhook</span>
+                  <strong>
+                    {squareStatus.webhook.signatureConfigured
+                      ? "Signed"
+                      : squareStatus.webhook.skipVerify
+                        ? "Skip verify"
+                        : "Not set"}
+                  </strong>
+                  <em>signature key</em>
+                </div>
+              </div>
+
+              <dl className="square-kv">
+                <div>
+                  <dt>Access token</dt>
+                  <dd>
+                    {squareStatus.accessToken.present
+                      ? squareStatus.accessToken.masked
+                      : "Missing"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Location</dt>
+                  <dd>
+                    {squareStatus.location.live
+                      ? `${squareStatus.location.live.name ?? "Location"} · ${squareStatus.location.live.id}${
+                          squareStatus.location.live.status
+                            ? ` · ${squareStatus.location.live.status}`
+                            : ""
+                        }`
+                      : squareStatus.location.error ||
+                        squareStatus.location.configuredId ||
+                        "Missing"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Webhook URL</dt>
+                  <dd className="mono">{squareStatus.webhook.notificationUrl}</dd>
+                </div>
+                <div>
+                  <dt>Active device</dt>
+                  <dd className="mono">
+                    {squareStatus.terminal.activeDeviceId || "—"}
+                  </dd>
+                </div>
+                {squareStatus.terminal.probe ? (
+                  <div>
+                    <dt>Last probe</dt>
+                    <dd>
+                      {squareStatus.terminal.probe.ok ? "OK · " : "Failed · "}
+                      {squareStatus.terminal.probe.detail}
+                    </dd>
+                  </div>
+                ) : null}
+                {squareStatus.apiError ? (
+                  <div>
+                    <dt>API note</dt>
+                    <dd>{squareStatus.apiError}</dd>
+                  </div>
+                ) : null}
+              </dl>
+
+              <div className="square-section">
+                <h3 className="square-section__title">Active Terminal device</h3>
+                <p className="list-meta">
+                  Saved here overrides <code>SQUARE_TERMINAL_DEVICE_ID</code>{" "}
+                  without redeploying. Use a device id from a successful Terminal
+                  API pairing (not Tap to Pay / Point of Sale alone).
+                </p>
+                <div className="square-device-form">
+                  <input
+                    value={deviceIdDraft}
+                    onChange={(e) => setDeviceIdDraft(e.target.value)}
+                    placeholder="Paired device id"
+                    aria-label="Terminal device id"
+                    className="mono"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    disabled={squareBusy}
+                    onClick={() =>
+                      void runSquareAction("set_terminal_device", {
+                        deviceId: deviceIdDraft.trim() || null,
+                      })
+                    }
+                  >
+                    Save device
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost"
+                    disabled={squareBusy || !squareStatus.terminal.dbDeviceId}
+                    onClick={() =>
+                      void runSquareAction("set_terminal_device", {
+                        deviceId: null,
+                      })
+                    }
+                  >
+                    Clear override
+                  </button>
+                </div>
+                {squareStatus.terminal.envDeviceId ? (
+                  <p className="list-meta" style={{ marginTop: "0.45rem" }}>
+                    Env fallback:{" "}
+                    <code>{squareStatus.terminal.envDeviceId}</code>
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="square-section">
+                <div className="square-section__row">
+                  <h3 className="square-section__title">Pair Square Terminal</h3>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    disabled={squareBusy || !squareStatus.configured}
+                    onClick={() => void runSquareAction("create_device_code")}
+                  >
+                    Create pairing code
+                  </button>
+                </div>
+                <p className="list-meta">
+                  On the hardware Terminal: Sign in → Device Code → enter the
+                  code within 5 minutes. Then refresh the code and tap Use
+                  device.
+                </p>
+                {activePairCode ? (
+                  <div className="square-pair-banner">
+                    <div>
+                      <span className="square-pair-banner__code">
+                        {activePairCode.code}
+                      </span>
+                      {activePairCode.pairBy ? (
+                        <em>Expires {new Date(activePairCode.pairBy).toLocaleTimeString()}</em>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      disabled={squareBusy}
+                      onClick={() =>
+                        void runSquareAction("refresh_device_code", {
+                          codeId: activePairCode.id,
+                        })
+                      }
+                    >
+                      Check pairing
+                    </button>
+                  </div>
+                ) : null}
+
+                {squareStatus.deviceCodes.length > 0 ? (
+                  <ul className="square-code-list">
+                    {squareStatus.deviceCodes.slice(0, 8).map((code) => (
+                      <li key={code.id}>
+                        <div>
+                          <strong>{code.name || "Terminal"}</strong>
+                          <span className="list-meta">
+                            {" "}
+                            · {code.status || "—"}
+                            {code.code ? ` · ${code.code}` : ""}
+                          </span>
+                          {code.deviceId ? (
+                            <div className="mono">{code.deviceId}</div>
+                          ) : null}
+                        </div>
+                        <div className="square-code-list__actions">
+                          {code.status === "UNPAIRED" && code.id ? (
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              disabled={squareBusy}
+                              onClick={() => {
+                                if (code.code) {
+                                  setActivePairCode({
+                                    id: code.id,
+                                    code: code.code,
+                                    pairBy: code.pairBy,
+                                  });
+                                }
+                                void runSquareAction("refresh_device_code", {
+                                  codeId: code.id,
+                                });
+                              }}
+                            >
+                              Refresh
+                            </button>
+                          ) : null}
+                          {code.deviceId ? (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              disabled={squareBusy}
+                              onClick={() =>
+                                void runSquareAction("set_terminal_device", {
+                                  deviceId: code.deviceId,
+                                })
+                              }
+                            >
+                              Use device
+                            </button>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="empty" style={{ marginTop: "0.65rem" }}>
+                    No device codes yet.
+                  </p>
+                )}
+              </div>
+
+              <div className="square-section">
+                <h3 className="square-section__title">Known devices</h3>
+                {squareStatus.devices.length > 0 ? (
+                  <ul className="square-code-list">
+                    {squareStatus.devices.map((device) => (
+                      <li key={device.id}>
+                        <div>
+                          <strong>{device.name || "Device"}</strong>
+                          <span className="list-meta">
+                            {" "}
+                            · {device.status || "—"}
+                            {device.deviceType ? ` · ${device.deviceType}` : ""}
+                          </span>
+                          <div className="mono">{device.id}</div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          disabled={squareBusy}
+                          onClick={() =>
+                            void runSquareAction("set_terminal_device", {
+                              deviceId: device.id,
+                            })
+                          }
+                        >
+                          Use device
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="empty">
+                    No paired Terminal API devices on this merchant yet.
+                  </p>
+                )}
+              </div>
+
+              <p className="list-meta" style={{ marginTop: "0.85rem" }}>
+                Checked {new Date(squareStatus.checkedAt).toLocaleString()}.
+                iPhone Tap to Pay in Square Point of Sale is separate from this
+                Terminal API push.
+              </p>
+            </>
+          ) : (
+            <p className="empty">Loading Square status…</p>
           )}
         </section>
       ) : null}

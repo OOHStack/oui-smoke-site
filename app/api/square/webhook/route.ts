@@ -1,6 +1,10 @@
 import { getDb } from "@/lib/db";
 import { payments } from "@/lib/db/schema";
-import { markPaymentFailed, markPaymentSucceeded } from "@/lib/payments";
+import {
+  markPaymentFailed,
+  markPaymentRefunded,
+  markPaymentSucceeded,
+} from "@/lib/payments";
 import {
   parsePaymentNoteId,
   verifySquareWebhookSignature,
@@ -24,6 +28,13 @@ type SquareTerminalCheckout = {
   payment_ids?: string[];
 };
 
+type SquareRefund = {
+  id?: string;
+  status?: string;
+  payment_id?: string;
+  amount_money?: { amount?: number; currency?: string };
+};
+
 type SquareWebhookBody = {
   type?: string;
   data?: {
@@ -32,6 +43,7 @@ type SquareWebhookBody = {
     object?: {
       payment?: SquarePayment;
       checkout?: SquareTerminalCheckout;
+      refund?: SquareRefund;
     };
   };
 };
@@ -41,11 +53,21 @@ async function resolvePaymentId(opts: {
   orderId?: string | null;
   terminalCheckoutId?: string | null;
   referenceId?: string | null;
+  squarePaymentId?: string | null;
 }): Promise<number | null> {
   const db = getDb();
   const noteId =
     parsePaymentNoteId(opts.note) ?? parsePaymentNoteId(opts.referenceId);
   if (noteId != null) return noteId;
+
+  if (opts.squarePaymentId) {
+    const [bySquare] = await db
+      .select({ id: payments.id })
+      .from(payments)
+      .where(eq(payments.squarePaymentId, opts.squarePaymentId))
+      .limit(1);
+    if (bySquare) return bySquare.id;
+  }
 
   if (opts.terminalCheckoutId) {
     const [byTerminal] = await db
@@ -129,6 +151,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, terminal: true });
   }
 
+  if (eventType === "refund.updated" || eventType === "refund.created") {
+    const refund = body.data?.object?.refund;
+    if (!refund?.payment_id) {
+      return NextResponse.json({ ok: true, ignored: "no refund payment" });
+    }
+
+    const status = (refund.status || "").toUpperCase();
+    if (status !== "COMPLETED" && status !== "PENDING") {
+      return NextResponse.json({ ok: true, ignored: status });
+    }
+
+    // Only apply COMPLETED refunds to the ledger (PENDING may reverse).
+    if (status !== "COMPLETED") {
+      return NextResponse.json({ ok: true, refundPending: true });
+    }
+
+    const paymentId = await resolvePaymentId({
+      squarePaymentId: refund.payment_id,
+    });
+    if (paymentId == null) {
+      console.warn("Square refund webhook: unmatched", refund.payment_id);
+      return NextResponse.json({ ok: true, unmatched: true });
+    }
+
+    await markPaymentRefunded({
+      paymentId,
+      squarePaymentId: refund.payment_id,
+      reason: "Square refund",
+      createdBy: "square",
+    });
+
+    return NextResponse.json({ ok: true, refund: true });
+  }
+
   if (eventType !== "payment.updated" && eventType !== "payment.created") {
     return NextResponse.json({ ok: true, ignored: eventType });
   }
@@ -141,6 +197,7 @@ export async function POST(request: Request) {
   const paymentId = await resolvePaymentId({
     note: payment.note,
     orderId: payment.order_id,
+    squarePaymentId: payment.id,
   });
 
   if (paymentId == null) {

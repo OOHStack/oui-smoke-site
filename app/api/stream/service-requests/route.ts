@@ -1,6 +1,8 @@
 import { requireApiSession } from "@/lib/auth/api";
 import { getDb } from "@/lib/db";
 import { hookahs, jobHookahs, jobs, serviceRequests } from "@/lib/db/schema";
+import { guestRefillPaymentMap } from "@/lib/refill-payment-link";
+import { isSquareTerminalReady } from "@/lib/square-status";
 import { createSseResponse } from "@/lib/sse";
 import { desc, eq, inArray } from "drizzle-orm";
 
@@ -9,7 +11,7 @@ export const maxDuration = 60;
 
 async function loadRequests() {
   const db = getDb();
-  return db
+  const rows = await db
     .select({
       id: serviceRequests.id,
       type: serviceRequests.type,
@@ -19,8 +21,11 @@ async function loadRequests() {
       flavourLabel: serviceRequests.flavourLabel,
       priceCents: serviceRequests.priceCents,
       priceAgreed: serviceRequests.priceAgreed,
+      payPreference: serviceRequests.payPreference,
+      requestedGuestPayTier: serviceRequests.requestedGuestPayTier,
       createdAt: serviceRequests.createdAt,
       acknowledgedAt: serviceRequests.acknowledgedAt,
+      acknowledgedBy: serviceRequests.acknowledgedBy,
       jobId: serviceRequests.jobId,
       jobTitle: jobs.title,
       clientName: jobs.clientName,
@@ -36,6 +41,26 @@ async function loadRequests() {
     .where(inArray(serviceRequests.status, ["open", "acknowledged"]))
     .orderBy(desc(serviceRequests.createdAt))
     .limit(50);
+
+  const payMap = await guestRefillPaymentMap(
+    rows
+      .filter((r) => r.type === "refill" || r.type === "order_unit")
+      .map((r) => r.id),
+  );
+
+  const requests = rows.map((r) => {
+    const pay = payMap.get(r.id);
+    return {
+      ...r,
+      paymentStatus: pay?.paymentStatus ?? null,
+      checkoutUrl: pay?.checkoutUrl ?? null,
+    };
+  });
+
+  return {
+    requests,
+    terminalReady: await isSquareTerminalReady(),
+  };
 }
 
 export async function GET(request: Request) {
@@ -45,6 +70,6 @@ export async function GET(request: Request) {
   return createSseResponse({
     signal: request.signal,
     intervalMs: 1500,
-    getPayload: async () => ({ requests: await loadRequests() }),
+    getPayload: loadRequests,
   });
 }

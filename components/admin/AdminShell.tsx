@@ -11,6 +11,7 @@ const NAV = [
   { href: "/admin/jobs", label: "Jobs" },
   { href: "/admin/payments", label: "Payments" },
   { href: "/admin/live", label: "Live Floor" },
+  { href: "/admin/prep", label: "Prep" },
   { href: "/admin/fleet", label: "Fleet" },
   { href: "/admin/flavours", label: "Flavours" },
   { href: "/admin/playbook", label: "Playbook" },
@@ -100,6 +101,9 @@ export default function AdminShell({
         </div>
       </header>
       <main className="admin-main">{children}</main>
+      <footer className="admin-footer">
+        <p className="admin-footer__text">Oui Smoke Ops · Toronto &amp; GTA</p>
+      </footer>
     </div>
   );
 }

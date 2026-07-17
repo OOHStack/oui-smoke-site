@@ -46,23 +46,31 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (existing.status !== "open" && existing.status !== "acknowledged") {
       return NextResponse.json({ error: "Request is not active" }, { status: 400 });
     }
+    // First claim sticks; later taps keep original claimer unless reclaiming open.
+    const keepClaim =
+      existing.status === "acknowledged" && existing.acknowledgedBy;
     [updated] = await db
       .update(serviceRequests)
       .set({
         status: "acknowledged",
         acknowledgedAt: existing.acknowledgedAt ?? now,
-        acknowledgedBy: session.name,
+        acknowledgedBy: keepClaim ? existing.acknowledgedBy : session.name,
+        acknowledgedByUserId: keepClaim
+          ? existing.acknowledgedByUserId
+          : session.userId,
       })
       .where(eq(serviceRequests.id, id))
       .returning();
 
-    await db.insert(jobEvents).values({
-      jobId: existing.jobId,
-      jobHookahId: existing.jobHookahId,
-      type: "note",
-      message: `On the way — guest ${existing.type} request`,
-      createdBy: session.name,
-    });
+    if (!keepClaim) {
+      await db.insert(jobEvents).values({
+        jobId: existing.jobId,
+        jobHookahId: existing.jobHookahId,
+        type: "note",
+        message: `I’m on it — guest ${existing.type} request`,
+        createdBy: session.name,
+      });
+    }
   } else if (action === "resolve") {
     [updated] = await db
       .update(serviceRequests)
@@ -72,6 +80,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         resolvedBy: session.name,
         acknowledgedAt: existing.acknowledgedAt ?? now,
         acknowledgedBy: existing.acknowledgedBy || session.name,
+        acknowledgedByUserId:
+          existing.acknowledgedByUserId ?? session.userId,
       })
       .where(eq(serviceRequests.id, id))
       .returning();

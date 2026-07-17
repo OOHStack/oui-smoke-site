@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import ActionErrorBanner from "@/components/admin/ActionErrorBanner";
+import { RefillCollectActions } from "@/components/admin/RefillCollectActions";
+import { readApiError } from "@/lib/api-error";
 import { useSse } from "@/lib/hooks/useSse";
+import { refillPayChip } from "@/lib/ops/guest-pay";
 
 type ServiceRequestRow = {
   id: number;
@@ -11,7 +15,12 @@ type ServiceRequestRow = {
   status: string;
   flavourLabel?: string | null;
   priceCents?: number | null;
+  payPreference?: "phone" | "terminal" | null;
+  requestedGuestPayTier?: "standard" | "unlimited" | null;
+  paymentStatus?: string | null;
+  checkoutUrl?: string | null;
   createdAt: string;
+  acknowledgedBy?: string | null;
   jobId: number;
   jobTitle: string;
   clientName: string;
@@ -41,6 +50,7 @@ function playChime() {
 function typeLabel(type: string) {
   if (type === "coals") return "Coals";
   if (type === "refill") return "Refill";
+  if (type === "order_unit") return "Extra hookah";
   if (type === "issue") return "Issue";
   return "Help";
 }
@@ -48,8 +58,19 @@ function typeLabel(type: string) {
 export default function ServiceAlerts() {
   const [requests, setRequests] = useState<ServiceRequestRow[]>([]);
   const [open, setOpen] = useState(false);
+  const [terminalReady, setTerminalReady] = useState(true);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState("");
+  const retryRef = useRef<(() => void) | null>(null);
   const knownOpen = useRef<Set<number>>(new Set());
+  const knownPay = useRef<Map<number, string>>(new Map());
   const primed = useRef(false);
+
+  function fail(message: string, retry?: () => void) {
+    setActionError(message);
+    retryRef.current = retry ?? null;
+    setOpen(true);
+  }
 
   const applyRows = useCallback((rows: ServiceRequestRow[]) => {
     if (primed.current) {
@@ -64,17 +85,56 @@ export default function ServiceAlerts() {
           }
           setOpen(true);
         }
+        const prevPay = knownPay.current.get(row.id);
+        if (
+          (row.type === "refill" || row.type === "order_unit") &&
+          row.paymentStatus === "succeeded" &&
+          prevPay !== "succeeded"
+        ) {
+          playChime();
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            const dollars =
+              row.priceCents != null
+                ? `$${(row.priceCents / 100).toFixed(0)}`
+                : "Payment";
+            new Notification(
+              row.type === "order_unit"
+                ? `Extra hookah paid · #${row.modelNumber}`
+                : `Refill paid · #${row.modelNumber}`,
+              {
+              body:
+                row.type === "order_unit"
+                  ? `${dollars} received — stage a new unit when ready`
+                  : `${dollars} received via Square — deliver when ready`,
+              tag: `${row.type}-paid-${row.id}`,
+            });
+          }
+          setOpen(true);
+        }
       }
     }
 
     knownOpen.current = new Set(rows.filter((r) => r.status === "open").map((r) => r.id));
+    knownPay.current = new Map(
+      rows
+        .filter(
+          (r) =>
+            (r.type === "refill" || r.type === "order_unit") && r.paymentStatus,
+        )
+        .map((r) => [r.id, r.paymentStatus || ""]),
+    );
     primed.current = true;
     setRequests(rows);
   }, []);
 
-  useSse<{ requests: ServiceRequestRow[] }>(
+  useSse<{ requests: ServiceRequestRow[]; terminalReady?: boolean }>(
     "/api/stream/service-requests",
-    (data) => applyRows(data.requests ?? []),
+    (data) => {
+      applyRows(data.requests ?? []);
+      if (typeof data.terminalReady === "boolean") {
+        setTerminalReady(data.terminalReady);
+      }
+    },
   );
 
   useEffect(() => {
@@ -84,16 +144,38 @@ export default function ServiceAlerts() {
   }, []);
 
   async function acknowledge(id: number) {
-    await fetch(`/api/service-requests/${id}`, {
+    setActionError("");
+    const res = await fetch(`/api/service-requests/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "acknowledge" }),
     });
+    if (!res.ok) {
+      fail(await readApiError(res), () => void acknowledge(id));
+      return;
+    }
+    const updated = (await res.json().catch(() => null)) as ServiceRequestRow | null;
+    setRequests((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              status: "acknowledged",
+              acknowledgedBy: updated?.acknowledgedBy ?? r.acknowledgedBy,
+            }
+          : r,
+      ),
+    );
   }
 
-  async function markDone(row: ServiceRequestRow) {
-    if (row.type === "refill") {
-      await fetch(`/api/jobs/${row.jobId}/hookahs`, {
+  async function deliverRefill(
+    row: ServiceRequestRow,
+    collectChannel?: "cash" | "terminal" | "already_paid",
+  ) {
+    setBusyId(row.id);
+    setActionError("");
+    try {
+      const res = await fetch(`/api/jobs/${row.jobId}/hookahs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -103,14 +185,67 @@ export default function ServiceAlerts() {
           source: "guest",
           flavourLabel: row.flavourLabel ?? undefined,
           priceCents: row.priceCents ?? undefined,
+          ...(collectChannel ? { collectChannel } : {}),
         }),
       });
+      if (!res.ok) {
+        fail(await readApiError(res), () =>
+          void deliverRefill(row, collectChannel),
+        );
+        return;
+      }
+      setRequests((prev) => prev.filter((r) => r.id !== row.id));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function pushRefillTerminal(row: ServiceRequestRow) {
+    setBusyId(row.id);
+    setActionError("");
+    try {
+      const res = await fetch(`/api/jobs/${row.jobId}/hookahs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "push_refill_terminal",
+          assignmentId: row.assignmentId,
+          serviceRequestId: row.id,
+          amountCents: row.priceCents ?? undefined,
+          flavourLabel: row.flavourLabel ?? undefined,
+        }),
+      });
+      if (!res.ok) {
+        fail(await readApiError(res), () => void pushRefillTerminal(row));
+        return;
+      }
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === row.id
+            ? { ...r, payPreference: "terminal", paymentStatus: "pending" }
+            : r,
+        ),
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function markDone(row: ServiceRequestRow) {
+    if (row.type === "refill") {
+      await deliverRefill(row);
     } else {
-      await fetch(`/api/service-requests/${row.id}`, {
+      setActionError("");
+      const res = await fetch(`/api/service-requests/${row.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "resolve" }),
       });
+      if (!res.ok) {
+        fail(await readApiError(res), () => void markDone(row));
+        return;
+      }
+      setRequests((prev) => prev.filter((r) => r.id !== row.id));
     }
   }
 
@@ -139,6 +274,28 @@ export default function ServiceAlerts() {
               Close
             </button>
           </div>
+          <ActionErrorBanner
+            message={actionError}
+            onRetry={
+              retryRef.current
+                ? () => {
+                    const fn = retryRef.current;
+                    setActionError("");
+                    fn?.();
+                  }
+                : undefined
+            }
+            onDismiss={() => {
+              setActionError("");
+              retryRef.current = null;
+            }}
+          />
+          {!terminalReady ? (
+            <p className="terminal-ready-banner" style={{ margin: "0.5rem 0.75rem" }}>
+              Terminal not ready —{" "}
+              <Link href="/admin/settings">Settings → Square</Link>
+            </p>
+          ) : null}
           {requests.length === 0 ? (
             <p className="empty">No active calls.</p>
           ) : (
@@ -148,11 +305,52 @@ export default function ServiceAlerts() {
                   <div>
                     <div className="service-alerts__title">
                       #{r.modelNumber} · {typeLabel(r.type)}
-                      {r.type === "refill" && r.flavourLabel ? `: ${r.flavourLabel}` : ""}
-                      {r.status === "acknowledged" ? " · on the way" : ""}
+                      {r.type === "refill" && r.flavourLabel
+                        ? `: ${r.flavourLabel}`
+                        : ""}
+                      {r.type === "order_unit"
+                        ? `: ${
+                            r.requestedGuestPayTier === "unlimited"
+                              ? "Unlimited"
+                              : r.requestedGuestPayTier === "standard"
+                                ? "Standard"
+                                : "Extra"
+                          }${r.flavourLabel ? ` · ${r.flavourLabel}` : ""}`
+                        : ""}
+                      {r.status === "acknowledged"
+                        ? r.acknowledgedBy
+                          ? ` · ${r.acknowledgedBy} on it`
+                          : " · claimed"
+                        : ""}
                     </div>
+                    {r.type === "refill" || r.type === "order_unit"
+                      ? (() => {
+                          const chip = refillPayChip({
+                            priceCents: r.priceCents,
+                            payPreference: r.payPreference,
+                            paymentStatus: r.paymentStatus,
+                          });
+                          if (!chip) return null;
+                          const tone = chip.startsWith("PAID") || chip === "INCLUDED"
+                            ? "paid"
+                            : chip.includes("TERMINAL")
+                              ? "terminal"
+                              : "awaiting";
+                          return (
+                            <div
+                              className={`pay-chip pay-chip--${tone}`}
+                              style={{ marginTop: 4 }}
+                            >
+                              {chip}
+                            </div>
+                          );
+                        })()
+                      : null}
                     <div className="list-meta">
                       {r.jobTitle} · {r.clientName}
+                      {r.type === "order_unit"
+                        ? " · Stage new unit on job, then Done"
+                        : ""}
                       {r.message ? ` · ${r.message}` : ""}
                     </div>
                     <Link href={`/admin/jobs/${r.jobId}`} className="service-alerts__link">
@@ -166,16 +364,29 @@ export default function ServiceAlerts() {
                         className="btn btn-sm btn-ok"
                         onClick={() => acknowledge(r.id)}
                       >
-                        On the way
+                        I’m on it
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      onClick={() => markDone(r)}
-                    >
-                      {r.type === "refill" ? "Delivered · paid" : "Done"}
-                    </button>
+                    {r.type === "refill" ? (
+                      <RefillCollectActions
+                        priceCents={r.priceCents}
+                        paymentStatus={r.paymentStatus}
+                        payPreference={r.payPreference}
+                        checkoutUrl={r.checkoutUrl}
+                        terminalReady={terminalReady}
+                        busy={busyId === r.id}
+                        onPushTerminal={() => pushRefillTerminal(r)}
+                        onDeliver={(channel) => deliverRefill(r, channel)}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => markDone(r)}
+                      >
+                        Done
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}

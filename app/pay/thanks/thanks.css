@@ -51,3 +51,28 @@
 .pay-thanks__link:hover {
   color: #c4a484;
 }
+
+.pay-thanks__badge {
+  display: inline-flex;
+  margin: 0 0 0.85rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #3d9a6a 28%, transparent);
+  color: #9ee0b8;
+  font-family: system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pay-thanks__hint {
+  margin: 1rem 0 0 !important;
+  font-size: 0.85rem !important;
+  color: color-mix(in srgb, #f5ebe0 55%, transparent) !important;
+}
+
+.pay-thanks strong {
+  color: #f5ebe0;
+  font-weight: 600;
+}

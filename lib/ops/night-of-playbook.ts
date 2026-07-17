@@ -19,21 +19,26 @@ export function getOpsNightOfPlaybook(
   sections: PlaybookSection[];
 } {
   const refillDollars = pricing.refillPriceCents / 100;
+  const hstPct = Math.round(pricing.hstRate * 100);
   return {
     title: "Night-of playbook",
     subtitle: "Floor lead process for guest pay, refills, and QR failures.",
     sections: [
       {
         id: "guest-pay",
-        title: `Guest pay — who collects $${pricing.onsiteUnitRate} vs $${pricing.onsiteUnlimitedRate}`,
+        title: `Guest pay — who collects $${pricing.onsiteUnitRate} vs $${pricing.onsiteUnlimitedRate} (+ ${hstPct}% HST)`,
         intro:
           "Package / client-deposit jobs skip this menu — the client already paid. Use this only for Pay at event.",
         bullets: [
           `Owner: the person with the Square terminal (floor lead). Runners do not negotiate rates.`,
-          `When: before or at send-out (Ready → On the floor). Choose the tier in the app before the unit leaves.`,
-          `Standard · $${pricing.onsiteUnitRate} — paid refills at $${refillDollars} each.`,
-          `Unlimited · $${pricing.onsiteUnlimitedRate} — no per-refill charge for that unit that night.`,
-          `Collect on Terminal (auto-captures when the device completes) or Mark paid for cash. End-of-night Actual ($) is suggested from the ledger.`,
+          `When: at send-out (Ready → On the floor). Tap Send as Standard or Send as Unlimited before the unit leaves.`,
+          `Standard · $${pricing.onsiteUnitRate} + HST — paid refills at $${refillDollars} + HST each.`,
+          `Unlimited · $${pricing.onsiteUnlimitedRate} + HST — no per-refill charge for that unit that night.`,
+          `Collect with Terminal (auto-captures when the device completes) or Mark paid for cash. Both paths add ${hstPct}% HST.`,
+          `Guest calls: tap I’m on it so the guest sees your name and follow-up alerts go to your device.`,
+          `Unpaid units show a chip on the board / ledger — clear them before close-out. End-of-night Actual ($) is suggested from the ledger.`,
+          `If Terminal isn’t ready, fix pairing under Settings → Square before taking card payments.`,
+          `Job reset and tip edits are admin-only.`,
         ],
       },
       {
@@ -42,9 +47,11 @@ export function getOpsNightOfPlaybook(
         intro:
           "Every refill is logged in the app — unlimited only skips the money, not the log.",
         bullets: [
-          `Guest QR refill → call appears on Live / the unit tile → prep a new head → collect $${refillDollars} if Standard → Deliver refill · paid.`,
-          `In-person ask: same flow from the unit modal — pick flavour, then Deliver refill.`,
-          `Unlimited units: deliver and log at $0 (no terminal charge).`,
+          `Guest QR refill → Square pay link opens on their phone → call shows Paid (Square) or Awaiting pay on Live / the unit tile.`,
+          `Claim with I’m on it, then prep a new head while they pay. When Paid → Deliver refill.`,
+          `If still unpaid when you arrive: Cash · deliver, Terminal · deliver, or Already paid (cancels any open Square link).`,
+          `In-person ask: same flow from the unit modal — pick flavour, then deliver with the matching pay action.`,
+          `Unlimited units: deliver and log at $0 (no Square charge).`,
           `Coals / help / issue: acknowledge and clear separately — do not use Deliver refill for those.`,
         ],
       },
@@ -65,6 +72,7 @@ export function getOpsNightOfPlaybook(
           `Floor lead records the total tip on the job. Edit tip % per person when the split isn’t even — percents must total 100%.`,
           `Keep staffNames current so the tip editor stays accurate.`,
           `Guest unit pay: prefer Terminal to auto-capture, or Mark paid for cash.`,
+          `After a coal check, use Log check — the UI confirms Check logged ✓ so you know it stuck.`,
         ],
       },
     ],

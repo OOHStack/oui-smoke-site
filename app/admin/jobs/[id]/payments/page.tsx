@@ -38,8 +38,42 @@ type JobPayment = {
   currency: string;
   label: string | null;
   checkoutUrl: string | null;
+  squarePaymentId?: string | null;
   paidAt: string | null;
   createdAt: string;
+};
+
+type ReconcileLine = {
+  paymentId: number;
+  kind: string;
+  localStatus: string;
+  localAmountCents: number;
+  squarePaymentId: string | null;
+  squareStatus: string | null;
+  squareAmountCents: number | null;
+  squareRefundedCents: number | null;
+  match: "ok" | "mismatch" | "missing_square" | "local_only" | "pending";
+  note: string;
+};
+
+type ReconcileResult = {
+  checkedAt: string;
+  counts: {
+    total: number;
+    matched: number;
+    mismatches: number;
+    localOnly: number;
+    pending: number;
+  };
+  totals: {
+    localSucceededCents: number;
+    squareSucceededCents: number;
+    packageDueCents: number;
+    packagePaidCents: number;
+    packageBalanceCents: number;
+    tipCents: number;
+  };
+  lines: ReconcileLine[];
 };
 
 type MoneySummary = {
@@ -146,6 +180,7 @@ export default function JobPaymentsPage() {
   const [quotedDollars, setQuotedDollars] = useState("");
   const [depositPercent, setDepositPercent] = useState(50);
   const [customAmount, setCustomAmount] = useState("");
+  const [tipDollars, setTipDollars] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -153,15 +188,19 @@ export default function JobPaymentsPage() {
   const [busy, setBusy] = useState(false);
   const [modelBusy, setModelBusy] = useState(false);
   const [quoteBusy, setQuoteBusy] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [reconcile, setReconcile] = useState<ReconcileResult | null>(null);
+  const [reconcileBusy, setReconcileBusy] = useState(false);
   const [balanceTiming, setBalanceTiming] = useState(
     "about a week before the event",
   );
 
   const load = useCallback(async () => {
-    const [jobRes, payRes, copyRes] = await Promise.all([
+    const [jobRes, payRes, copyRes, sessionRes] = await Promise.all([
       fetch(`/api/jobs/${jobId}`),
       fetch(`/api/jobs/${jobId}/payments`),
       fetch("/api/payment-copy"),
+      fetch("/api/auth/session"),
     ]);
     if (!jobRes.ok) {
       setError("Failed to load job");
@@ -183,6 +222,10 @@ export default function JobPaymentsPage() {
     if (copyRes.ok) {
       const copy = await copyRes.json().catch(() => null);
       if (copy?.balanceTiming) setBalanceTiming(copy.balanceTiming);
+    }
+    if (sessionRes.ok) {
+      const s = await sessionRes.json().catch(() => null);
+      setIsAdmin(s?.role === "admin");
     }
     setLoading(false);
   }, [jobId]);
@@ -314,6 +357,89 @@ export default function JobPaymentsPage() {
       await load();
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function collectTip(channel: "terminal" | "manual") {
+    setBusy(true);
+    setMsg("");
+    setError("");
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "tip",
+          channel,
+          amountDollars: tipDollars.trim(),
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(d.error ?? "Couldn’t collect tip");
+        return;
+      }
+      setTipDollars("");
+      setMsg(
+        channel === "terminal"
+          ? "Tip sent to Square Terminal — complete the charge on the device."
+          : "Cash tip recorded.",
+      );
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refundPayment(paymentId: number) {
+    if (
+      !window.confirm(
+        "Refund this payment in Square and mark it refunded on the job?",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setMsg("");
+    setError("");
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "refund", paymentId }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(d.error ?? "Couldn’t refund");
+        return;
+      }
+      setMsg("Refund submitted to Square.");
+      setReconcile(null);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runReconcile() {
+    setReconcileBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/reconcile`);
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(d.error ?? "Couldn’t reconcile with Square");
+        return;
+      }
+      setReconcile(d as ReconcileResult);
+      const c = d.counts as ReconcileResult["counts"];
+      setMsg(
+        c.mismatches > 0
+          ? `Reconcile: ${c.mismatches} mismatch${c.mismatches === 1 ? "" : "es"} — review below.`
+          : `Reconcile OK · ${c.matched} matched${c.localOnly ? ` · ${c.localOnly} cash/manual` : ""}${c.pending ? ` · ${c.pending} pending` : ""}.`,
+      );
+    } finally {
+      setReconcileBusy(false);
     }
   }
 
@@ -672,7 +798,9 @@ export default function JobPaymentsPage() {
                             ? "ok"
                             : p.status === "pending"
                               ? "wait"
-                              : "muted"
+                              : p.status === "refunded"
+                                ? "muted"
+                                : "muted"
                         }`}
                       >
                         {p.status}
@@ -705,6 +833,18 @@ export default function JobPaymentsPage() {
                           Cancel
                         </button>
                       ) : null}
+                      {isAdmin &&
+                      p.status === "succeeded" &&
+                      p.squarePaymentId ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={busy}
+                          onClick={() => void refundPayment(p.id)}
+                        >
+                          Refund
+                        </button>
+                      ) : null}
                     </div>
                   </li>
                 ))}
@@ -716,8 +856,265 @@ export default function JobPaymentsPage() {
               </p>
             )}
           </section>
+
+          <section className="panel collect-section">
+            <div className="collect-section__head">
+              <h2 className="panel-title" style={{ margin: 0 }}>
+                Tip on Terminal
+              </h2>
+              <p className="list-meta" style={{ margin: 0 }}>
+                Job tip total{" "}
+                {formatCadCents(job.tipCents ?? 0)}
+                {terminalConfigured
+                  ? " — push a tip charge to the paired device"
+                  : " — Terminal not configured; cash tips still work"}
+              </p>
+            </div>
+            <div className="collect-quote">
+              <div className="field">
+                <label htmlFor="tip-amount">Tip amount ($)</label>
+                <input
+                  id="tip-amount"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={tipDollars}
+                  onChange={(e) => setTipDollars(e.target.value)}
+                  placeholder="e.g. 40.00"
+                />
+              </div>
+              <div className="collect-quote__side">
+                {terminalConfigured ? (
+                  <button
+                    type="button"
+                    className="btn btn-ok btn-sm"
+                    disabled={busy || !tipDollars.trim()}
+                    onClick={() => void collectTip("terminal")}
+                  >
+                    Collect on Terminal
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={busy || !tipDollars.trim()}
+                  onClick={() => void collectTip("manual")}
+                >
+                  Record cash tip
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="panel collect-section">
+            <div className="collect-section__head">
+              <h2 className="panel-title" style={{ margin: 0 }}>
+                End-of-night reconcile
+              </h2>
+              <p className="list-meta" style={{ margin: 0 }}>
+                Compare this job’s ledger to Square payment status and amounts
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={reconcileBusy || !squareConfigured}
+              onClick={() => void runReconcile()}
+            >
+              {reconcileBusy ? "Checking Square…" : "Run Square reconcile"}
+            </button>
+            {reconcile ? (
+              <div className="collect-reconcile" style={{ marginTop: "0.85rem" }}>
+                <p className="list-meta" style={{ margin: "0 0 0.5rem" }}>
+                  Checked {format(new Date(reconcile.checkedAt), "MMM d, h:mm a")}{" "}
+                  · local collected{" "}
+                  {formatCadCents(reconcile.totals.localSucceededCents)} · Square{" "}
+                  {formatCadCents(reconcile.totals.squareSucceededCents)} · package
+                  balance{" "}
+                  {formatCadCents(reconcile.totals.packageBalanceCents)} · tips{" "}
+                  {formatCadCents(reconcile.totals.tipCents)}
+                </p>
+                <ul className="collect-ledger">
+                  {reconcile.lines.map((line) => (
+                    <li key={line.paymentId} className="collect-ledger__row">
+                      <div className="collect-ledger__main">
+                        <span
+                          className={`collect-badge collect-badge--${
+                            line.match === "ok"
+                              ? "ok"
+                              : line.match === "pending"
+                                ? "wait"
+                                : line.match === "local_only"
+                                  ? "muted"
+                                  : "wait"
+                          }`}
+                        >
+                          {line.match}
+                        </span>
+                        <strong>
+                          {formatCadCents(line.localAmountCents)}
+                        </strong>
+                        <span className="collect-ledger__kind">
+                          {line.kind} · #{line.paymentId}
+                        </span>
+                      </div>
+                      <div className="collect-ledger__meta">{line.note}</div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
         </>
       )}
+
+      {!requiresClientDeposit(model) ? (
+        <>
+          <section className="panel collect-section">
+            <div className="collect-section__head">
+              <h2 className="panel-title" style={{ margin: 0 }}>
+                Tip on Terminal
+              </h2>
+              <p className="list-meta" style={{ margin: 0 }}>
+                Job tip total {formatCadCents(job.tipCents ?? 0)}
+              </p>
+            </div>
+            <div className="collect-quote">
+              <div className="field">
+                <label htmlFor="tip-amount-floor">Tip amount ($)</label>
+                <input
+                  id="tip-amount-floor"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={tipDollars}
+                  onChange={(e) => setTipDollars(e.target.value)}
+                  placeholder="e.g. 40.00"
+                />
+              </div>
+              <div className="collect-quote__side">
+                {terminalConfigured ? (
+                  <button
+                    type="button"
+                    className="btn btn-ok btn-sm"
+                    disabled={busy || !tipDollars.trim()}
+                    onClick={() => void collectTip("terminal")}
+                  >
+                    Collect on Terminal
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={busy || !tipDollars.trim()}
+                  onClick={() => void collectTip("manual")}
+                >
+                  Record cash tip
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {payments.length > 0 ? (
+            <section className="panel collect-section">
+              <div className="collect-section__head">
+                <h2 className="panel-title" style={{ margin: 0 }}>
+                  Activity
+                </h2>
+              </div>
+              <ul className="collect-ledger">
+                {payments.map((p) => (
+                  <li key={p.id} className="collect-ledger__row">
+                    <div className="collect-ledger__main">
+                      <span
+                        className={`collect-badge collect-badge--${
+                          p.status === "succeeded"
+                            ? "ok"
+                            : p.status === "pending"
+                              ? "wait"
+                              : "muted"
+                        }`}
+                      >
+                        {p.status}
+                      </span>
+                      <strong>
+                        {formatCadCents(p.amountCents, p.currency || "CAD")}
+                      </strong>
+                      <span className="collect-ledger__kind">{p.kind}</span>
+                    </div>
+                    <div className="collect-ledger__meta">
+                      {isAdmin &&
+                      p.status === "succeeded" &&
+                      p.squarePaymentId ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={busy}
+                          onClick={() => void refundPayment(p.id)}
+                        >
+                          Refund
+                        </button>
+                      ) : null}
+                      {p.status === "pending" ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={busy}
+                          onClick={() => void cancelPending(p.id)}
+                        >
+                          Cancel
+                        </button>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section className="panel collect-section">
+            <div className="collect-section__head">
+              <h2 className="panel-title" style={{ margin: 0 }}>
+                End-of-night reconcile
+              </h2>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={reconcileBusy || !squareConfigured}
+              onClick={() => void runReconcile()}
+            >
+              {reconcileBusy ? "Checking Square…" : "Run Square reconcile"}
+            </button>
+            {reconcile ? (
+              <div className="collect-reconcile" style={{ marginTop: "0.85rem" }}>
+                <p className="list-meta" style={{ margin: "0 0 0.5rem" }}>
+                  {reconcile.counts.matched} matched ·{" "}
+                  {reconcile.counts.mismatches} mismatch ·{" "}
+                  {reconcile.counts.localOnly} cash/manual ·{" "}
+                  {reconcile.counts.pending} pending
+                </p>
+                <ul className="collect-ledger">
+                  {reconcile.lines.map((line) => (
+                    <li key={line.paymentId} className="collect-ledger__row">
+                      <div className="collect-ledger__main">
+                        <span className="collect-badge collect-badge--muted">
+                          {line.match}
+                        </span>
+                        <strong>
+                          {formatCadCents(line.localAmountCents)}
+                        </strong>
+                        <span className="collect-ledger__kind">{line.kind}</span>
+                      </div>
+                      <div className="collect-ledger__meta">{line.note}</div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
+        </>
+      ) : null}
 
       <section className="panel collect-section collect-section--muted">
         <button

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  guestPayTierUnitCents,
+  guestPayTierUnitChargeCents,
   summarizeGuestLedger,
   type GuestPayTier,
 } from "@/lib/ops/guest-pay";
@@ -16,6 +16,8 @@ export type LedgerAssignment = {
   guestPayTier?: GuestPayTier | null;
   hookah: { modelNumber: number };
   status: string;
+  sentOutAt?: string | null;
+  sortOrder?: number | null;
 };
 
 export type LedgerPayment = {
@@ -60,6 +62,31 @@ function refillCentsByAssignment(payments: LedgerPayment[]) {
   return map;
 }
 
+function statusRank(status: string) {
+  if (status === "out") return 0;
+  if (status === "staged") return 1;
+  if (status === "returned") return 2;
+  return 3;
+}
+
+function compareBySendOut(a: LedgerAssignment, b: LedgerAssignment) {
+  const rank = statusRank(a.status) - statusRank(b.status);
+  if (rank !== 0) return rank;
+
+  const aOut = a.sentOutAt ? new Date(a.sentOutAt).getTime() : NaN;
+  const bOut = b.sentOutAt ? new Date(b.sentOutAt).getTime() : NaN;
+  const aHas = Number.isFinite(aOut);
+  const bHas = Number.isFinite(bOut);
+  if (aHas && bHas && aOut !== bOut) return aOut - bOut;
+  if (aHas !== bHas) return aHas ? -1 : 1;
+
+  const aSort = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+  const bSort = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+  if (aSort !== bSort) return aSort - bSort;
+
+  return a.hookah.modelNumber - b.hookah.modelNumber;
+}
+
 export default function GuestLedger({
   assignments,
   payments,
@@ -69,9 +96,13 @@ export default function GuestLedger({
   onMarkPaid,
   onApplySuggestedActual,
   onSaveTipSplit,
+  onCollectTip,
+  tipCollectBusy = false,
   busyId,
   tipSplitBusy,
+  canEditTips = true,
   pricing = DEFAULT_PRICING,
+  terminalReady = true,
 }: {
   jobId: string | number;
   assignments: LedgerAssignment[];
@@ -85,9 +116,16 @@ export default function GuestLedger({
   ) => void | Promise<void>;
   onApplySuggestedActual: (cents: number) => void;
   onSaveTipSplit: (json: string) => void | Promise<void>;
+  onCollectTip?: (
+    amountDollars: string,
+    channel: "terminal" | "manual",
+  ) => boolean | Promise<boolean>;
+  tipCollectBusy?: boolean;
   busyId?: number | null;
   tipSplitBusy?: boolean;
+  canEditTips?: boolean;
   pricing?: PricingConfig;
+  terminalReady?: boolean;
 }) {
   const summary = summarizeGuestLedger({
     assignments: assignments.map((a) => ({
@@ -112,6 +150,7 @@ export default function GuestLedger({
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(false);
+  const [tipDollars, setTipDollars] = useState("");
   const [filterTouched, setFilterTouched] = useState(false);
 
   useEffect(() => {
@@ -121,30 +160,32 @@ export default function GuestLedger({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return assignments.filter((a) => {
-      const isPaid = paid.has(a.id);
-      const isPending = pending.has(a.id);
-      const tier = a.guestPayTier;
+    return assignments
+      .filter((a) => {
+        const isPaid = paid.has(a.id);
+        const isPending = pending.has(a.id);
+        const tier = a.guestPayTier;
 
-      if (filter === "open" && !(tier && !isPaid)) return false;
-      if (filter === "paid" && !isPaid) return false;
-      if (filter === "no_tier" && tier) return false;
-      if (filter === "standard" && tier !== "standard") return false;
-      if (filter === "unlimited" && tier !== "unlimited") return false;
+        if (filter === "open" && !(tier && !isPaid)) return false;
+        if (filter === "paid" && !isPaid) return false;
+        if (filter === "no_tier" && tier) return false;
+        if (filter === "standard" && tier !== "standard") return false;
+        if (filter === "unlimited" && tier !== "unlimited") return false;
 
-      if (!q) return true;
-      const hay = [
-        String(a.hookah.modelNumber),
-        `#${a.hookah.modelNumber}`,
-        a.status,
-        tier ?? "no tier",
-        isPaid ? "paid" : "",
-        isPending ? "terminal pending" : "",
-      ]
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
-    });
+        if (!q) return true;
+        const hay = [
+          String(a.hookah.modelNumber),
+          `#${a.hookah.modelNumber}`,
+          a.status,
+          tier ?? "no tier",
+          isPaid ? "paid" : "",
+          isPending ? "terminal pending" : "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      })
+      .sort(compareBySendOut);
   }, [assignments, paid, pending, filter, query]);
 
   const visible = expanded ? filtered : filtered.slice(0, COLLAPSED_ROWS);
@@ -234,7 +275,7 @@ export default function GuestLedger({
           <tr>
             <th>Unit</th>
             <th>Tier</th>
-            <th>Unit $</th>
+            <th>Unit $ (incl. HST)</th>
             <th>Refills</th>
             <th />
           </tr>
@@ -277,7 +318,7 @@ export default function GuestLedger({
                   </td>
                   <td>
                     {tier
-                      ? formatCadCents(guestPayTierUnitCents(tier, pricing))
+                      ? formatCadCents(guestPayTierUnitChargeCents(tier, pricing))
                       : "—"}
                     {isPaid ? (
                       <span className="list-meta"> · paid</span>
@@ -292,7 +333,14 @@ export default function GuestLedger({
                         <button
                           type="button"
                           className="btn btn-sm btn-ok"
-                          disabled={busyId === a.id || isPending}
+                          disabled={
+                            busyId === a.id || isPending || !terminalReady
+                          }
+                          title={
+                            terminalReady
+                              ? undefined
+                              : "Pair a Square Terminal in Settings → Square"
+                          }
                           onClick={() => onMarkPaid(a.id, "terminal")}
                         >
                           Terminal
@@ -360,13 +408,62 @@ export default function GuestLedger({
 
       {tipsOpen ? (
         <div className="guest-ledger__tips">
-          <TipSplitEditor
-            tipCents={tipCents}
-            staffNames={staffNames}
-            tipSplitJson={tipSplitJson}
-            busy={tipSplitBusy}
-            onSave={onSaveTipSplit}
-          />
+          {onCollectTip ? (
+            <div className="guest-ledger__tip-collect">
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor="ledger-tip-amount">Collect tip ($)</label>
+                <input
+                  id="ledger-tip-amount"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={tipDollars}
+                  onChange={(e) => setTipDollars(e.target.value)}
+                  placeholder="e.g. 40.00"
+                  disabled={tipCollectBusy}
+                />
+              </div>
+              <div className="guest-ledger__tip-actions">
+                {terminalReady ? (
+                  <button
+                    type="button"
+                    className="btn btn-ok btn-sm"
+                    disabled={tipCollectBusy || !tipDollars.trim()}
+                    onClick={async () => {
+                      const ok = await onCollectTip(tipDollars, "terminal");
+                      if (ok) setTipDollars("");
+                    }}
+                  >
+                    {tipCollectBusy ? "Sending…" : "Collect on Terminal"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={tipCollectBusy || !tipDollars.trim()}
+                  onClick={async () => {
+                    const ok = await onCollectTip(tipDollars, "manual");
+                    if (ok) setTipDollars("");
+                  }}
+                >
+                  Record cash tip
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {canEditTips ? (
+            <TipSplitEditor
+              tipCents={tipCents}
+              staffNames={staffNames}
+              tipSplitJson={tipSplitJson}
+              busy={tipSplitBusy}
+              onSave={onSaveTipSplit}
+            />
+          ) : (
+            <p className="list-meta">
+              Tip split is admin-only. Ask a floor lead / admin to edit percents.
+            </p>
+          )}
         </div>
       ) : null}
     </div>

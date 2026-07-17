@@ -107,6 +107,11 @@ export const jobs = pgTable("jobs", {
   tipCents: integer("tip_cents").default(0),
   /** JSON array of { name, percent } for custom tip splits. Empty = even split. */
   tipSplitJson: text("tip_split_json").default(""),
+  /**
+   * Optional partial PricingConfig overrides for this job (floor rates).
+   * Empty/null → use global catalog from site_settings.
+   */
+  pricingJson: jsonb("pricing_json").$type<Record<string, unknown>>().default({}),
   staffNames: text("staff_names").default(""),
   packingNotes: text("packing_notes").default(""),
   outcomeNotes: text("outcome_notes").default(""),
@@ -155,6 +160,7 @@ export const serviceRequestTypeEnum = pgEnum("service_request_type", [
   "refill",
   "issue",
   "other",
+  "order_unit",
 ]);
 
 export const serviceRequestStatusEnum = pgEnum("service_request_status", [
@@ -162,6 +168,11 @@ export const serviceRequestStatusEnum = pgEnum("service_request_status", [
   "acknowledged",
   "resolved",
   "cancelled",
+]);
+
+export const refillPayPreferenceEnum = pgEnum("refill_pay_preference", [
+  "phone",
+  "terminal",
 ]);
 
 export const serviceRequests = pgTable("service_requests", {
@@ -178,11 +189,17 @@ export const serviceRequests = pgTable("service_requests", {
   flavourLabel: text("flavour_label").default(""),
   priceCents: integer("price_cents"),
   priceAgreed: boolean("price_agreed").notNull().default(false),
+  /** Guest choice when refill has a charge: pay on phone vs bring terminal. */
+  payPreference: refillPayPreferenceEnum("pay_preference"),
+  /** For order_unit: Standard vs Unlimited the guest selected. */
+  requestedGuestPayTier: guestPayTierEnum("requested_guest_pay_tier"),
   status: serviceRequestStatusEnum("status").notNull().default("open"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   acknowledgedBy: text("acknowledged_by").default(""),
+  /** Ops user who claimed (“I’m on it”) — used to scope follow-up pushes. */
+  acknowledgedByUserId: integer("acknowledged_by_user_id"),
   resolvedBy: text("resolved_by").default(""),
 });
 
@@ -248,17 +265,6 @@ export const jobPhotos = pgTable("job_photos", {
 });
 
 /** Staff browser push subscriptions for guest service alerts */
-export const pushSubscriptions = pgTable("push_subscriptions", {
-  id: serial("id").primaryKey(),
-  endpoint: text("endpoint").notNull().unique(),
-  p256dh: text("p256dh").notNull(),
-  auth: text("auth").notNull(),
-  userAgent: text("user_agent").default(""),
-  createdBy: text("created_by").default("ops"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
 export const opsRoleEnum = pgEnum("ops_role", ["admin", "staff"]);
 
 export const opsUsers = pgTable("ops_users", {
@@ -271,6 +277,20 @@ export const opsUsers = pgTable("ops_users", {
   passwordResetTokenHash: text("password_reset_token_hash"),
   passwordResetExpiresAt: timestamp("password_reset_expires_at", {
     withTimezone: true,
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent").default(""),
+  createdBy: text("created_by").default("ops"),
+  opsUserId: integer("ops_user_id").references(() => opsUsers.id, {
+    onDelete: "set null",
   }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -290,6 +310,7 @@ export const paymentStatusEnum = pgEnum("payment_status", [
   "succeeded",
   "failed",
   "cancelled",
+  "refunded",
 ]);
 
 /** Square (and future) payment ledger — source of truth for money movement */
@@ -398,6 +419,7 @@ export const paymentSettings = pgTable("payment_settings", {
   autoDepositOnQuote: boolean("auto_deposit_on_quote").notNull().default(true),
   autoBalanceEnabled: boolean("auto_balance_enabled").notNull().default(true),
   autoBalanceDaysBefore: integer("auto_balance_days_before").notNull().default(7),
+  squareTerminalDeviceId: text("square_terminal_device_id"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -410,10 +432,27 @@ export const siteSettings = pgTable("site_settings", {
   defaultCheckIntervalMinutes: integer("default_check_interval_minutes")
     .notNull()
     .default(45),
+  /** Capability URL for the kitchen prep board (no ops login). */
+  prepToken: text("prep_token").unique(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type SiteSettings = typeof siteSettings.$inferSelect;
+
+/** Marketing / site media assets (Blob URLs + labels) */
+export const siteMedia = pgTable("site_media", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  label: text("label").notNull().default(""),
+  url: text("url").notNull(),
+  contentType: text("content_type").notNull().default("video/mp4"),
+  pathname: text("pathname").default(""),
+  section: text("section").default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type SiteMedia = typeof siteMedia.$inferSelect;
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
   job: one(jobs, { fields: [payments.jobId], references: [jobs.id] }),

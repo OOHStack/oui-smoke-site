@@ -7,24 +7,51 @@ import {
   jobs,
   serviceRequests,
 } from "@/lib/db/schema";
-import { getPricing } from "@/lib/pricing";
-import { asc, desc, eq } from "drizzle-orm";
+import {
+  defaultRefillCentsForTier,
+  guestPayTierUnitCents,
+  isGuestPayTier,
+  refillChargeCents,
+  type GuestPayTier,
+} from "@/lib/ops/guest-pay";
+import { getPricingForJob, hstPercentLabel, withHstCents } from "@/lib/pricing";
+import {
+  findGuestOrderUnitPayment,
+  findGuestRefillPayment,
+} from "@/lib/refill-payment-link";
+import { and, asc, desc, eq, inArray, lt, ne, sql } from "drizzle-orm";
 
-/** Default minutes from “On the way” until guest should expect staff. */
-export const GUEST_ETA_MINUTES = 5;
+/** Base minutes after claim before a quiet floor ETA. */
+export const GUEST_ETA_BASE_MINUTES = 3;
+/** Extra minutes per other open/acked call ahead on the same job. */
+export const GUEST_ETA_PER_AHEAD_MINUTES = 2;
+/** Cap so we never overpromise absurd waits. */
+export const GUEST_ETA_MAX_MINUTES = 15;
+
+/** @deprecated use guestEtaMinutesFromQueue — kept for imports that expect a constant. */
+export const GUEST_ETA_MINUTES = GUEST_ETA_BASE_MINUTES;
+
+export function guestEtaMinutesFromQueue(queueAhead: number): number {
+  const n = Math.max(0, Math.floor(queueAhead));
+  return Math.min(
+    GUEST_ETA_MAX_MINUTES,
+    GUEST_ETA_BASE_MINUTES + n * GUEST_ETA_PER_AHEAD_MINUTES,
+  );
+}
 
 export async function loadServeSnapshot(token: string) {
   const db = getDb();
-  const pricing = await getPricing();
   const [assignment] = await db
     .select({
       id: jobHookahs.id,
+      jobId: jobHookahs.jobId,
       status: jobHookahs.status,
       sentOutAt: jobHookahs.sentOutAt,
       returnedAt: jobHookahs.returnedAt,
       flavourId: jobHookahs.flavourId,
       flavourLabel: jobHookahs.flavourLabel,
       refillCount: jobHookahs.refillCount,
+      guestPayTier: jobHookahs.guestPayTier,
       guestRating: jobHookahs.guestRating,
       guestComment: jobHookahs.guestComment,
       guestFeedbackAt: jobHookahs.guestFeedbackAt,
@@ -32,6 +59,8 @@ export async function loadServeSnapshot(token: string) {
       flavourName: flavours.name,
       jobTitle: jobs.title,
       jobStatus: jobs.status,
+      paymentModel: jobs.paymentModel,
+      pricingJson: jobs.pricingJson,
     })
     .from(jobHookahs)
     .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
@@ -42,6 +71,14 @@ export async function loadServeSnapshot(token: string) {
 
   if (!assignment) return { error: "not_found" as const };
 
+  const pricing = await getPricingForJob(assignment);
+
+  const tier = isGuestPayTier(assignment.guestPayTier)
+    ? (assignment.guestPayTier as GuestPayTier)
+    : null;
+  const refillPriceCents = defaultRefillCentsForTier(tier, pricing);
+  const refillTotalCents = refillChargeCents(refillPriceCents, pricing);
+
   let requests: Array<{
     id: number;
     type: (typeof serviceRequests.$inferSelect)["type"];
@@ -49,6 +86,8 @@ export async function loadServeSnapshot(token: string) {
     status: (typeof serviceRequests.$inferSelect)["status"];
     flavourLabel: string | null;
     priceCents: number | null;
+    payPreference: (typeof serviceRequests.$inferSelect)["payPreference"];
+    requestedGuestPayTier: (typeof serviceRequests.$inferSelect)["requestedGuestPayTier"];
     createdAt: Date;
     acknowledgedAt: Date | null;
     resolvedAt: Date | null;
@@ -64,6 +103,8 @@ export async function loadServeSnapshot(token: string) {
         status: serviceRequests.status,
         flavourLabel: serviceRequests.flavourLabel,
         priceCents: serviceRequests.priceCents,
+        payPreference: serviceRequests.payPreference,
+        requestedGuestPayTier: serviceRequests.requestedGuestPayTier,
         createdAt: serviceRequests.createdAt,
         acknowledgedAt: serviceRequests.acknowledgedAt,
         resolvedAt: serviceRequests.resolvedAt,
@@ -131,19 +172,67 @@ export async function loadServeSnapshot(token: string) {
       }
     : null;
 
+  let checkoutUrl: string | null = null;
+  let paymentStatus: string | null = null;
+  if (active?.type === "refill") {
+    const pay = await findGuestRefillPayment(active.id);
+    if (pay) {
+      checkoutUrl = pay.checkoutUrl;
+      paymentStatus = pay.status;
+    }
+  } else if (active?.type === "order_unit") {
+    const pay = await findGuestOrderUnitPayment(active.id);
+    if (pay) {
+      checkoutUrl = pay.checkoutUrl;
+      paymentStatus = pay.status;
+    }
+  }
+
+  let queueAhead = 0;
+  if (active?.status === "acknowledged") {
+    try {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(serviceRequests)
+        .where(
+          and(
+            eq(serviceRequests.jobId, assignment.jobId),
+            inArray(serviceRequests.status, ["open", "acknowledged"]),
+            ne(serviceRequests.id, active.id),
+            lt(serviceRequests.createdAt, active.createdAt),
+          ),
+        );
+      queueAhead = Number(row?.n ?? 0) || 0;
+    } catch (err) {
+      console.error("queue ahead count failed", err);
+    }
+  }
+
+  const etaMinutes =
+    active?.status === "acknowledged"
+      ? guestEtaMinutesFromQueue(queueAhead)
+      : null;
+
   const activeRequest = active
     ? {
         ...active,
-        etaMinutes: active.status === "acknowledged" ? GUEST_ETA_MINUTES : null,
+        checkoutUrl,
+        paymentStatus,
+        queueAhead,
+        etaMinutes,
         etaAt:
-          active.status === "acknowledged" && active.acknowledgedAt
+          etaMinutes != null && active.acknowledgedAt
             ? new Date(
                 new Date(active.acknowledgedAt).getTime() +
-                  GUEST_ETA_MINUTES * 60 * 1000,
+                  etaMinutes * 60 * 1000,
               ).toISOString()
             : null,
       }
     : null;
+
+  const standardUnitCents = guestPayTierUnitCents("standard", pricing);
+  const unlimitedUnitCents = guestPayTierUnitCents("unlimited", pricing);
+  const canOrderUnit = assignment.paymentModel === "pay_at_event";
 
   return {
     modelNumber: assignment.modelNumber,
@@ -152,10 +241,20 @@ export async function loadServeSnapshot(token: string) {
     jobTitle: assignment.jobTitle,
     assignmentStatus: assignment.status,
     jobStatus: assignment.jobStatus,
+    paymentModel: assignment.paymentModel,
     sentOutAt: assignment.sentOutAt,
     returnedAt: assignment.returnedAt,
     refillCount: assignment.refillCount ?? 0,
-    refillPriceCents: pricing.refillPriceCents,
+    refillPriceCents,
+    refillChargeCents: refillTotalCents,
+    standardUnitCents,
+    unlimitedUnitCents,
+    standardUnitChargeCents: withHstCents(standardUnitCents, pricing.hstRate),
+    unlimitedUnitChargeCents: withHstCents(unlimitedUnitCents, pricing.hstRate),
+    canOrderUnit,
+    hstRate: pricing.hstRate,
+    hstPercent: hstPercentLabel(pricing.hstRate),
+    guestPayTier: tier,
     flavours: menu,
     active: !!active,
     sessionEnded,
