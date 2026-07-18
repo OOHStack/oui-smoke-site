@@ -2589,20 +2589,19 @@ function HookahModal({
     setQrLoading(true);
     setFormError("");
     try {
-      let token = a.guestToken;
-      if (!token) {
-        const ensureRes = await fetch(`/api/jobs/${jobId}/hookahs`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "ensure_guest_token", assignmentId: a.id }),
-        });
-        if (!ensureRes.ok) {
-          setFormError("Couldn’t create guest link");
-          return;
-        }
-        const updated = await ensureRes.json();
-        token = updated.guestToken;
+      // Always hit the API so the event tablet QR takeover refreshes,
+      // even when this unit already has a guest token.
+      const ensureRes = await fetch(`/api/jobs/${jobId}/hookahs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ensure_guest_token", assignmentId: a.id }),
+      });
+      if (!ensureRes.ok) {
+        setFormError("Couldn’t create guest link");
+        return;
       }
+      const updated = await ensureRes.json();
+      const token = (updated.guestToken as string | undefined) || a.guestToken;
       if (!token) {
         setFormError("Couldn’t create guest link");
         return;
