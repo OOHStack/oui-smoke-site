@@ -101,6 +101,7 @@ export async function POST(request: Request, context: RouteContext) {
       guestRating: null,
       guestComment: "",
       guestFeedbackAt: null,
+      displayQrAt: null,
     })
     .where(eq(jobHookahs.jobId, jobId));
 

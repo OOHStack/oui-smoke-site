@@ -14,7 +14,12 @@ import {
   type PricingConfig,
 } from "@/lib/pricing";
 
-type TabId = "account" | "rates" | "payments" | "square" | "team";
+type TabId = "account" | "rates" | "payments" | "display" | "square" | "team";
+
+type DisplayWorkflowSettings = {
+  qrTrigger: "on_paid" | "on_send_out";
+  qrDurationSeconds: number;
+};
 
 type SessionInfo = {
   name: string;
@@ -97,9 +102,12 @@ const TABS: { id: TabId; label: string; adminOnly?: boolean }[] = [
   { id: "account", label: "Account" },
   { id: "rates", label: "Rates", adminOnly: true },
   { id: "payments", label: "Payments", adminOnly: true },
+  { id: "display", label: "Display", adminOnly: true },
   { id: "square", label: "Square", adminOnly: true },
   { id: "team", label: "Team", adminOnly: true },
 ];
+
+const QR_DURATION_PRESETS = [30, 60, 90, 120, 180] as const;
 
 const PREVIEW_UNITS = [4, 6, 10] as const;
 
@@ -144,6 +152,7 @@ function parseTab(value: string | null, isAdmin: boolean): TabId {
   if (
     value === "rates" ||
     value === "payments" ||
+    value === "display" ||
     value === "square" ||
     value === "team"
   ) {
@@ -164,6 +173,10 @@ export default function SettingsHub() {
     null,
   );
   const [paymentDraft, setPaymentDraft] = useState<PaymentSettings | null>(null);
+  const [displaySettings, setDisplaySettings] =
+    useState<DisplayWorkflowSettings | null>(null);
+  const [displayDraft, setDisplayDraft] =
+    useState<DisplayWorkflowSettings | null>(null);
   const [squareStatus, setSquareStatus] = useState<SquareStatus | null>(null);
   const [squareBusy, setSquareBusy] = useState(false);
   const [deviceIdDraft, setDeviceIdDraft] = useState("");
@@ -271,6 +284,17 @@ export default function SettingsHub() {
     setPaymentDraft(data.settings);
   }, []);
 
+  const loadDisplay = useCallback(async () => {
+    const res = await fetch("/api/display-settings");
+    if (!res.ok) {
+      setError("Failed to load display workflow settings");
+      return;
+    }
+    const data = await res.json();
+    setDisplaySettings(data.settings);
+    setDisplayDraft(data.settings);
+  }, []);
+
   const loadSquare = useCallback(async (probe = false) => {
     const res = await fetch(
       `/api/square/status${probe ? "?probe=1" : ""}`,
@@ -298,12 +322,13 @@ export default function SettingsHub() {
           loadTeam(),
           loadRates(),
           loadPayments(),
+          loadDisplay(),
           loadSquare(),
         ]);
       }
       setLoading(false);
     })();
-  }, [loadSession, loadTeam, loadRates, loadPayments, loadSquare]);
+  }, [loadSession, loadTeam, loadRates, loadPayments, loadDisplay, loadSquare]);
 
   useEffect(() => {
     const raw = searchParams.get("tab");
@@ -439,6 +464,31 @@ export default function SettingsHub() {
     }
   }
 
+  async function saveDisplay(e: FormEvent) {
+    e.preventDefault();
+    if (!displayDraft || !isAdmin) return;
+    setBusy(true);
+    setError("");
+    setOkMsg("");
+    try {
+      const res = await fetch("/api/display-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(displayDraft),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Couldn’t save display settings");
+        return;
+      }
+      setDisplaySettings(data.settings);
+      setDisplayDraft(data.settings);
+      setOkMsg("Display workflow saved — event tablets will use these rules.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runSquareAction(
     action: string,
     body: Record<string, unknown> = {},
@@ -558,7 +608,7 @@ export default function SettingsHub() {
           <h1 className="page-title">Control Center</h1>
           <p className="page-sub">
             Your account
-            {isAdmin ? " · rates · payments · Square · team" : ""}
+            {isAdmin ? " · rates · payments · display · Square · team" : ""}
           </p>
         </div>
       </div>
@@ -1206,6 +1256,130 @@ export default function SettingsHub() {
             </form>
           ) : (
             <p className="empty">Loading payment defaults…</p>
+          )}
+        </section>
+      ) : null}
+
+      {tab === "display" && isAdmin ? (
+        <section className="panel">
+          <h2 className="panel-title">Event display workflow</h2>
+          <p className="list-meta" style={{ marginTop: 0 }}>
+            Controls when the job tablet shows the guest serve QR after an
+            on-site unit is collected — and how long it stays up.
+          </p>
+          {displayDraft ? (
+            <form className="form" onSubmit={saveDisplay}>
+              <div className="field">
+                <span>Show guest QR when</span>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.45rem",
+                    marginTop: "0.45rem",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className={`chip${
+                      displayDraft.qrTrigger === "on_paid" ? " active" : ""
+                    }`}
+                    onClick={() =>
+                      setDisplayDraft({
+                        ...displayDraft,
+                        qrTrigger: "on_paid",
+                      })
+                    }
+                  >
+                    Marked paid
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip${
+                      displayDraft.qrTrigger === "on_send_out" ? " active" : ""
+                    }`}
+                    onClick={() =>
+                      setDisplayDraft({
+                        ...displayDraft,
+                        qrTrigger: "on_send_out",
+                      })
+                    }
+                  >
+                    Sent to floor
+                  </button>
+                </div>
+                <p className="list-meta" style={{ marginTop: "0.45rem" }}>
+                  {displayDraft.qrTrigger === "on_paid"
+                    ? "Cash, already paid, or Terminal clearance shows the QR. Unit stays on Ready to send so you can prep and walk it out. Private/comp jobs still show QR at send-out."
+                    : "QR appears when you tap Send (unit moves On the floor). Paying alone won’t trigger the tablet."}
+                </p>
+              </div>
+
+              <div className="field">
+                <label htmlFor="qr-duration">QR on screen (seconds)</label>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.45rem",
+                    marginBottom: "0.45rem",
+                  }}
+                >
+                  {QR_DURATION_PRESETS.map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      className={`chip${
+                        displayDraft.qrDurationSeconds === sec ? " active" : ""
+                      }`}
+                      onClick={() =>
+                        setDisplayDraft({
+                          ...displayDraft,
+                          qrDurationSeconds: sec,
+                        })
+                      }
+                    >
+                      {sec}s
+                    </button>
+                  ))}
+                </div>
+                <input
+                  id="qr-duration"
+                  type="number"
+                  min={15}
+                  max={300}
+                  step={5}
+                  value={displayDraft.qrDurationSeconds}
+                  onChange={(e) =>
+                    setDisplayDraft({
+                      ...displayDraft,
+                      qrDurationSeconds: Math.min(
+                        300,
+                        Math.max(15, Math.round(Number(e.target.value) || 90)),
+                      ),
+                    })
+                  }
+                  style={{ width: "6.5rem" }}
+                />
+                <p className="list-meta" style={{ marginTop: "0.45rem" }}>
+                  Newest paid/sent unit wins if more than one is in the window.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-ok"
+                disabled={
+                  busy ||
+                  JSON.stringify(displayDraft) ===
+                    JSON.stringify(displaySettings)
+                }
+              >
+                {busy ? "Saving…" : "Save display settings"}
+              </button>
+            </form>
+          ) : (
+            <p className="empty">Loading display settings…</p>
           )}
         </section>
       ) : null}

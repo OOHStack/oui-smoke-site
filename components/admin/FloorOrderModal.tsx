@@ -190,20 +190,21 @@ export default function FloorOrderModal({
             <p className="confirm-modal__message">
               Terminal checkout is open
               {row.modelNumber != null ? ` for #${row.modelNumber}` : ""}. When
-              it clears, the unit lands on Ready to send — make it, carry it
-              out, then Send for the guest QR.
+              it clears, the guest QR shows on the event display and the unit
+              lands on Ready to send.
             </p>
           ) : finishPaid ? (
             <p className="confirm-modal__message">
               Paid
               {row.modelNumber != null ? ` · #${row.modelNumber}` : ""}. Confirm
-              to park it on Ready to send.
+              to show the guest QR and park it on Ready to send.
             </p>
           ) : (
             <>
               <p className="confirm-modal__message">
-                Assign a unit and collect — it goes to Ready to send so you can
-                prep and walk it out. Guest QR shows when you Send.
+                Assign a unit and collect — QR shows on the event display when
+                paid; the unit stays on Ready to send so you can prep and walk
+                it out.
               </p>
               <label className="field" style={{ display: "grid", gap: 6 }}>
                 <span>Assign to hookah</span>
@@ -283,7 +284,7 @@ export default function FloorOrderModal({
                 disabled={busy || !pick}
                 onClick={() => void fulfill("cash")}
               >
-                {busy ? "…" : "Cash · ready"}
+                {busy ? "…" : "Cash · QR"}
               </button>
               <button
                 type="button"
@@ -291,7 +292,7 @@ export default function FloorOrderModal({
                 disabled={busy || !pick}
                 onClick={() => void fulfill("already_paid")}
               >
-                Paid · ready
+                Paid · QR
               </button>
               <button
                 type="button"

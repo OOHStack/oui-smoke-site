@@ -14,6 +14,7 @@ import {
   jobDueCents,
   jobPaidCents,
 } from "@/lib/job-balance";
+import { pushAssignmentDisplayQr } from "@/lib/display-workflow";
 import { fulfillFloorOrder } from "@/lib/ops/fulfill-floor-order";
 import {
   guestRefillServiceRequestIdFromKey,
@@ -166,14 +167,20 @@ export async function markPaymentSucceeded(opts: {
           if (ready.ok && ready.ready) {
             void notifyStaffPush({
               title: `Floor order ready · #${ready.modelNumber}`,
-              body: `Paid · on Ready to send — make & carry out, then Send`,
+              body: `Paid · QR on event display · make & carry out, then Send`,
               url: `/admin/jobs/${row.jobId}`,
               tag: `floor-ready-${floorReq.id}`,
             });
           }
+        } else {
+          // Regular onsite unit (not a floor-tablet order) — still show QR on paid.
+          await pushAssignmentDisplayQr({
+            assignmentId: row.jobHookahId,
+            reason: "paid",
+          });
         }
       } catch (err) {
-        console.error("floor order ready-after-pay failed", err);
+        console.error("onsite unit paid / display QR failed", err);
       }
     }
 

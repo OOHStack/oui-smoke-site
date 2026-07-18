@@ -4,6 +4,11 @@ import type {
   DisplayFlavour,
   DisplayPackage,
 } from "@/lib/display-board";
+import {
+  displayQrDurationMs,
+  FALLBACK_DISPLAY_WORKFLOW,
+  getDisplayWorkflowSettings,
+} from "@/lib/display-workflow";
 import { guestServeUrl } from "@/lib/guest";
 import { findJobIdByDisplayToken } from "@/lib/job-display-token";
 import {
@@ -20,8 +25,9 @@ import {
 import { asc, eq } from "drizzle-orm";
 import QRCode from "qrcode";
 
-/** How long the send-out CFD takeover stays up after sentOutAt. */
-export const JOB_DISPLAY_TAKEOVER_MS = 90_000;
+/** Default takeover window — overridden by Settings → Display. */
+export const JOB_DISPLAY_TAKEOVER_MS =
+  FALLBACK_DISPLAY_WORKFLOW.qrDurationSeconds * 1000;
 
 export type JobDisplayTakeover = {
   assignmentId: number;
@@ -29,10 +35,13 @@ export type JobDisplayTakeover = {
   hookahLabel: string | null;
   flavour: string;
   guestPayTier: "standard" | "unlimited" | null;
+  /** When the QR takeover started (ISO). */
+  shownAt: string;
+  /** @deprecated alias of shownAt */
   sentOutAt: string;
   serveUrl: string;
   qrDataUrl: string;
-  /** Seconds remaining in the takeover window (approx). */
+  /** Milliseconds remaining in the takeover window (approx). */
   remainingMs: number;
 };
 
@@ -193,6 +202,9 @@ export async function loadJobDisplayBoard(
     .where(eq(flavours.active, true))
     .orderBy(asc(flavours.name));
 
+  const workflow = await getDisplayWorkflowSettings();
+  const takeoverMs = displayQrDurationMs(workflow);
+
   const assignments = await db
     .select({
       id: jobHookahs.id,
@@ -200,7 +212,7 @@ export async function loadJobDisplayBoard(
       flavourLabel: jobHookahs.flavourLabel,
       guestToken: jobHookahs.guestToken,
       guestPayTier: jobHookahs.guestPayTier,
-      sentOutAt: jobHookahs.sentOutAt,
+      displayQrAt: jobHookahs.displayQrAt,
       modelNumber: hookahs.modelNumber,
       hookahLabel: hookahs.label,
     })
@@ -212,37 +224,39 @@ export async function loadJobDisplayBoard(
   const stagedCount = assignments.filter((a) => a.status === "staged").length;
 
   const now = Date.now();
-  const recentOut = assignments
+  const recentQr = assignments
     .filter(
       (a) =>
-        a.status === "out" &&
+        a.status !== "returned" &&
         a.guestToken &&
-        a.sentOutAt &&
-        now - a.sentOutAt.getTime() <= JOB_DISPLAY_TAKEOVER_MS,
+        a.displayQrAt &&
+        now - a.displayQrAt.getTime() <= takeoverMs,
     )
     .sort(
       (a, b) =>
-        (b.sentOutAt?.getTime() ?? 0) - (a.sentOutAt?.getTime() ?? 0),
+        (b.displayQrAt?.getTime() ?? 0) - (a.displayQrAt?.getTime() ?? 0),
     )[0];
 
   let takeover: JobDisplayTakeover | null = null;
-  if (recentOut?.guestToken && recentOut.sentOutAt) {
-    const serveUrl = guestServeUrl(recentOut.guestToken);
-    const sentMs = recentOut.sentOutAt.getTime();
+  if (recentQr?.guestToken && recentQr.displayQrAt) {
+    const serveUrl = guestServeUrl(recentQr.guestToken);
+    const shownMs = recentQr.displayQrAt.getTime();
+    const shownAt = recentQr.displayQrAt.toISOString();
     takeover = {
-      assignmentId: recentOut.id,
-      modelNumber: recentOut.modelNumber,
-      hookahLabel: recentOut.hookahLabel ?? null,
-      flavour: (recentOut.flavourLabel ?? "").trim() || "Your flavour",
+      assignmentId: recentQr.id,
+      modelNumber: recentQr.modelNumber,
+      hookahLabel: recentQr.hookahLabel ?? null,
+      flavour: (recentQr.flavourLabel ?? "").trim() || "Your flavour",
       guestPayTier:
-        recentOut.guestPayTier === "standard" ||
-        recentOut.guestPayTier === "unlimited"
-          ? recentOut.guestPayTier
+        recentQr.guestPayTier === "standard" ||
+        recentQr.guestPayTier === "unlimited"
+          ? recentQr.guestPayTier
           : null,
-      sentOutAt: recentOut.sentOutAt.toISOString(),
+      shownAt,
+      sentOutAt: shownAt,
       serveUrl,
       qrDataUrl: await qrFor(serveUrl, 560),
-      remainingMs: Math.max(0, JOB_DISPLAY_TAKEOVER_MS - (now - sentMs)),
+      remainingMs: Math.max(0, takeoverMs - (now - shownMs)),
     };
   }
 

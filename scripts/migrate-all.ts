@@ -389,12 +389,17 @@ async function main() {
     CREATE UNIQUE INDEX IF NOT EXISTS site_settings_display_token_unique
     ON site_settings (display_token)
   `;
+  await sql`
+    ALTER TABLE site_settings
+    ADD COLUMN IF NOT EXISTS display_workflow_json jsonb NOT NULL DEFAULT '{}'::jsonb
+  `;
   console.log("✓ site_settings");
 
   // --- prep kitchen completion ---
   await sql`ALTER TABLE job_hookahs ADD COLUMN IF NOT EXISTS prep_completed_at timestamptz`;
   await sql`ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS prep_completed_at timestamptz`;
-  console.log("✓ prep completion");
+  await sql`ALTER TABLE job_hookahs ADD COLUMN IF NOT EXISTS display_qr_at timestamptz`;
+  console.log("✓ prep completion + display QR");
 
   // Floor tablet first orders: service request before a unit is assigned
   await sql`ALTER TABLE service_requests ALTER COLUMN job_hookah_id DROP NOT NULL`;

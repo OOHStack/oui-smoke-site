@@ -8,6 +8,7 @@ import {
   payments,
   serviceRequests,
 } from "@/lib/db/schema";
+import { pushAssignmentDisplayQr } from "@/lib/display-workflow";
 import {
   guestPayTierLabel,
   guestPayTierUnitCents,
@@ -356,6 +357,12 @@ export async function fulfillFloorOrder(opts: {
     type: "note",
     message: `Floor order ready to send · #${hookah.modelNumber} · ${flavourLabel} · make & carry out, then Send`,
     createdBy: opts.staffName,
+  });
+
+  // Event tablet QR on paid (Settings → Display), while unit stays Ready to send.
+  await pushAssignmentDisplayQr({
+    assignmentId,
+    reason: "paid",
   });
 
   return {

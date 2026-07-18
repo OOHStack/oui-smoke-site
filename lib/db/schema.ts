@@ -156,6 +156,8 @@ export const jobHookahs = pgTable("job_hookahs", {
   guestFeedbackAt: timestamp("guest_feedback_at", { withTimezone: true }),
   /** Kitchen marked this staged head packed / flavour done (still awaiting send-out). */
   prepCompletedAt: timestamp("prep_completed_at", { withTimezone: true }),
+  /** Event tablet guest-QR takeover starts at this time (paid or send-out, per settings). */
+  displayQrAt: timestamp("display_qr_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -442,6 +444,11 @@ export const siteSettings = pgTable("site_settings", {
   /** Capability URL for the kitchen prep board (no ops login). */
   prepToken: text("prep_token").unique(),
   displayToken: text("display_token").unique(),
+  /** Event tablet CFD workflow (QR trigger, duration, etc.). */
+  displayWorkflowJson: jsonb("display_workflow_json")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

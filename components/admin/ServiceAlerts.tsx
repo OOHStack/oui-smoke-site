@@ -402,7 +402,7 @@ export default function ServiceAlerts() {
                     <div className="list-meta">
                       {r.jobTitle} · {r.clientName}
                       {r.type === "order_unit"
-                        ? " · Assign, collect → Ready to send"
+                        ? " · Assign, collect → QR + Ready to send"
                         : ""}
                       {r.message ? ` · ${r.message}` : ""}
                     </div>

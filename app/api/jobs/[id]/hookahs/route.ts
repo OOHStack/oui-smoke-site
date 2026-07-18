@@ -14,6 +14,7 @@ import {
   cancelOpenServiceRequests,
   hookahOutOnOtherActiveJob,
 } from "@/lib/fleet";
+import { pushAssignmentDisplayQr } from "@/lib/display-workflow";
 import { createGuestToken } from "@/lib/guest";
 import {
   defaultRefillCentsForTier,
@@ -577,6 +578,13 @@ export async function POST(request: Request, context: RouteContext) {
           type: "sent_out",
           message: note || `Hookah sent out`,
           createdBy: session.name,
+        });
+
+        // QR on send-out when Settings → Display is set to that trigger
+        // (or private/comp fallback when trigger is on_paid).
+        await pushAssignmentDisplayQr({
+          assignmentId,
+          reason: "send_out",
         });
 
         return NextResponse.json(updated);
@@ -1349,6 +1357,10 @@ export async function POST(request: Request, context: RouteContext) {
           .limit(1);
 
         if (existing.length > 0) {
+          await pushAssignmentDisplayQr({
+            assignmentId,
+            reason: "paid",
+          });
           return NextResponse.json({ ok: true, alreadyPaid: true });
         }
 
@@ -1413,6 +1425,11 @@ export async function POST(request: Request, context: RouteContext) {
           type: "note",
           message: `Guest unit paid · ${label}`,
           createdBy: session.name,
+        });
+
+        await pushAssignmentDisplayQr({
+          assignmentId,
+          reason: "paid",
         });
 
         return NextResponse.json({ payment: row, channel: "manual" });
