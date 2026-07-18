@@ -3249,7 +3249,9 @@ button.fleet-tile {
   display: flex;
   flex-direction: column;
   gap: 1.35rem;
+  width: 100%;
   max-width: 1100px;
+  margin: 0 auto;
 }
 
 .analytics__head {
