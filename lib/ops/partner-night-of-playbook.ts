@@ -4,7 +4,7 @@ import {
 } from "@/lib/pricing";
 import type { PlaybookSection } from "@/lib/ops/night-of-playbook";
 
-/** Venue / host-facing night-of expectations (no internal ops steps). */
+/** Venue / host-facing event-day expectations (no internal ops steps). */
 export function getPartnerNightOfPlaybook(
   pricing: PricingConfig = DEFAULT_PRICING,
 ): {
@@ -15,15 +15,15 @@ export function getPartnerNightOfPlaybook(
   const refillDollars = pricing.refillPriceCents / 100;
   const hstPct = Math.round(pricing.hstRate * 100);
   return {
-    title: "Night-of — what to expect",
-    subtitle: "On-site sales nights: guests pay on the floor; Oui staff run service.",
+    title: "Event day — what to expect",
+    subtitle: "On-site sales events: guests pay on the floor; Oui staff run service.",
     sections: [
       {
         id: "pricing",
         title: "Guest pricing",
         bullets: [
           `Standard · $${pricing.onsiteUnitRate} + HST per unit — refills $${refillDollars} + HST each.`,
-          `Unlimited · $${pricing.onsiteUnlimitedRate} + HST per unit — unlimited flavour refills for the night.`,
+          `Unlimited · $${pricing.onsiteUnlimitedRate} + HST per unit — unlimited flavour refills for the event.`,
           `Oui staff collect payment on the floor (Square terminal or cash), including ${hstPct}% HST. Hosts do not need to run a package deposit for on-site sales.`,
         ],
       },

@@ -1393,7 +1393,7 @@ export default function JobDetailPage() {
                   </button>
                   {" · "}
                   <Link href="/admin/playbook" className="job-pricing-summary__inline">
-                    Night-of playbook
+                    Event-day playbook
                   </Link>
                   .
                 </>

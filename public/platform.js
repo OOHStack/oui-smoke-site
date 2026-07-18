@@ -14,7 +14,7 @@
     ops: {
       kicker: "1 · Ops console",
       title: "Our team’s live floor board",
-      body: "This is what Oui staff use during your event: every hookah on the floor, open guest calls, and check timers — so service stays tight all night.",
+      body: "This is what Oui staff use during your event: every hookah on the floor, open guest calls, and check timers — so service stays tight throughout.",
     },
     portal: {
       kicker: "2 · Client portal",

@@ -259,7 +259,7 @@ export default function PrepKitchenPage() {
         <p className="prep__workflow">
           <strong>Workflow:</strong> Stage units → set flavour on the job → pack
           here → mark Done → staff send out. Packed heads stay below by flavour
-          for the night.
+          for the event.
         </p>
 
         {actionError ? (
@@ -374,7 +374,7 @@ export default function PrepKitchenPage() {
 
           {packedByFlavour.length === 0 ? (
             <p className="prep__packed-empty">
-              Packed flavours show here by count for the night.
+              Packed flavours show here by count for the event.
             </p>
           ) : (
             <ul className="prep__packed-groups">

@@ -280,7 +280,7 @@ export default function PartnerSheet() {
             <p>
               {isPackage
                 ? "From $450 · up to 4 hours included"
-                : "Per unit · guests choose on the night"}
+                : "Per unit · guests choose on site"}
             </p>
           </div>
           {isPackage ? (
@@ -392,7 +392,7 @@ export default function PartnerSheet() {
             {mode === "on_site" ? (
               <>
                 {" · "}
-                <a href="/partner/playbook">Night-of playbook</a>
+                <a href="/partner/playbook">Event-day playbook</a>
               </>
             ) : null}
           </p>

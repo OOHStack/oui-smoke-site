@@ -909,7 +909,7 @@ export default function JobPaymentsPage() {
           <section className="panel collect-section">
             <div className="collect-section__head">
               <h2 className="panel-title" style={{ margin: 0 }}>
-                End-of-night reconcile
+                End-of-event reconcile
               </h2>
               <p className="list-meta" style={{ margin: 0 }}>
                 Compare this job’s ledger to Square payment status and amounts
@@ -1075,7 +1075,7 @@ export default function JobPaymentsPage() {
           <section className="panel collect-section">
             <div className="collect-section__head">
               <h2 className="panel-title" style={{ margin: 0 }}>
-                End-of-night reconcile
+                End-of-event reconcile
               </h2>
             </div>
             <button

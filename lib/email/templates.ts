@@ -495,7 +495,7 @@ export function jobCompletedClientEmail(input: {
   const html = layout({
     title: "Thank you",
     eyebrow: "Until next time",
-    preheader: "Hope the night was smooth.",
+    preheader: "Hope the event was smooth.",
     bodyHtml: [
       p(`Hi ${escapeHtml(input.clientName)},`),
       p(

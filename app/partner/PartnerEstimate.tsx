@@ -390,7 +390,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
           </ul>
           <p className="partner-estimate__intro">
             Guests choose ${pricing.onsiteUnitRate} with paid refills, or $
-            {pricing.onsiteUnlimitedRate} with unlimited refills for the night —
+            {pricing.onsiteUnlimitedRate} with unlimited refills for the event —
             plus HST.
           </p>
           <p className="partner-estimate__note">

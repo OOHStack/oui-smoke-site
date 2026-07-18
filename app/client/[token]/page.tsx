@@ -183,7 +183,7 @@ export default function ClientPortalPage() {
             title={data.wrapped ? "Event gallery" : "Guest photos"}
             subtitle={
               data.wrapped
-                ? "Moments guests shared during your Oui Smoke night"
+                ? "Moments guests shared during your Oui Smoke event"
                 : "Live photos from the floor — swipe to browse"
             }
           />

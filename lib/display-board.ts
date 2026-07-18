@@ -133,7 +133,7 @@ export async function loadDisplayBoard(): Promise<DisplayBoardSnapshot> {
   return {
     brand: {
       name: "Oui Smoke",
-      tagline: "Premium hookah for nights that matter.",
+      tagline: "Premium hookah for events that matter.",
       contactEmail: CONTACT_EMAIL,
     },
     flavours: menu.map((f) => ({
@@ -160,7 +160,7 @@ export async function loadDisplayBoard(): Promise<DisplayBoardSnapshot> {
       {
         id: "instagram",
         label: "@ouismoke",
-        hint: "Follow the night",
+        hint: "Follow along",
         url: instagramUrl,
         qrDataUrl: igQr,
       },

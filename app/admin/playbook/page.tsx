@@ -4,7 +4,7 @@ import { getPricing } from "@/lib/pricing";
 import PlaybookDocument from "@/components/PlaybookDocument";
 
 export const metadata: Metadata = {
-  title: "Night-of playbook",
+  title: "Event-day playbook",
 };
 
 export default async function AdminPlaybookPage() {

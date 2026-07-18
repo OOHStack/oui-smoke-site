@@ -5,9 +5,9 @@ import { getPricing } from "@/lib/pricing";
 import PlaybookDocument from "@/components/PlaybookDocument";
 
 export const metadata: Metadata = {
-  title: "Night-of · Oui Smoke",
+  title: "Event day · Oui Smoke",
   description:
-    "What hosts and partners should expect on Oui Smoke on-site sales nights.",
+    "What hosts and partners should expect at Oui Smoke on-site sales events.",
 };
 
 export default async function PartnerPlaybookPage() {

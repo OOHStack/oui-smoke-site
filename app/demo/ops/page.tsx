@@ -13,7 +13,7 @@ export default function DemoOpsPage() {
 
       <section className="demo-ops__hero">
         <div>
-          <p className="demo-ops__kicker">Tonight</p>
+          <p className="demo-ops__kicker">Live</p>
           <h2>Harborview Rooftop · Corporate</h2>
           <p className="demo-ops__meta">8 hookahs · Active · 92 guests</p>
         </div>

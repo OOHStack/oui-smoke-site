@@ -253,9 +253,9 @@ export default function JobDisplayPage() {
 
             <div className="jdisplay__panels">
               <div>
-                <p className="jdisplay__section-label">Tonight&apos;s flavours</p>
+                <p className="jdisplay__section-label">Flavour menu</p>
                 {board.flavours.length === 0 ? (
-                  <p className="jdisplay__lede">Ask the crew for tonight&apos;s menu.</p>
+                  <p className="jdisplay__lede">Ask the crew for the menu.</p>
                 ) : (
                   <div className="jdisplay__flavours">
                     {board.flavours.map((f) => (

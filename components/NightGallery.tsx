@@ -15,7 +15,7 @@ export type NightGalleryPhoto = {
 
 export default function NightGallery({
   photos,
-  title = "Night gallery",
+  title = "Event gallery",
   subtitle = "Swipe through moments from this session",
 }: {
   photos: NightGalleryPhoto[];

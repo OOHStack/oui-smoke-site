@@ -140,7 +140,7 @@ export default function DisplayPage() {
             <p className="display__tagline">{board.brand.tagline}</p>
             <div className="display__welcome-meta">
               <span>
-                <strong>{board.flavours.length}</strong> flavours tonight
+                <strong>{board.flavours.length}</strong> flavours on the menu
               </span>
               <span>
                 Private packages from{" "}
@@ -154,7 +154,7 @@ export default function DisplayPage() {
             aria-hidden={active !== "flavours"}
           >
             <p className="display__kicker">Menu</p>
-            <h2 className="display__title">Tonight&apos;s flavours</h2>
+            <h2 className="display__title">Flavour menu</h2>
             <p className="display__lede">
               Ask your host for a pour. Mixes and classics, packed fresh.
             </p>

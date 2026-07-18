@@ -434,7 +434,7 @@ function BookForm() {
             </li>
             <li>
               <span>Unlimited unit</span>
-              <span>${pricing.onsiteUnlimitedRate} + HST / night</span>
+              <span>${pricing.onsiteUnlimitedRate} + HST / event</span>
             </li>
           </ul>
           <p className="book__estimate-note" style={{ margin: "0.65rem 0 0" }}>

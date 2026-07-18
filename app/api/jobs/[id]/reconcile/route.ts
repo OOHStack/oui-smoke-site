@@ -22,7 +22,7 @@ type ReconcileLine = {
 };
 
 /**
- * End-of-night check: compare this job’s ledger rows to Square Payments API.
+ * End-of-event check: compare this job’s ledger rows to Square Payments API.
  */
 export async function GET(_request: Request, context: RouteContext) {
   const { error } = await requireApiSession();

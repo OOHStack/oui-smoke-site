@@ -445,7 +445,7 @@ export default function GuestServePage() {
         setError(json.error ?? "Couldn’t send feedback");
         return;
       }
-      setFeedbackMsg("Thanks — your feedback helps us make every night better.");
+      setFeedbackMsg("Thanks — your feedback helps us make every event better.");
       setData((prev) =>
         prev
           ? {
@@ -830,7 +830,7 @@ export default function GuestServePage() {
             <p>This hookah is no longer on the floor. Thanks for smoking with Oui.</p>
             {data.sessionSummary ? (
               <div className="serve__summary">
-                <p className="serve__summary-title">Your night with Oui</p>
+                <p className="serve__summary-title">Your event with Oui</p>
                 <ul className="serve__summary-list">
                   {summaryDuration ? (
                     <li>
@@ -859,7 +859,7 @@ export default function GuestServePage() {
             {data.photos && data.photos.length > 0 ? (
               <NightGallery
                 photos={data.photos}
-                title="Your night"
+                title="Your event"
                 subtitle="Moments you shared from this hookah"
               />
             ) : null}
@@ -875,7 +875,7 @@ export default function GuestServePage() {
               <form className="serve__feedback" onSubmit={submitFeedback}>
                 <p className="serve__feedback-title">How was your session?</p>
                 <p className="serve__feedback-lede">
-                  Rate the night — we review every response on the dashboard.
+                  Rate the event — we review every response on the dashboard.
                 </p>
                 <div className="serve__stars" role="group" aria-label="Rating from 1 to 5">
                   {[1, 2, 3, 4, 5].map((n) => (
@@ -1414,7 +1414,7 @@ export default function GuestServePage() {
 
         {!data.sessionEnded && recent.length > 0 ? (
           <section className="serve__history">
-            <h2 className="serve__section-title">Tonight so far</h2>
+            <h2 className="serve__section-title">So far</h2>
             <ul className="serve__history-list">
               {recent.map((r) => (
                 <li key={r.id}>
@@ -1430,7 +1430,7 @@ export default function GuestServePage() {
           <section className="serve__photo">
             <h2 className="serve__section-title">Share a moment</h2>
             <p className="serve__muted">
-              Send a photo from your night — Oui may feature it on social media.
+              Send a photo from your event — Oui may feature it on social media.
             </p>
 
             <label className="serve__agree serve__agree--photo" htmlFor="photo-consent">

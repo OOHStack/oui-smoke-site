@@ -10,7 +10,7 @@ export type PlaybookSection = {
   bullets: string[];
 };
 
-/** Staff night-of process — rates stay in sync with live pricing. */
+/** Staff event-day process — rates stay in sync with live pricing. */
 export function getOpsNightOfPlaybook(
   pricing: PricingConfig = DEFAULT_PRICING,
 ): {
@@ -21,7 +21,7 @@ export function getOpsNightOfPlaybook(
   const refillDollars = pricing.refillPriceCents / 100;
   const hstPct = Math.round(pricing.hstRate * 100);
   return {
-    title: "Night-of playbook",
+    title: "Event-day playbook",
     subtitle: "Floor lead process for guest pay, refills, and QR failures.",
     sections: [
       {
@@ -33,10 +33,10 @@ export function getOpsNightOfPlaybook(
           `Owner: the person with the Square terminal (floor lead). Runners do not negotiate rates.`,
           `When: at send-out (Ready → On the floor). Tap Send as Standard or Send as Unlimited before the unit leaves.`,
           `Standard · $${pricing.onsiteUnitRate} + HST — paid refills at $${refillDollars} + HST each.`,
-          `Unlimited · $${pricing.onsiteUnlimitedRate} + HST — no per-refill charge for that unit that night.`,
+          `Unlimited · $${pricing.onsiteUnlimitedRate} + HST — no per-refill charge for that unit for the event.`,
           `Collect with Terminal (auto-captures when the device completes) or Mark paid for cash. Both paths add ${hstPct}% HST.`,
           `Guest calls: tap I’m on it so the guest sees your name and follow-up alerts go to your device.`,
-          `Unpaid units show a chip on the board / ledger — clear them before close-out. End-of-night Actual ($) is suggested from the ledger.`,
+          `Unpaid units show a chip on the board / ledger — clear them before close-out. End-of-event Actual ($) is suggested from the ledger.`,
           `If Terminal isn’t ready, fix pairing under Settings → Square before taking card payments.`,
           `Job reset and tip edits are admin-only.`,
         ],

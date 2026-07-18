@@ -136,14 +136,14 @@ function buildOnsitePackages(pricing: PricingConfig): DisplayPackage[] {
   return [
     {
       id: "standard",
-      eyebrow: "Tonight",
+      eyebrow: "On site",
       title: "Standard",
       price: `$${pricing.onsiteUnitRate}`,
       detail: `Per hookah · refills $${refill}`,
     },
     {
       id: "unlimited",
-      eyebrow: "Tonight",
+      eyebrow: "On site",
       title: "Unlimited",
       price: `$${pricing.onsiteUnlimitedRate}`,
       detail: "Per hookah · refills included",
@@ -169,8 +169,8 @@ function idleCopy(
   }
   if (mode === "comp") {
     return {
-      headline: job.clientName || job.title || "Tonight",
-      lede: "Complimentary service · pick a flavour and enjoy the night.",
+      headline: job.clientName || job.title || "Your event",
+      lede: "Complimentary service · pick a flavour and enjoy.",
     };
   }
   return {

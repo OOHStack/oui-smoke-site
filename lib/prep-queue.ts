@@ -129,7 +129,7 @@ function groupByFlavour(items: PrepItem[]): PrepFlavourGroup[] {
 
 /**
  * Kitchen marks a flavour packed. Unit stays staged / call stays open for floor;
- * item moves to the packed list until flavour changes or the night wraps.
+ * item moves to the packed list until flavour changes or the event wraps.
  */
 export async function completePrepItem(
   itemId: string,
