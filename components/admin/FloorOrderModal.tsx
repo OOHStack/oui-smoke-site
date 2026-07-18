@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { readApiError } from "@/lib/api-error";
 
 type FloorOrderRow = {
@@ -40,6 +40,13 @@ type Props = {
   onError: (message: string, retry?: () => void) => void;
 };
 
+function formatMoney(cents: number) {
+  const dollars = cents / 100;
+  return Number.isInteger(dollars)
+    ? `$${dollars}`
+    : `$${dollars.toFixed(2)}`;
+}
+
 export default function FloorOrderModal({
   row,
   terminalReady,
@@ -53,14 +60,42 @@ export default function FloorOrderModal({
   const [pick, setPick] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
-  const dollars =
-    row.priceCents != null ? `$${(row.priceCents / 100).toFixed(0)}` : null;
   const tierLabel =
     row.requestedGuestPayTier === "unlimited"
       ? "Unlimited"
       : row.requestedGuestPayTier === "standard"
         ? "Standard"
-        : "Hookah";
+        : "Plan TBD";
+  const flavour = (row.flavourLabel || "").trim() || "Flavour TBD";
+  const priceLabel =
+    row.priceCents != null && row.priceCents > 0
+      ? `${formatMoney(row.priceCents)} + HST`
+      : "Price TBD";
+
+  const pickedSummary = useMemo(() => {
+    if (!pick || !candidates) return null;
+    if (pick.startsWith("a:")) {
+      const id = Number(pick.slice(2));
+      const s = candidates.staged.find((x) => x.assignmentId === id);
+      if (!s) return null;
+      return {
+        modelNumber: s.modelNumber,
+        source: "Ready to send" as const,
+        detail: s.flavourLabel || s.label || null,
+      };
+    }
+    if (pick.startsWith("h:")) {
+      const id = Number(pick.slice(2));
+      const h = candidates.available.find((x) => x.hookahId === id);
+      if (!h) return null;
+      return {
+        modelNumber: h.modelNumber,
+        source: "Fleet" as const,
+        detail: h.label || null,
+      };
+    }
+    return null;
+  }, [pick, candidates]);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,6 +179,11 @@ export default function FloorOrderModal({
     row.paymentStatus === "pending" && row.assignmentId != null;
   const finishPaid =
     row.paymentStatus === "succeeded" && row.assignmentId != null;
+  const canCollect = Boolean(pick) && !busy && !waitingTerminal && !finishPaid;
+  const noUnits =
+    candidates &&
+    candidates.staged.length === 0 &&
+    candidates.available.length === 0;
 
   return (
     <div
@@ -155,108 +195,212 @@ export default function FloorOrderModal({
     >
       <div
         ref={dialogRef}
-        className="confirm-modal"
+        className="confirm-modal floor-order-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="floor-order-title"
         tabIndex={-1}
-        style={{ width: "min(100%, 28rem)" }}
       >
-        <div className="confirm-modal__body">
-          <h2 id="floor-order-title" className="confirm-modal__title">
-            Floor order
+        <div className="confirm-modal__body floor-order-modal__body">
+          <div className="floor-order-modal__eyebrow">
+            Floor tablet order
+            <span>
+              {row.jobTitle}
+              {row.clientName ? ` · ${row.clientName}` : ""}
+            </span>
+          </div>
+          <h2 id="floor-order-title" className="floor-order-modal__title">
+            Guest ordered
           </h2>
-          <p className="confirm-modal__message">
-            {tierLabel}
-            {row.flavourLabel ? ` · ${row.flavourLabel}` : ""}
-            {dollars ? ` · ${dollars}` : ""}
-            <br />
-            {row.jobTitle} · {row.clientName}
-            {row.message ? (
-              <>
-                <br />
-                {row.message}
-              </>
-            ) : null}
-          </p>
+
+          <div className="floor-order-summary" aria-label="Order details">
+            <div className="floor-order-summary__cell">
+              <span className="floor-order-summary__label">Plan</span>
+              <strong
+                className={`floor-order-summary__value floor-order-summary__value--tier floor-order-summary__value--${
+                  row.requestedGuestPayTier || "unknown"
+                }`}
+              >
+                {tierLabel}
+              </strong>
+            </div>
+            <div className="floor-order-summary__cell floor-order-summary__cell--wide">
+              <span className="floor-order-summary__label">Flavour</span>
+              <strong className="floor-order-summary__value floor-order-summary__value--flavour">
+                {flavour}
+              </strong>
+            </div>
+            <div className="floor-order-summary__cell">
+              <span className="floor-order-summary__label">Collect</span>
+              <strong className="floor-order-summary__value floor-order-summary__value--price">
+                {priceLabel}
+              </strong>
+            </div>
+          </div>
+
+          {row.message ? (
+            <p className="floor-order-modal__note">“{row.message}”</p>
+          ) : null}
 
           {loadError ? (
-            <p className="confirm-modal__message" style={{ color: "var(--danger)" }}>
-              {loadError}
-            </p>
+            <p className="floor-order-modal__error">{loadError}</p>
           ) : null}
 
           {waitingTerminal ? (
-            <p className="confirm-modal__message">
-              Terminal checkout is open
-              {row.modelNumber != null ? ` for #${row.modelNumber}` : ""}. When
-              it clears, the guest QR shows on the event display and the unit
-              lands on Ready to send.
-            </p>
+            <div className="floor-order-status floor-order-status--wait">
+              <div className="floor-order-status__unit">
+                {row.modelNumber != null ? `#${row.modelNumber}` : "Unit"}
+              </div>
+              <div>
+                <strong>Waiting on Square Terminal</strong>
+                <p>
+                  Complete the charge on the device. When it clears, the guest QR
+                  shows on the event display and this unit parks on Ready to send.
+                </p>
+              </div>
+            </div>
           ) : finishPaid ? (
-            <p className="confirm-modal__message">
-              Paid
-              {row.modelNumber != null ? ` · #${row.modelNumber}` : ""}. Confirm
-              to show the guest QR and park it on Ready to send.
-            </p>
+            <div className="floor-order-status floor-order-status--paid">
+              <div className="floor-order-status__unit">
+                {row.modelNumber != null ? `#${row.modelNumber}` : "Unit"}
+              </div>
+              <div>
+                <strong>Paid — ready to finish</strong>
+                <p>
+                  Confirm to push the guest QR to the event display and keep the
+                  unit on Ready to send for prep.
+                </p>
+              </div>
+            </div>
           ) : (
             <>
-              <p className="confirm-modal__message">
-                Assign a unit and collect — QR shows on the event display when
-                paid; the unit stays on Ready to send so you can prep and walk
-                it out.
-              </p>
-              <label className="field" style={{ display: "grid", gap: 6 }}>
-                <span>Assign to hookah</span>
-                <select
-                  value={pick}
-                  onChange={(e) => setPick(e.target.value)}
-                  disabled={busy || !candidates}
-                >
-                  <option value="">Select a unit…</option>
-                  {candidates?.staged.length ? (
-                    <optgroup label="Staged on this job">
-                      {candidates.staged.map((s) => (
-                        <option key={`a-${s.assignmentId}`} value={`a:${s.assignmentId}`}>
-                          #{s.modelNumber}
-                          {s.flavourLabel ? ` · ${s.flavourLabel}` : ""}
-                          {s.label ? ` · ${s.label}` : ""}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ) : null}
-                  {candidates?.available.length ? (
-                    <optgroup label="Available fleet">
-                      {candidates.available.map((h) => (
-                        <option key={`h-${h.hookahId}`} value={`h:${h.hookahId}`}>
-                          #{h.modelNumber}
-                          {h.label ? ` · ${h.label}` : ""}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ) : null}
-                </select>
-              </label>
-              {candidates &&
-              candidates.staged.length === 0 &&
-              candidates.available.length === 0 ? (
-                <p className="confirm-modal__message">
-                  No free hookahs — stage a unit on the job or free one from the
-                  fleet.
+              <section className="floor-order-step">
+                <h3 className="floor-order-step__title">
+                  <span className="floor-order-step__n">1</span>
+                  Assign a hookah
+                </h3>
+                <p className="floor-order-step__hint">
+                  Pick which physical unit this order becomes. Flavour above is
+                  what the guest chose — set it on the unit when you prep.
                 </p>
-              ) : null}
+                <label className="floor-order-assign">
+                  <span className="floor-order-assign__label">Unit</span>
+                  <select
+                    value={pick}
+                    onChange={(e) => setPick(e.target.value)}
+                    disabled={busy || !candidates}
+                  >
+                    <option value="">Select a unit…</option>
+                    {candidates?.staged.length ? (
+                      <optgroup label="Already on this job (Ready to send)">
+                        {candidates.staged.map((s) => (
+                          <option
+                            key={`a-${s.assignmentId}`}
+                            value={`a:${s.assignmentId}`}
+                          >
+                            #{s.modelNumber}
+                            {s.flavourLabel ? ` · ${s.flavourLabel}` : ""}
+                            {s.label ? ` · ${s.label}` : ""}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                    {candidates?.available.length ? (
+                      <optgroup label="Available in fleet">
+                        {candidates.available.map((h) => (
+                          <option
+                            key={`h-${h.hookahId}`}
+                            value={`h:${h.hookahId}`}
+                          >
+                            #{h.modelNumber}
+                            {h.label ? ` · ${h.label}` : ""}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                  </select>
+                </label>
+                {pickedSummary ? (
+                  <p className="floor-order-assign__picked">
+                    Assigning{" "}
+                    <strong>#{pickedSummary.modelNumber}</strong>
+                    <span>
+                      {" "}
+                      · {pickedSummary.source}
+                      {pickedSummary.detail
+                        ? ` · ${pickedSummary.detail}`
+                        : ""}
+                    </span>
+                  </p>
+                ) : null}
+                {noUnits ? (
+                  <p className="floor-order-modal__error">
+                    No free hookahs — stage a unit on the job or free one from the
+                    fleet, then reopen this order.
+                  </p>
+                ) : null}
+              </section>
+
+              <section className="floor-order-step">
+                <h3 className="floor-order-step__title">
+                  <span className="floor-order-step__n">2</span>
+                  Collect {priceLabel}
+                </h3>
+                <p className="floor-order-step__hint">
+                  Choose how you took payment. After collect, the guest QR goes to
+                  the event display and the unit stays on Ready to send.
+                </p>
+                <div className="floor-order-pay">
+                  <button
+                    type="button"
+                    className="floor-order-pay__btn"
+                    disabled={!canCollect || noUnits}
+                    onClick={() => void fulfill("cash")}
+                  >
+                    <strong>Cash</strong>
+                    <span>Took cash at the table — then show guest QR</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="floor-order-pay__btn"
+                    disabled={!canCollect || noUnits}
+                    onClick={() => void fulfill("already_paid")}
+                  >
+                    <strong>Already paid</strong>
+                    <span>Phone link / Square already shows paid</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="floor-order-pay__btn floor-order-pay__btn--primary"
+                    disabled={!canCollect || noUnits || !terminalReady}
+                    title={
+                      terminalReady
+                        ? `Push ${priceLabel} to Square Terminal`
+                        : "Pair a Square Terminal in Settings → Square"
+                    }
+                    onClick={() => void fulfill("terminal")}
+                  >
+                    <strong>Square Terminal</strong>
+                    <span>
+                      {terminalReady
+                        ? "Push charge to the paired Terminal"
+                        : "Terminal not ready — pair in Settings"}
+                    </span>
+                  </button>
+                </div>
+              </section>
             </>
           )}
         </div>
 
-        <div className="confirm-modal__footer">
+        <div className="confirm-modal__footer floor-order-modal__footer">
           <button
             type="button"
             className="btn btn-ghost"
             onClick={onClose}
             disabled={busy}
           >
-            Later
+            {waitingTerminal ? "Close" : "Later"}
           </button>
           {finishPaid ? (
             <button
@@ -265,50 +409,15 @@ export default function FloorOrderModal({
               disabled={busy}
               onClick={() => void fulfill("already_paid")}
             >
-              {busy ? "…" : "Ready to send"}
+              {busy ? "Working…" : "Show QR · Ready to send"}
             </button>
           ) : waitingTerminal ? (
-            <button
-              type="button"
-              className="btn"
-              disabled={busy}
-              onClick={onClose}
-            >
-              Waiting on terminal
+            <button type="button" className="btn" disabled>
+              Waiting on Terminal…
             </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="btn"
-                disabled={busy || !pick}
-                onClick={() => void fulfill("cash")}
-              >
-                {busy ? "…" : "Cash · QR"}
-              </button>
-              <button
-                type="button"
-                className="btn"
-                disabled={busy || !pick}
-                onClick={() => void fulfill("already_paid")}
-              >
-                Paid · QR
-              </button>
-              <button
-                type="button"
-                className="btn btn-ok"
-                disabled={busy || !pick || !terminalReady}
-                title={
-                  terminalReady
-                    ? "Push amount to Square Terminal"
-                    : "Terminal not ready"
-                }
-                onClick={() => void fulfill("terminal")}
-              >
-                {busy ? "…" : "Terminal"}
-              </button>
-            </>
-          )}
+          ) : busy ? (
+            <span className="floor-order-modal__busy">Working…</span>
+          ) : null}
         </div>
       </div>
     </div>
