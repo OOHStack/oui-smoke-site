@@ -19,8 +19,8 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 /**
  * Clear operational / test activity on a job while keeping the job shell
- * (details, packing notes, staged assignments + flavours, client portal token).
- * Also clears prep-board packed marks so kitchen queue starts fresh.
+ * (details, packing notes, staged assignments, client portal token).
+ * Clears prep-board packed marks and flavour assignments on units.
  */
 export async function POST(request: Request, context: RouteContext) {
   const { session, error } = await requireApiAdmin();
@@ -105,6 +105,8 @@ export async function POST(request: Request, context: RouteContext) {
       displayQrAt: null,
       // Prep board “packed” marks — so kitchen queue starts fresh
       prepCompletedAt: null,
+      flavourId: null,
+      flavourLabel: "",
     })
     .where(eq(jobHookahs.jobId, jobId));
 
@@ -134,7 +136,7 @@ export async function POST(request: Request, context: RouteContext) {
     jobId,
     type: "note",
     message:
-      "Job reset — cleared floor activity, prep board, ledger, requests, photos, and outcomes",
+      "Job reset — cleared floor activity, flavours, prep board, ledger, requests, photos, and outcomes",
     createdBy: session.name,
   });
 
