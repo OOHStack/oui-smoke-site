@@ -1,0 +1,20 @@
+/* Event / venue tablets — lock document to the visible viewport.
+   Prevents bottom padding / QR white frame from clipping past the fold. */
+
+html {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  background: #0a0908 !important;
+}
+
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  background: #0a0908 !important;
+}

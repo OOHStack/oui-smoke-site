@@ -9,8 +9,15 @@
   --line: rgba(247, 244, 239, 0.12);
   --shadow: rgba(0, 0, 0, 0.55);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Prefer small viewport so tablet chrome never clips the bottom frame */
   position: relative;
-  min-height: 100dvh;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  height: 100svh;
+  max-height: 100%;
+  max-height: 100dvh;
+  max-height: 100svh;
   margin: 0;
   overflow: hidden;
   background: var(--bg);
@@ -20,6 +27,7 @@
   color-scheme: dark;
   touch-action: manipulation;
   user-select: none;
+  box-sizing: border-box;
 }
 
 .jdisplay__bg {
@@ -74,10 +82,15 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  min-height: 100dvh;
-  padding: clamp(1.1rem, 2.8vw, 2rem);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  max-height: 100%;
+  padding-top: max(clamp(0.85rem, 2.2vw, 1.75rem), env(safe-area-inset-top, 0px));
+  padding-right: max(clamp(0.85rem, 2.2vw, 1.75rem), env(safe-area-inset-right, 0px));
+  padding-bottom: max(clamp(0.85rem, 2.2vw, 1.75rem), env(safe-area-inset-bottom, 0px));
+  padding-left: max(clamp(0.85rem, 2.2vw, 1.75rem), env(safe-area-inset-left, 0px));
   box-sizing: border-box;
+  min-height: 0;
 }
 
 .jdisplay__top {
@@ -534,11 +547,15 @@
 }
 
 .jdisplay__cfd-qr img {
-  width: min(300px, 38vw);
+  /* Cap by height too so the white QR frame stays fully inside the viewport */
+  width: min(300px, 38vw, 42svh);
   height: auto;
+  max-height: min(42svh, 300px);
+  object-fit: contain;
   border-radius: 6px;
   background: #fff;
   padding: 0.75rem;
+  box-sizing: border-box;
   box-shadow:
     0 0 0 1px rgba(247, 244, 239, 0.08),
     0 24px 60px rgba(0, 0, 0, 0.5);
@@ -575,9 +592,13 @@
 .jdisplay--error {
   display: grid;
   place-items: center;
-  min-height: 100dvh;
+  height: 100%;
+  height: 100dvh;
+  height: 100svh;
+  max-height: 100svh;
   padding: 2rem;
   text-align: center;
+  box-sizing: border-box;
 }
 
 .jdisplay--error h1 {
@@ -625,12 +646,55 @@
     grid-template-columns: 1fr;
   }
 
+  .jdisplay__cfd-grid {
+    justify-items: center;
+    text-align: center;
+    gap: 0.85rem;
+    overflow: auto;
+    min-height: 0;
+  }
+
+  .jdisplay__cfd-hint {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   .jdisplay__cfd-qr img {
-    width: min(240px, 70vw);
+    width: min(220px, 58vw, 36svh);
+    max-height: min(36svh, 220px);
   }
 
   .jdisplay__flavours {
-    max-height: min(24dvh, 180px);
+    max-height: min(22svh, 160px);
+  }
+
+  .jdisplay__foot {
+    padding-top: 0.55rem;
+    font-size: 0.72rem;
+  }
+}
+
+@media (max-height: 720px) {
+  .jdisplay__event {
+    font-size: clamp(1.45rem, 3.8vw, 2.1rem);
+  }
+
+  .jdisplay__cfd-unit {
+    font-size: clamp(3.6rem, 12vw, 6.5rem);
+  }
+
+  .jdisplay__cfd-flavour {
+    font-size: clamp(1.25rem, 3vw, 1.85rem);
+  }
+
+  .jdisplay__cfd-qr img {
+    width: min(200px, 34svh);
+    max-height: min(34svh, 200px);
+    padding: 0.55rem;
+  }
+
+  .jdisplay__top {
+    padding-bottom: 0.55rem;
   }
 }
 
