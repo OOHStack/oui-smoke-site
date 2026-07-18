@@ -264,6 +264,11 @@
   max-width: 920px;
 }
 
+.jdisplay__order-panel--flavours {
+  max-width: min(1120px, 100%);
+  width: 100%;
+}
+
 .jdisplay__order-tiers {
   margin-top: 1.25rem;
   display: grid;
@@ -317,37 +322,68 @@
 }
 
 .jdisplay__order-flavours {
-  margin-top: 1rem;
+  margin-top: 1.15rem;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 0.55rem;
-  max-height: min(38dvh, 320px);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.85rem;
+  max-height: min(52dvh, 520px);
   overflow: auto;
-  padding-right: 0.2rem;
+  padding: 0.15rem 0.25rem 0.35rem 0.1rem;
 }
 
 .jdisplay__order-flavour {
   display: grid;
-  gap: 0.2rem;
+  align-content: start;
+  gap: 0.35rem;
+  min-height: 7.5rem;
   text-align: left;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: rgba(10, 9, 8, 0.4);
+  padding: 1.15rem 1.25rem 1.25rem;
+  border: 1px solid rgba(247, 244, 239, 0.18);
+  border-radius: 6px;
+  background: rgba(10, 9, 8, 0.55);
   color: inherit;
   font: inherit;
   cursor: pointer;
+  transition:
+    border-color 0.18s var(--ease),
+    background 0.18s var(--ease),
+    transform 0.18s var(--ease);
 }
 
-.jdisplay__order-flavour.is-selected,
 .jdisplay__order-flavour:hover {
+  border-color: rgba(247, 244, 239, 0.38);
+  background: rgba(10, 9, 8, 0.72);
+  transform: translateY(-1px);
+}
+
+.jdisplay__order-flavour.is-selected {
   border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, rgba(10, 9, 8, 0.72));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.jdisplay__order-flavour-kind {
+  margin: 0;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.jdisplay__order-flavour strong {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(1.55rem, 2.8vw, 2.05rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1;
 }
 
 .jdisplay__order-flavour span {
-  color: var(--ink-mute);
-  font-size: 0.82rem;
-  line-height: 1.3;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .jdisplay__order-label {
@@ -677,6 +713,17 @@
     max-height: min(22svh, 160px);
   }
 
+  .jdisplay__order-flavours {
+    grid-template-columns: 1fr;
+    max-height: min(48dvh, 420px);
+    gap: 0.7rem;
+  }
+
+  .jdisplay__order-flavour {
+    min-height: 6.25rem;
+    padding: 1rem 1.1rem 1.1rem;
+  }
+
   .jdisplay__foot {
     padding-top: 0.55rem;
     font-size: 0.72rem;
@@ -712,9 +759,14 @@
   .jdisplay__cfd,
   .jdisplay__cfd-qr img,
   .jdisplay__cfd-kicker,
-  .jdisplay__veil {
+  .jdisplay__veil,
+  .jdisplay__order-flavour {
     animation: none;
     transition: none;
+  }
+
+  .jdisplay__order-flavour:hover {
+    transform: none;
   }
 
   .jdisplay__bg-photo {

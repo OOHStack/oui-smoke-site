@@ -364,7 +364,7 @@ export default function JobDisplayPage() {
             ) : null}
 
             {orderStep === "flavour" ? (
-              <div className="jdisplay__order-panel">
+              <div className="jdisplay__order-panel jdisplay__order-panel--flavours">
                 <p className="jdisplay__cfd-kicker">Step 2 · {tier}</p>
                 <h2 className="jdisplay__headline">Pick a flavour</h2>
                 <div className="jdisplay__order-flavours">
@@ -377,6 +377,9 @@ export default function JobDisplayPage() {
                       }`}
                       onClick={() => setFlavourId(f.id)}
                     >
+                      <em className="jdisplay__order-flavour-kind">
+                        {f.kind === "mix" ? "Mix" : "Single"}
+                      </em>
                       <strong>{f.name}</strong>
                       {f.description ? <span>{f.description}</span> : null}
                     </button>
