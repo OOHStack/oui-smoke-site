@@ -12,6 +12,10 @@ export function createPrepToken() {
   return randomBytes(18).toString("base64url");
 }
 
+export function createDisplayToken() {
+  return randomBytes(18).toString("base64url");
+}
+
 export function getSiteUrl() {
   if (process.env.NEXT_PUBLIC_SITE_URL) {
     return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
@@ -35,4 +39,8 @@ export function clientPortalUrl(token: string) {
 
 export function prepPortalUrl(token: string) {
   return `${getSiteUrl()}/prep/${token}`;
+}
+
+export function displayPortalUrl(token: string) {
+  return `${getSiteUrl()}/display/${token}`;
 }

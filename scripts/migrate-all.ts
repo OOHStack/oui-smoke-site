@@ -379,6 +379,11 @@ async function main() {
     CREATE UNIQUE INDEX IF NOT EXISTS site_settings_prep_token_unique
     ON site_settings (prep_token)
   `;
+  await sql`ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS display_token text`;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS site_settings_display_token_unique
+    ON site_settings (display_token)
+  `;
   console.log("✓ site_settings");
 
   // --- prep kitchen completion ---

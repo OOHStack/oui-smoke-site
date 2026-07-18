@@ -9,8 +9,11 @@ export default function PromoModeCard() {
           Promo mode
         </h2>
         <p className="page-sub" style={{ margin: 0 }}>
-          Flip <code>promoMode</code> in <code>public/config.js</code>, open{" "}
-          <code>/promo</code>, or add <code>?promo=1</code> to any public URL.
+          Static homepage kiosk: flip <code>promoMode</code> in{" "}
+          <code>public/config.js</code>, open <code>/promo</code>, or add{" "}
+          <code>?promo=1</code>. For a live floor tablet (flavours, packages,
+          QR), use{" "}
+          <a href="/admin/display">Event display</a>.
         </p>
       </div>
       <div className="partner-share-card__actions">
@@ -21,6 +24,9 @@ export default function PromoModeCard() {
           rel="noopener noreferrer"
         >
           Open /promo
+        </a>
+        <a className="btn btn-ghost" href="/admin/display">
+          Event display
         </a>
       </div>
       <p className="partner-share-card__url">{PROMO_URL}</p>

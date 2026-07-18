@@ -438,6 +438,7 @@ export const siteSettings = pgTable("site_settings", {
     .default(45),
   /** Capability URL for the kitchen prep board (no ops login). */
   prepToken: text("prep_token").unique(),
+  displayToken: text("display_token").unique(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
