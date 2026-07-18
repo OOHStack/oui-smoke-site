@@ -13,10 +13,31 @@ export type FlavourOption = { id: number; name: string; active?: boolean };
 
 type MenuPos = { top: number; left: number; width: number; maxHeight: number };
 
+function measureMenuPos(trigger: HTMLElement): MenuPos {
+  const rect = trigger.getBoundingClientRect();
+  const gap = 6;
+  const viewportPad = 8;
+  const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPad;
+  const spaceAbove = rect.top - gap - viewportPad;
+  const preferBelow = spaceBelow >= 160 || spaceBelow >= spaceAbove;
+  const maxHeight = Math.max(
+    120,
+    Math.min(280, preferBelow ? spaceBelow : spaceAbove),
+  );
+  const top = preferBelow
+    ? rect.bottom + gap
+    : Math.max(viewportPad, rect.top - gap - maxHeight);
+  return {
+    top,
+    left: rect.left,
+    width: Math.max(rect.width, 160),
+    maxHeight,
+  };
+}
+
 /**
- * Custom listbox — native <select> menus close whenever React re-renders the
- * parent (live SSE on the job page), which made flavour picking unusable.
- * Menu is portaled so modal overflow cannot clip it.
+ * Custom listbox — native <select> menus close on live SSE re-renders.
+ * Menu is portaled above the hookah modal backdrop.
  */
 export function FlavourPicker({
   value,
@@ -33,7 +54,6 @@ export function FlavourPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<MenuPos | null>(null);
-  const [mounted, setMounted] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLUListElement>(null);
   const listId = useId();
@@ -42,43 +62,26 @@ export function FlavourPicker({
     ? options.find((f) => String(f.id) === value)
     : undefined;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  function openMenu() {
+    if (disabled || !rootRef.current) return;
+    setPos(measureMenuPos(rootRef.current));
+    setOpen(true);
+  }
+
+  function closeMenu() {
+    setOpen(false);
+  }
 
   useLayoutEffect(() => {
-    if (!open || !rootRef.current) {
-      setPos(null);
-      return;
-    }
+    if (!open || !rootRef.current) return;
 
     function place() {
-      const trigger = rootRef.current;
-      if (!trigger) return;
-      const rect = trigger.getBoundingClientRect();
-      const gap = 6;
-      const viewportPad = 8;
-      const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPad;
-      const spaceAbove = rect.top - gap - viewportPad;
-      const preferBelow = spaceBelow >= 160 || spaceBelow >= spaceAbove;
-      const maxHeight = Math.max(
-        120,
-        Math.min(280, preferBelow ? spaceBelow : spaceAbove),
-      );
-      const top = preferBelow
-        ? rect.bottom + gap
-        : Math.max(viewportPad, rect.top - gap - maxHeight);
-      setPos({
-        top,
-        left: rect.left,
-        width: rect.width,
-        maxHeight,
-      });
+      if (!rootRef.current) return;
+      setPos(measureMenuPos(rootRef.current));
     }
 
     place();
     window.addEventListener("resize", place);
-    // Capture scroll from modal body / page without closing.
     window.addEventListener("scroll", place, true);
     return () => {
       window.removeEventListener("resize", place);
@@ -89,39 +92,46 @@ export function FlavourPicker({
   useEffect(() => {
     if (!open) return;
 
+    // Defer so the opening click does not immediately count as "outside".
+    let active = false;
+    const arm = window.setTimeout(() => {
+      active = true;
+    }, 0);
+
     function onPointerDown(e: MouseEvent | TouchEvent) {
+      if (!active) return;
       const target = e.target as Node | null;
       if (!target) return;
       if (rootRef.current?.contains(target)) return;
       if (menuRef.current?.contains(target)) return;
-      setOpen(false);
+      closeMenu();
     }
 
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
-      setOpen(false);
+      closeMenu();
     }
 
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("touchstart", onPointerDown);
-    // Capture so the hookah modal Escape handler does not close the dialog.
+    document.addEventListener("mousedown", onPointerDown, true);
+    document.addEventListener("touchstart", onPointerDown, true);
     window.addEventListener("keydown", onKey, true);
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("touchstart", onPointerDown);
+      window.clearTimeout(arm);
+      document.removeEventListener("mousedown", onPointerDown, true);
+      document.removeEventListener("touchstart", onPointerDown, true);
       window.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
 
   function pick(next: string) {
-    setOpen(false);
+    closeMenu();
     if (next !== value) onChange(next);
   }
 
   const menu =
-    open && pos && mounted
+    typeof document !== "undefined" && open && pos
       ? createPortal(
           <ul
             ref={menuRef}
@@ -187,8 +197,12 @@ export function FlavourPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
-        onClick={() => {
-          if (!disabled) setOpen((v) => !v);
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (disabled) return;
+          if (open) closeMenu();
+          else openMenu();
         }}
       >
         <span className="flavour-picker__label">

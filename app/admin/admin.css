@@ -1634,7 +1634,8 @@ a.admin-user.active {
 
 .flavour-picker__menu--portal {
   position: fixed;
-  z-index: 80;
+  /* Above .hookah-modal-backdrop (10000) so the menu is visible. */
+  z-index: 10050;
 }
 
 .flavour-picker__option {

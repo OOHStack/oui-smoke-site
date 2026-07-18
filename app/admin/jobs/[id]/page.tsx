@@ -2859,14 +2859,14 @@ function HookahModal({
             <section className="hookah-modal__section">
               <h3 className="hookah-modal__section-title">Prep before it goes out</h3>
               <div className="hookah-card__fields">
-                <label className="hookah-field">
+                <div className="hookah-field">
                   <span>Flavour</span>
                   <FlavourPicker
                     value={flavourId}
                     flavours={flavours}
                     onChange={applyFlavourChoice}
                   />
-                </label>
+                </div>
                 <label className="hookah-field">
                   <span>Note for the send-out (optional)</span>
                   <input
@@ -3010,7 +3010,7 @@ function HookahModal({
                   : "Prep the new head at the station, then bring it back. Same flavour or a change — both are tracked."}
               </p>
               <div className="hookah-card__fields">
-                <label className="hookah-field">
+                <div className="hookah-field">
                   <span>Flavour on the new head</span>
                   <FlavourPicker
                     value={refillFlavourId}
@@ -3022,7 +3022,7 @@ function HookahModal({
                     )}
                     onChange={setRefillFlavourId}
                   />
-                </label>
+                </div>
                 <div className="hookah-modal__price-row">
                   <span>Charge</span>
                   <strong>
@@ -3202,14 +3202,14 @@ function HookahModal({
                 {a.returnNotes ? ` Note: ${a.returnNotes}` : ""}{" "}
                 Send it out again or park it in ready.
               </p>
-              <label className="hookah-field">
+              <div className="hookah-field">
                 <span>Flavour for next send-out</span>
                 <FlavourPicker
                   value={flavourId}
                   flavours={flavours}
                   onChange={applyFlavourChoice}
                 />
-              </label>
+              </div>
               <div className="hookah-modal__btn-stack">
                 <button
                   type="button"
