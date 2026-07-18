@@ -36,9 +36,10 @@ type ServiceCall = {
   paymentStatus?: string | null;
   checkoutUrl?: string | null;
   jobId: number;
-  assignmentId: number;
-  modelNumber: number;
+  assignmentId: number | null;
+  modelNumber: number | null;
   jobTitle: string;
+  requestedGuestPayTier?: "standard" | "unlimited" | null;
   acknowledgedBy?: string | null;
 };
 
@@ -261,7 +262,16 @@ export default function LiveFloorPage() {
                 <div className="job-card-head">
                   <div>
                     <span className="job-card-title">
-                      #{c.modelNumber} · {c.type}
+                      {c.modelNumber != null ? `#${c.modelNumber}` : "Floor"} ·{" "}
+                      {c.type === "order_unit"
+                        ? `Extra${
+                            c.requestedGuestPayTier === "unlimited"
+                              ? " · Unlimited"
+                              : c.requestedGuestPayTier === "standard"
+                                ? " · Standard"
+                                : ""
+                          }${c.flavourLabel ? ` · ${c.flavourLabel}` : ""}`
+                        : c.type}
                     </span>
                     <div className="list-meta">
                       {c.jobTitle}

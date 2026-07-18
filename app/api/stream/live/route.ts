@@ -87,8 +87,8 @@ async function loadLiveFloor() {
     })
     .from(serviceRequests)
     .innerJoin(jobs, eq(jobs.id, serviceRequests.jobId))
-    .innerJoin(jobHookahs, eq(jobHookahs.id, serviceRequests.jobHookahId))
-    .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
+    .leftJoin(jobHookahs, eq(jobHookahs.id, serviceRequests.jobHookahId))
+    .leftJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
     .where(inArray(serviceRequests.status, ["open", "acknowledged"]))
     .orderBy(desc(serviceRequests.createdAt))
     .limit(50);

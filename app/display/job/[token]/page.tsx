@@ -9,6 +9,9 @@ import type { JobDisplaySnapshot } from "@/lib/job-display-board";
 import "./job-display.css";
 
 const HERO_PHOTO = "/images/model-2-web.jpg";
+const CONFIRM_MS = 8_000;
+
+type OrderStep = "closed" | "tier" | "flavour" | "done";
 
 function playTakeoverChime() {
   try {
@@ -37,6 +40,10 @@ function playTakeoverChime() {
   }
 }
 
+function dollars(cents: number) {
+  return `$${Math.round(cents / 100)}`;
+}
+
 export default function JobDisplayPage() {
   const params = useParams<{ token: string }>();
   const token = params?.token ?? "";
@@ -44,6 +51,18 @@ export default function JobDisplayPage() {
   const [board, setBoard] = useState<JobDisplaySnapshot | null>(null);
   const [error, setError] = useState("");
   const lastTakeoverId = useRef<number | null>(null);
+
+  const [orderStep, setOrderStep] = useState<OrderStep>("closed");
+  const [tier, setTier] = useState<"standard" | "unlimited" | "">("");
+  const [flavourId, setFlavourId] = useState<number | null>(null);
+  const [guestLabel, setGuestLabel] = useState("");
+  const [orderBusy, setOrderBusy] = useState(false);
+  const [orderError, setOrderError] = useState("");
+  const [orderDone, setOrderDone] = useState<{
+    flavourLabel: string;
+    tier: string;
+    priceCents: number;
+  } | null>(null);
 
   useOuiMarkMotion(rootRef, Boolean(board) && !error);
 
@@ -88,8 +107,58 @@ export default function JobDisplayPage() {
     if (id != null && id !== lastTakeoverId.current) {
       lastTakeoverId.current = id;
       playTakeoverChime();
+      setOrderStep("closed");
     }
   }, [board?.takeover?.assignmentId]);
+
+  useEffect(() => {
+    if (orderStep !== "done") return;
+    const t = window.setTimeout(() => {
+      setOrderStep("closed");
+      setOrderDone(null);
+      setTier("");
+      setFlavourId(null);
+      setGuestLabel("");
+      setOrderError("");
+    }, CONFIRM_MS);
+    return () => window.clearTimeout(t);
+  }, [orderStep]);
+
+  async function submitOrder() {
+    if (!token || !tier || flavourId == null) return;
+    setOrderBusy(true);
+    setOrderError("");
+    try {
+      const res = await fetch(
+        `/api/display/job/${encodeURIComponent(token)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "order",
+            guestPayTier: tier,
+            flavourId,
+            guestLabel: guestLabel.trim() || undefined,
+          }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setOrderError(data.error ?? "Couldn’t place order");
+        return;
+      }
+      setOrderDone({
+        flavourLabel: data.flavourLabel ?? "Your flavour",
+        tier: data.tier ?? tier,
+        priceCents: data.priceCents ?? 0,
+      });
+      setOrderStep("done");
+    } catch {
+      setOrderError("Couldn’t reach Oui Smoke. Try again.");
+    } finally {
+      setOrderBusy(false);
+    }
+  }
 
   if (error) {
     return (
@@ -116,11 +185,16 @@ export default function JobDisplayPage() {
     : board.idle.showPrivatePackages
       ? board.idle.privatePackages
       : [];
+  const orderingOpen =
+    orderStep !== "closed" && orderStep !== "done" && !takeover;
+  const canOrder = board.ordering.enabled && !takeover;
 
   return (
     <div
       ref={rootRef}
-      className={`jdisplay${takeover ? " jdisplay--takeover" : ""}`}
+      className={`jdisplay${takeover ? " jdisplay--takeover" : ""}${
+        orderingOpen || orderStep === "done" ? " jdisplay--ordering" : ""
+      }`}
     >
       <div className="jdisplay__bg" aria-hidden />
       <div
@@ -156,11 +230,26 @@ export default function JobDisplayPage() {
 
         <div className="jdisplay__stage">
           <section
-            className={`jdisplay__idle${takeover ? " is-dimmed" : ""}`}
-            aria-hidden={Boolean(takeover)}
+            className={`jdisplay__idle${
+              takeover || orderingOpen || orderStep === "done" ? " is-dimmed" : ""
+            }`}
+            aria-hidden={Boolean(takeover || orderingOpen || orderStep === "done")}
           >
             <h2 className="jdisplay__headline">{board.idle.headline}</h2>
             <p className="jdisplay__lede">{board.idle.lede}</p>
+
+            {canOrder ? (
+              <button
+                type="button"
+                className="jdisplay__order-cta"
+                onClick={() => {
+                  setOrderError("");
+                  setOrderStep("tier");
+                }}
+              >
+                Order a hookah
+              </button>
+            ) : null}
 
             <div className="jdisplay__panels">
               <div>
@@ -214,6 +303,139 @@ export default function JobDisplayPage() {
                 </div>
               )}
             </div>
+          </section>
+
+          <section
+            className={`jdisplay__order${orderingOpen ? " is-on" : ""}`}
+            aria-hidden={!orderingOpen}
+          >
+            {orderStep === "tier" ? (
+              <div className="jdisplay__order-panel">
+                <p className="jdisplay__cfd-kicker">Step 1</p>
+                <h2 className="jdisplay__headline">Choose your plan</h2>
+                <p className="jdisplay__lede">
+                  Pay when staff bring the terminal. Prices before tax.
+                </p>
+                <div className="jdisplay__order-tiers">
+                  <button
+                    type="button"
+                    className="jdisplay__order-choice"
+                    onClick={() => {
+                      setTier("standard");
+                      setOrderStep("flavour");
+                    }}
+                  >
+                    <strong>Standard</strong>
+                    <span className="jdisplay__order-choice-price">
+                      {dollars(board.ordering.standardCents)}
+                    </span>
+                    <span>Refills extra</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="jdisplay__order-choice"
+                    onClick={() => {
+                      setTier("unlimited");
+                      setOrderStep("flavour");
+                    }}
+                  >
+                    <strong>Unlimited</strong>
+                    <span className="jdisplay__order-choice-price">
+                      {dollars(board.ordering.unlimitedCents)}
+                    </span>
+                    <span>Refills included</span>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="jdisplay__order-back"
+                  onClick={() => setOrderStep("closed")}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : null}
+
+            {orderStep === "flavour" ? (
+              <div className="jdisplay__order-panel">
+                <p className="jdisplay__cfd-kicker">Step 2 · {tier}</p>
+                <h2 className="jdisplay__headline">Pick a flavour</h2>
+                <div className="jdisplay__order-flavours">
+                  {board.flavours.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={`jdisplay__order-flavour${
+                        flavourId === f.id ? " is-selected" : ""
+                      }`}
+                      onClick={() => setFlavourId(f.id)}
+                    >
+                      <strong>{f.name}</strong>
+                      {f.description ? <span>{f.description}</span> : null}
+                    </button>
+                  ))}
+                </div>
+                <label className="jdisplay__order-label">
+                  Name or table{" "}
+                  <span className="jdisplay__order-optional">(optional)</span>
+                  <input
+                    type="text"
+                    value={guestLabel}
+                    maxLength={40}
+                    placeholder="e.g. Table 4 · Maya"
+                    onChange={(e) => setGuestLabel(e.target.value)}
+                    autoComplete="off"
+                  />
+                </label>
+                {orderError ? (
+                  <p className="jdisplay__order-error">{orderError}</p>
+                ) : null}
+                <div className="jdisplay__order-actions">
+                  <button
+                    type="button"
+                    className="jdisplay__order-back"
+                    onClick={() => {
+                      setFlavourId(null);
+                      setOrderStep("tier");
+                    }}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="jdisplay__order-cta"
+                    disabled={flavourId == null || orderBusy}
+                    onClick={() => void submitOrder()}
+                  >
+                    {orderBusy ? "Sending…" : "Send order"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section
+            className={`jdisplay__order-done${orderStep === "done" ? " is-on" : ""}`}
+            aria-live="polite"
+            aria-hidden={orderStep !== "done"}
+          >
+            {orderDone ? (
+              <div>
+                <p className="jdisplay__cfd-kicker">Order received</p>
+                <h2 className="jdisplay__headline">We&apos;re on it</h2>
+                <p className="jdisplay__cfd-flavour">
+                  {orderDone.tier === "unlimited" ? "Unlimited" : "Standard"} ·{" "}
+                  {orderDone.flavourLabel}
+                </p>
+                <p className="jdisplay__cfd-hint">
+                  Staff will pack your flavour and bring the terminal
+                  {orderDone.priceCents > 0
+                    ? ` · ${dollars(orderDone.priceCents)} before tax`
+                    : ""}
+                  . When your hookah goes out, this screen will show your QR.
+                </p>
+              </div>
+            ) : null}
           </section>
 
           <section

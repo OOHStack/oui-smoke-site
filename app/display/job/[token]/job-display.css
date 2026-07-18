@@ -201,6 +201,188 @@
   line-height: 1.4;
 }
 
+.jdisplay__order-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1.1rem;
+  min-height: 3rem;
+  padding: 0.7rem 1.4rem;
+  border: 0;
+  border-radius: 4px;
+  background: var(--ink);
+  color: #111;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.jdisplay__order-cta:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.jdisplay__order,
+.jdisplay__order-done {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(14px);
+  pointer-events: none;
+  transition:
+    opacity 0.45s var(--ease),
+    transform 0.45s var(--ease);
+}
+
+.jdisplay__order.is-on,
+.jdisplay__order-done.is-on {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.jdisplay__order-panel {
+  max-width: 920px;
+}
+
+.jdisplay__order-tiers {
+  margin-top: 1.25rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+.jdisplay__order-choice {
+  display: grid;
+  gap: 0.25rem;
+  text-align: left;
+  padding: 1.1rem 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: rgba(10, 9, 8, 0.45);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.jdisplay__order-choice:hover,
+.jdisplay__order-choice:focus-visible {
+  border-color: rgba(247, 244, 239, 0.35);
+  background: rgba(10, 9, 8, 0.62);
+}
+
+.jdisplay__order-choice strong {
+  font-size: 1.15rem;
+}
+
+.jdisplay__order-choice-price {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 2.2rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.jdisplay__order-choice span:last-child {
+  color: var(--ink-mute);
+  font-size: 0.88rem;
+}
+
+.jdisplay__order-flavours {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.55rem;
+  max-height: min(38dvh, 320px);
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.jdisplay__order-flavour {
+  display: grid;
+  gap: 0.2rem;
+  text-align: left;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: rgba(10, 9, 8, 0.4);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.jdisplay__order-flavour.is-selected,
+.jdisplay__order-flavour:hover {
+  border-color: var(--accent);
+}
+
+.jdisplay__order-flavour span {
+  color: var(--ink-mute);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.jdisplay__order-label {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  max-width: 28rem;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.jdisplay__order-optional {
+  color: var(--ink-mute);
+  font-weight: 400;
+}
+
+.jdisplay__order-label input {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: rgba(10, 9, 8, 0.55);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.jdisplay__order-label input::placeholder {
+  color: var(--ink-mute);
+}
+
+.jdisplay__order-actions {
+  margin-top: 1.1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.jdisplay__order-back {
+  border: 0;
+  background: transparent;
+  color: var(--ink-mute);
+  font: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0.5rem 0.25rem;
+}
+
+.jdisplay__order-error {
+  margin: 0.75rem 0 0;
+  color: #f0a29c;
+  font-size: 0.95rem;
+}
+
 .jdisplay__panels {
   margin-top: 1.2rem;
   display: grid;
@@ -438,7 +620,8 @@
   }
 
   .jdisplay__panels,
-  .jdisplay__cfd-grid {
+  .jdisplay__cfd-grid,
+  .jdisplay__order-tiers {
     grid-template-columns: 1fr;
   }
 

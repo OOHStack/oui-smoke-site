@@ -93,17 +93,19 @@ export async function GET(_request: Request, context: RouteContext) {
   );
 
   const callByAssignment = new Map(
-    activeCalls.map((c) => {
-      const pay = payMap.get(c.id);
-      return [
-        c.jobHookahId,
-        {
-          ...c,
-          paymentStatus: pay?.paymentStatus ?? null,
-          checkoutUrl: pay?.checkoutUrl ?? null,
-        },
-      ] as const;
-    }),
+    activeCalls
+      .filter((c) => c.jobHookahId != null)
+      .map((c) => {
+        const pay = payMap.get(c.id);
+        return [
+          c.jobHookahId as number,
+          {
+            ...c,
+            paymentStatus: pay?.paymentStatus ?? null,
+            checkoutUrl: pay?.checkoutUrl ?? null,
+          },
+        ] as const;
+      }),
   );
 
   const assignmentsWithCalls = assignments.map((a) => ({

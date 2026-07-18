@@ -11,6 +11,7 @@ import {
   paymentModelLabel,
   type PaymentModel,
 } from "@/lib/payment-model";
+import { guestPayTierUnitCents } from "@/lib/ops/guest-pay";
 import {
   getPricingForJob,
   hstPercentLabel,
@@ -59,6 +60,12 @@ export type JobDisplaySnapshot = {
   floor: {
     outCount: number;
     stagedCount: number;
+  };
+  /** On-site only: guests can place a floor order from this tablet. */
+  ordering: {
+    enabled: boolean;
+    standardCents: number;
+    unlimitedCents: number;
   };
   takeover: JobDisplayTakeover | null;
   serverTime: string;
@@ -146,7 +153,7 @@ function idleCopy(
   if (mode === "onsite") {
     return {
       headline: "Hookah on the floor",
-      lede: "Ask staff for a unit — when yours goes out, scan the code for coals, refills, and help.",
+      lede: "Tap Order to pick a plan and flavour — staff will pack it and bring your QR when it goes out.",
     };
   }
   if (mode === "comp") {
@@ -282,6 +289,15 @@ export async function loadJobDisplayBoard(
       description: (f.description ?? "").trim(),
     })),
     floor: { outCount, stagedCount },
+    ordering: {
+      enabled:
+        mode === "onsite" &&
+        job.status !== "completed" &&
+        job.status !== "cancelled" &&
+        job.status !== "draft",
+      standardCents: guestPayTierUnitCents("standard", pricing),
+      unlimitedCents: guestPayTierUnitCents("unlimited", pricing),
+    },
     takeover,
     serverTime: new Date(now).toISOString(),
   };

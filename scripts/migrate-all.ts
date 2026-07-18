@@ -396,6 +396,10 @@ async function main() {
   await sql`ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS prep_completed_at timestamptz`;
   console.log("✓ prep completion");
 
+  // Floor tablet first orders: service request before a unit is assigned
+  await sql`ALTER TABLE service_requests ALTER COLUMN job_hookah_id DROP NOT NULL`;
+  console.log("✓ service_requests.job_hookah_id nullable");
+
   // --- site media (marketing assets on Blob) ---
   await sql`
     CREATE TABLE IF NOT EXISTS site_media (

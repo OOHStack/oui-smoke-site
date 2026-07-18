@@ -337,8 +337,8 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
         flavourComponents: flavours.components,
       })
       .from(serviceRequests)
-      .innerJoin(jobHookahs, eq(jobHookahs.id, serviceRequests.jobHookahId))
-      .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
+      .leftJoin(jobHookahs, eq(jobHookahs.id, serviceRequests.jobHookahId))
+      .leftJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
       .leftJoin(flavours, eq(flavours.id, serviceRequests.flavourId))
       .where(
         and(
@@ -373,7 +373,7 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
         jobTitle: job.title,
         clientName: job.clientName,
         location: job.location,
-        modelNumber: row.modelNumber,
+        modelNumber: row.modelNumber ?? null,
         flavourName,
         flavourComponents: row.flavourComponents?.trim() || null,
         hasFlavour: true,
@@ -389,7 +389,7 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
         packedAt: row.prepCompletedAt
           ? new Date(row.prepCompletedAt).toISOString()
           : null,
-        assignmentId: row.assignmentId,
+        assignmentId: row.assignmentId ?? null,
         serviceRequestId: row.id,
       };
 

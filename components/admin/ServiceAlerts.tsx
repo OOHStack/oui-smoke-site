@@ -25,8 +25,8 @@ type ServiceRequestRow = {
   jobTitle: string;
   clientName: string;
   location: string | null;
-  assignmentId: number;
-  modelNumber: number;
+  assignmentId: number | null;
+  modelNumber: number | null;
 };
 
 function playChime() {
@@ -304,7 +304,8 @@ export default function ServiceAlerts() {
                 <li key={r.id} className={`service-alerts__item service-alerts__item--${r.status}`}>
                   <div>
                     <div className="service-alerts__title">
-                      #{r.modelNumber} · {typeLabel(r.type)}
+                      {r.modelNumber != null ? `#${r.modelNumber}` : "Floor"} ·{" "}
+                      {typeLabel(r.type)}
                       {r.type === "refill" && r.flavourLabel
                         ? `: ${r.flavourLabel}`
                         : ""}
@@ -349,7 +350,9 @@ export default function ServiceAlerts() {
                     <div className="list-meta">
                       {r.jobTitle} · {r.clientName}
                       {r.type === "order_unit"
-                        ? " · Stage new unit on job, then Done"
+                        ? r.modelNumber == null
+                          ? " · Floor tablet · stage a unit on the job, then Done"
+                          : " · Stage new unit on job, then Done"
                         : ""}
                       {r.message ? ` · ${r.message}` : ""}
                     </div>

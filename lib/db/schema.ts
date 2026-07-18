@@ -184,9 +184,10 @@ export const serviceRequests = pgTable("service_requests", {
   jobId: integer("job_id")
     .notNull()
     .references(() => jobs.id, { onDelete: "cascade" }),
-  jobHookahId: integer("job_hookah_id")
-    .notNull()
-    .references(() => jobHookahs.id, { onDelete: "cascade" }),
+  /** Null for floor-tablet first orders (no unit assigned yet). */
+  jobHookahId: integer("job_hookah_id").references(() => jobHookahs.id, {
+    onDelete: "cascade",
+  }),
   type: serviceRequestTypeEnum("type").notNull(),
   message: text("message").default(""),
   flavourId: integer("flavour_id").references(() => flavours.id),
