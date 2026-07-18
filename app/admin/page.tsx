@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, count, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, count, eq, inArray, lt } from "drizzle-orm";
 import { format } from "date-fns";
 import { getDb } from "@/lib/db";
 import { jobs, jobHookahs, hookahs, serviceRequests } from "@/lib/db/schema";
@@ -85,38 +85,6 @@ export default async function AdminDashboardPage() {
     .where(inArray(serviceRequests.status, ["open", "acknowledged"]))
     .orderBy(serviceRequests.createdAt)
     .limit(12);
-
-  let recentGuestFeedback: Array<{
-    assignmentId: number;
-    jobId: number;
-    modelNumber: number;
-    guestRating: number | null;
-    guestComment: string | null;
-    guestFeedbackAt: Date | null;
-    jobTitle: string;
-    clientName: string;
-  }> = [];
-  try {
-    recentGuestFeedback = await db
-      .select({
-        assignmentId: jobHookahs.id,
-        jobId: jobHookahs.jobId,
-        modelNumber: hookahs.modelNumber,
-        guestRating: jobHookahs.guestRating,
-        guestComment: jobHookahs.guestComment,
-        guestFeedbackAt: jobHookahs.guestFeedbackAt,
-        jobTitle: jobs.title,
-        clientName: jobs.clientName,
-      })
-      .from(jobHookahs)
-      .innerJoin(jobs, eq(jobs.id, jobHookahs.jobId))
-      .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
-      .where(sql`${jobHookahs.guestFeedbackAt} is not null`)
-      .orderBy(sql`${jobHookahs.guestFeedbackAt} desc`)
-      .limit(8);
-  } catch {
-    recentGuestFeedback = [];
-  }
 
   const active = Number(activeRow?.n ?? 0);
   const out = Number(outRow?.n ?? 0);
@@ -268,38 +236,6 @@ export default async function AdminDashboardPage() {
           )}
         </section>
       </div>
-
-      <section className="dash-rail dash-rail--feedback">
-        <div className="dash-rail__head">
-          <h2 className="dash-rail__title">Guest feedback</h2>
-          <span className="dash-rail__count">{recentGuestFeedback.length}</span>
-        </div>
-        {recentGuestFeedback.length === 0 ? (
-          <p className="dash-empty">No guest ratings yet — they’ll appear when QR sessions wrap.</p>
-        ) : (
-          <ul className="dash-feed">
-            {recentGuestFeedback.map((row) => (
-              <li key={row.assignmentId}>
-                <Link href={`/admin/jobs/${row.jobId}`} className="dash-feed__row">
-                  <div>
-                    <div className="dash-feed__title">
-                      {row.guestRating}/5 · #{row.modelNumber} · {row.jobTitle}
-                    </div>
-                    <div className="dash-feed__meta">
-                      {row.clientName}
-                      {row.guestComment ? ` · “${row.guestComment}”` : ""}
-                      {row.guestFeedbackAt
-                        ? ` · ${format(new Date(row.guestFeedbackAt), "MMM d, h:mm a")}`
-                        : ""}
-                    </div>
-                  </div>
-                  <span className="dash-feed__go">Open</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </DashboardMotion>
   );
 }

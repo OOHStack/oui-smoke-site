@@ -171,6 +171,44 @@ export async function GET() {
     })
     .from(jobPhotos);
 
+  let recentGuestFeedback: Array<{
+    assignmentId: number;
+    jobId: number;
+    modelNumber: number;
+    guestRating: number | null;
+    guestComment: string | null;
+    guestFeedbackAt: string | null;
+    jobTitle: string;
+    clientName: string;
+  }> = [];
+  try {
+    const feedbackRows = await db
+      .select({
+        assignmentId: jobHookahs.id,
+        jobId: jobHookahs.jobId,
+        modelNumber: hookahs.modelNumber,
+        guestRating: jobHookahs.guestRating,
+        guestComment: jobHookahs.guestComment,
+        guestFeedbackAt: jobHookahs.guestFeedbackAt,
+        jobTitle: jobs.title,
+        clientName: jobs.clientName,
+      })
+      .from(jobHookahs)
+      .innerJoin(jobs, eq(jobs.id, jobHookahs.jobId))
+      .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
+      .where(isNotNull(jobHookahs.guestFeedbackAt))
+      .orderBy(desc(jobHookahs.guestFeedbackAt))
+      .limit(20);
+    recentGuestFeedback = feedbackRows.map((row) => ({
+      ...row,
+      guestFeedbackAt: row.guestFeedbackAt
+        ? new Date(row.guestFeedbackAt).toISOString()
+        : null,
+    }));
+  } catch {
+    recentGuestFeedback = [];
+  }
+
   return NextResponse.json({
     jobsByStatus,
     jobsCompleted30d: Number(completed30d?.count ?? 0),
@@ -197,5 +235,6 @@ export async function GET() {
     ugcApproved: Number(ugcRow?.approved ?? 0),
     ugcFeatured: Number(ugcRow?.featured ?? 0),
     ugcTotal: Number(ugcRow?.total ?? 0),
+    recentGuestFeedback,
   });
 }

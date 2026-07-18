@@ -3675,15 +3675,6 @@ button.fleet-tile {
   color: var(--muted);
 }
 
-.dash-rail--feedback {
-  width: 100%;
-  min-width: 0;
-  padding: 0.85rem 1rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: var(--panel);
-}
-
 .guest-feedback-list {
   margin: 0 0 1rem;
   padding: 0.75rem 0.85rem;

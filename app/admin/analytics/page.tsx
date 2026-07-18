@@ -1,6 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+
+type GuestFeedbackRow = {
+  assignmentId: number;
+  jobId: number;
+  modelNumber: number;
+  guestRating: number | null;
+  guestComment: string | null;
+  guestFeedbackAt: string | null;
+  jobTitle: string;
+  clientName: string;
+};
 
 type Analytics = {
   jobsByStatus: Record<string, number>;
@@ -24,7 +36,22 @@ type Analytics = {
   ugcApproved?: number;
   ugcFeatured?: number;
   ugcTotal?: number;
+  recentGuestFeedback?: GuestFeedbackRow[];
 };
+
+function formatFeedbackWhen(iso: string | null) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
 
 function formatMoney(cents: number) {
   return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -182,6 +209,37 @@ export default function AnalyticsPage() {
               <li key={f.name} className="list-item">
                 <span>{f.name}</span>
                 <strong>{f.timesUsed}</strong>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="panel" style={{ marginTop: "0.75rem" }}>
+        <h2 className="panel-title">Guest feedback</h2>
+        {(data.recentGuestFeedback ?? []).length === 0 ? (
+          <p className="empty">
+            No guest ratings yet — they appear when QR sessions wrap.
+          </p>
+        ) : (
+          <ul className="list">
+            {(data.recentGuestFeedback ?? []).map((row) => (
+              <li key={row.assignmentId} className="list-item">
+                <div>
+                  <div>
+                    {row.guestRating}/5 · #{row.modelNumber} · {row.jobTitle}
+                  </div>
+                  <div className="list-meta">
+                    {row.clientName}
+                    {row.guestComment ? ` · “${row.guestComment}”` : ""}
+                    {row.guestFeedbackAt
+                      ? ` · ${formatFeedbackWhen(row.guestFeedbackAt)}`
+                      : ""}
+                  </div>
+                </div>
+                <Link href={`/admin/jobs/${row.jobId}`} className="btn btn-sm">
+                  Open
+                </Link>
               </li>
             ))}
           </ul>
