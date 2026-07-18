@@ -36,6 +36,92 @@ function ageLabel(iso: string, now: number) {
   return `${h}h ${mins % 60}m`;
 }
 
+function rebuildFromLists(
+  prev: PrepQueueSnapshot,
+  items: PrepItem[],
+  packed: PrepItem[],
+): PrepQueueSnapshot {
+  const tallyMap = new Map<string, number>();
+  for (const row of items) {
+    tallyMap.set(row.flavourName, (tallyMap.get(row.flavourName) ?? 0) + 1);
+  }
+  const tallies = [...tallyMap.entries()]
+    .map(([flavourName, count]) => ({ flavourName, count }))
+    .sort(
+      (a, b) =>
+        b.count - a.count || a.flavourName.localeCompare(b.flavourName),
+    );
+
+  const packedTallyMap = new Map<string, number>();
+  for (const row of packed) {
+    packedTallyMap.set(
+      row.flavourName,
+      (packedTallyMap.get(row.flavourName) ?? 0) + 1,
+    );
+  }
+  const packedTallies = [...packedTallyMap.entries()]
+    .map(([flavourName, count]) => ({ flavourName, count }))
+    .sort(
+      (a, b) =>
+        b.count - a.count || a.flavourName.localeCompare(b.flavourName),
+    );
+
+  const groupMap = new Map<string, PrepItem[]>();
+  for (const row of packed) {
+    const list = groupMap.get(row.flavourName) ?? [];
+    list.push(row);
+    groupMap.set(row.flavourName, list);
+  }
+  const packedByFlavour = [...groupMap.entries()]
+    .map(([flavourName, groupItems]) => ({
+      flavourName,
+      flavourComponents: groupItems[0]?.flavourComponents ?? null,
+      count: groupItems.length,
+      items: [...groupItems].sort((a, b) => {
+        const aT = a.packedAt ? new Date(a.packedAt).getTime() : 0;
+        const bT = b.packedAt ? new Date(b.packedAt).getTime() : 0;
+        return bT - aT;
+      }),
+    }))
+    .sort(
+      (a, b) =>
+        b.count - a.count || a.flavourName.localeCompare(b.flavourName),
+    );
+
+  return {
+    ...prev,
+    items,
+    tallies,
+    packed,
+    packedTallies,
+    packedByFlavour,
+    counts: {
+      total: items.length,
+      newUnits: items.filter((i) => i.kind === "new_unit").length,
+      refills: items.filter((i) => i.kind === "refill").length,
+      extras: items.filter((i) => i.kind === "order_unit").length,
+      needsFlavour: 0,
+      packed: packed.length,
+    },
+  };
+}
+
+function normalizeSnapshot(payload: PrepQueueSnapshot): PrepQueueSnapshot {
+  const packed = payload.packed ?? [];
+  const packedTallies = payload.packedTallies ?? [];
+  const packedByFlavour = payload.packedByFlavour ?? [];
+  return {
+    ...payload,
+    packed,
+    packedTallies,
+    packedByFlavour,
+    counts: {
+      ...payload.counts,
+      packed: payload.counts?.packed ?? packed.length,
+    },
+  };
+}
+
 export default function PrepKitchenPage() {
   const params = useParams();
   const token = params.token as string;
@@ -62,7 +148,8 @@ export default function PrepKitchenPage() {
         return;
       }
 
-      const items = payload.items ?? [];
+      const snap = normalizeSnapshot(payload);
+      const items = snap.items ?? [];
       if (primed.current) {
         for (const item of items) {
           if (!knownIds.current.has(item.id)) {
@@ -73,7 +160,7 @@ export default function PrepKitchenPage() {
       }
       knownIds.current = new Set(items.map((i) => i.id));
       primed.current = true;
-      setData(payload);
+      setData(snap);
       setError("");
       setLoading(false);
     },
@@ -84,32 +171,15 @@ export default function PrepKitchenPage() {
     setBusyId(item.id);
     setActionError("");
 
-    // Optimistic remove
+    const packedAt = new Date().toISOString();
     setData((prev) => {
       if (!prev) return prev;
       const items = prev.items.filter((i) => i.id !== item.id);
-      const tallyMap = new Map<string, number>();
-      for (const row of items) {
-        tallyMap.set(row.flavourName, (tallyMap.get(row.flavourName) ?? 0) + 1);
-      }
-      const tallies = [...tallyMap.entries()]
-        .map(([flavourName, count]) => ({ flavourName, count }))
-        .sort(
-          (a, b) =>
-            b.count - a.count || a.flavourName.localeCompare(b.flavourName),
-        );
-      return {
-        ...prev,
-        items,
-        tallies,
-        counts: {
-          total: items.length,
-          newUnits: items.filter((i) => i.kind === "new_unit").length,
-          refills: items.filter((i) => i.kind === "refill").length,
-          extras: items.filter((i) => i.kind === "order_unit").length,
-          needsFlavour: 0,
-        },
-      };
+      const packed = [
+        { ...item, packedAt, status: item.status },
+        ...prev.packed.filter((i) => i.id !== item.id),
+      ];
+      return rebuildFromLists(prev, items, packed);
     });
     knownIds.current.delete(item.id);
 
@@ -125,12 +195,12 @@ export default function PrepKitchenPage() {
       };
       if (!res.ok) {
         setActionError(body.error || "Couldn’t mark complete");
-        // SSE will restore the card shortly
         return;
       }
       if (body.items) {
-        knownIds.current = new Set(body.items.map((i) => i.id));
-        setData(body);
+        const snap = normalizeSnapshot(body);
+        knownIds.current = new Set(snap.items.map((i) => i.id));
+        setData(snap);
       }
     } catch {
       setActionError("Network error — try again");
@@ -159,7 +229,7 @@ export default function PrepKitchenPage() {
     );
   }
 
-  const { items, tallies, counts } = data;
+  const { items, tallies, packedByFlavour, packedTallies, counts } = data;
 
   return (
     <div className="prep">
@@ -169,19 +239,22 @@ export default function PrepKitchenPage() {
             <p className="prep__kicker">Oui Smoke</p>
             <h1 className="prep__title">Prep board</h1>
             <p className="prep__muted">
-              Pack heads for Ready-to-send · tap Done when flavour is packed
+              Pack heads · tap Done · packed stays listed by flavour
             </p>
           </div>
           <div className="prep__counts" aria-live="polite">
             <strong>{counts.total}</strong>
-            <span>in queue</span>
+            <span>to pack</span>
+            {counts.packed > 0 ? (
+              <span className="prep__counts-sub">{counts.packed} packed</span>
+            ) : null}
           </div>
         </header>
 
         <p className="prep__workflow">
           <strong>Workflow:</strong> Stage units → set flavour on the job → pack
-          here → mark Done → staff send out. Only flavoured orders appear.
-          Refills and extra hookahs show when guests order.
+          here → mark Done → staff send out. Packed heads stay below by flavour
+          for the night.
         </p>
 
         {actionError ? (
@@ -190,90 +263,167 @@ export default function PrepKitchenPage() {
           </p>
         ) : null}
 
-        {tallies.length > 0 ? (
-          <section className="prep__tallies" aria-label="Flavour totals">
-            {tallies.map((t) => (
-              <div key={t.flavourName} className="prep__tally">
-                <strong>{t.count}×</strong>
-                <span>{t.flavourName}</span>
-              </div>
-            ))}
-          </section>
-        ) : null}
-
-        {items.length === 0 ? (
-          <div className="prep__empty">
-            <p>You’re clear</p>
-            <span>
-              When staff stage a unit and set its flavour — or a guest orders a
-              refill — it shows up here.
-            </span>
+        <section className="prep__section" aria-label="To pack">
+          <div className="prep__section-head">
+            <h2 className="prep__section-title">To pack</h2>
+            <span className="prep__section-count">{counts.total}</span>
           </div>
-        ) : (
-          <ul className="prep__list">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className={`prep__card prep__card--${item.kind}`}
-              >
-                <div className="prep__card-top">
-                  <span className="prep__kind">{prepKindLabel(item.kind)}</span>
-                  <span className="prep__age">
-                    {ageLabel(item.createdAt, now)}
-                  </span>
+
+          {tallies.length > 0 ? (
+            <div className="prep__tallies" aria-label="Flavour totals to pack">
+              {tallies.map((t) => (
+                <div key={t.flavourName} className="prep__tally">
+                  <strong>{t.count}×</strong>
+                  <span>{t.flavourName}</span>
                 </div>
-                <h2 className="prep__flavour">{item.flavourName}</h2>
-                {item.flavourComponents ? (
-                  <p className="prep__recipe">{item.flavourComponents}</p>
-                ) : null}
-                <div className="prep__meta">
-                  {item.modelNumber != null ? (
-                    <span>#{item.modelNumber}</span>
-                  ) : null}
-                  {item.tier ? (
-                    <span className="prep__tier">{item.tier}</span>
-                  ) : null}
-                  <span>{item.jobTitle}</span>
-                  {item.location ? <span>{item.location}</span> : null}
-                </div>
-                {item.kind !== "new_unit" && item.paymentStatus ? (
-                  <p className="prep__pay">
-                    Pay · {item.paymentStatus}
-                    {item.payPreference ? ` · ${item.payPreference}` : ""}
-                  </p>
-                ) : null}
-                {item.kind === "order_unit" ? (
-                  <p className="prep__hint">
-                    Extra hookah — pack this flavour, then staff stage &amp;
-                    send out
-                  </p>
-                ) : item.kind === "new_unit" ? (
-                  <p className="prep__hint">
-                    Staged · pack this head, then staff send out
-                  </p>
-                ) : (
-                  <p className="prep__hint">
-                    Refill for floor unit
-                    {item.modelNumber != null ? ` #${item.modelNumber}` : ""}
-                  </p>
-                )}
-                <button
-                  type="button"
-                  className="prep__done"
-                  disabled={busyId === item.id}
-                  onClick={() => void markComplete(item)}
+              ))}
+            </div>
+          ) : null}
+
+          {items.length === 0 ? (
+            <div className="prep__empty">
+              <p>You’re clear</p>
+              <span>
+                When staff stage a unit and set its flavour — or a guest orders a
+                refill — it shows up here.
+              </span>
+            </div>
+          ) : (
+            <ul className="prep__list">
+              {items.map((item) => (
+                <li
+                  key={item.id}
+                  className={`prep__card prep__card--${item.kind}`}
                 >
-                  {busyId === item.id ? "Saving…" : "Done · flavour packed"}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <div className="prep__card-top">
+                    <span className="prep__kind">{prepKindLabel(item.kind)}</span>
+                    <span className="prep__age">
+                      {ageLabel(item.createdAt, now)}
+                    </span>
+                  </div>
+                  <h3 className="prep__flavour">{item.flavourName}</h3>
+                  {item.flavourComponents ? (
+                    <p className="prep__recipe">{item.flavourComponents}</p>
+                  ) : null}
+                  <div className="prep__meta">
+                    {item.modelNumber != null ? (
+                      <span>#{item.modelNumber}</span>
+                    ) : null}
+                    {item.tier ? (
+                      <span className="prep__tier">{item.tier}</span>
+                    ) : null}
+                    <span>{item.jobTitle}</span>
+                    {item.location ? <span>{item.location}</span> : null}
+                  </div>
+                  {item.kind !== "new_unit" && item.paymentStatus ? (
+                    <p className="prep__pay">
+                      Pay · {item.paymentStatus}
+                      {item.payPreference ? ` · ${item.payPreference}` : ""}
+                    </p>
+                  ) : null}
+                  {item.kind === "order_unit" ? (
+                    <p className="prep__hint">
+                      Extra hookah — pack this flavour, then staff stage &amp;
+                      send out
+                    </p>
+                  ) : item.kind === "new_unit" ? (
+                    <p className="prep__hint">
+                      Staged · pack this head, then staff send out
+                    </p>
+                  ) : (
+                    <p className="prep__hint">
+                      Refill for floor unit
+                      {item.modelNumber != null ? ` #${item.modelNumber}` : ""}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="prep__done"
+                    disabled={busyId === item.id}
+                    onClick={() => void markComplete(item)}
+                  >
+                    {busyId === item.id ? "Saving…" : "Done · flavour packed"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="prep__section prep__section--packed" aria-label="Packed">
+          <div className="prep__section-head">
+            <h2 className="prep__section-title">Packed</h2>
+            <span className="prep__section-count">{counts.packed}</span>
+          </div>
+
+          {packedTallies.length > 0 ? (
+            <div className="prep__tallies prep__tallies--packed" aria-label="Packed by flavour">
+              {packedTallies.map((t) => (
+                <div key={t.flavourName} className="prep__tally prep__tally--packed">
+                  <strong>{t.count}×</strong>
+                  <span>{t.flavourName}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {packedByFlavour.length === 0 ? (
+            <p className="prep__packed-empty">
+              Packed flavours show here by count for the night.
+            </p>
+          ) : (
+            <ul className="prep__packed-groups">
+              {packedByFlavour.map((group) => (
+                <li key={group.flavourName} className="prep__packed-group">
+                  <div className="prep__packed-group-head">
+                    <h3 className="prep__packed-flavour">
+                      <strong>{group.count}×</strong> {group.flavourName}
+                    </h3>
+                    {group.flavourComponents ? (
+                      <p className="prep__recipe">{group.flavourComponents}</p>
+                    ) : null}
+                  </div>
+                  <ul className="prep__packed-items">
+                    {group.items.map((item) => (
+                      <li key={item.id} className="prep__packed-item">
+                        <span className="prep__packed-kind">
+                          {prepKindLabel(item.kind)}
+                        </span>
+                        {item.modelNumber != null ? (
+                          <span>#{item.modelNumber}</span>
+                        ) : null}
+                        <span className="prep__packed-job">{item.jobTitle}</span>
+                        <span className="prep__age">
+                          {item.packedAt
+                            ? ageLabel(item.packedAt, now)
+                            : ageLabel(item.createdAt, now)}
+                        </span>
+                        {item.status === "out" ? (
+                          <span className="prep__packed-status">On floor</span>
+                        ) : item.status === "resolved" ? (
+                          <span className="prep__packed-status">Delivered</span>
+                        ) : item.status === "staged" ? (
+                          <span className="prep__packed-status prep__packed-status--wait">
+                            Ready to send
+                          </span>
+                        ) : (
+                          <span className="prep__packed-status prep__packed-status--wait">
+                            Awaiting floor
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         <footer className="prep__foot">
           <span>
             {counts.newUnits} new · {counts.refills} refill · {counts.extras}{" "}
-            extra
+            extra · {counts.packed} packed
           </span>
           <span>Keep this page open</span>
         </footer>

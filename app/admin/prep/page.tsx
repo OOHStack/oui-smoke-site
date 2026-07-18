@@ -68,6 +68,8 @@ export default function AdminPrepPage() {
 
   const items = queue?.items ?? [];
   const tallies = queue?.tallies ?? [];
+  const packedTallies = queue?.packedTallies ?? [];
+  const packedByFlavour = queue?.packedByFlavour ?? [];
   const counts = queue?.counts;
 
   return (
@@ -158,13 +160,14 @@ export default function AdminPrepPage() {
           </h2>
           <span className="list-meta">
             {counts
-              ? `${counts.total} in queue · ${counts.newUnits} new · ${counts.refills} refill · ${counts.extras} extra`
+              ? `${counts.total} to pack · ${counts.packed ?? 0} packed · ${counts.newUnits} new · ${counts.refills} refill · ${counts.extras} extra`
               : "Loading…"}
           </span>
         </div>
 
         {tallies.length > 0 ? (
           <p className="list-meta" style={{ marginTop: "0.65rem" }}>
+            To pack:{" "}
             {tallies.map((t) => `${t.count}× ${t.flavourName}`).join(" · ")}
           </p>
         ) : null}
@@ -201,6 +204,54 @@ export default function AdminPrepPage() {
             ))}
           </ul>
         )}
+
+        <h3 className="panel-title" style={{ marginTop: "1.25rem" }}>
+          Packed by flavour
+        </h3>
+        {packedTallies.length > 0 ? (
+          <p className="list-meta" style={{ marginTop: "0.45rem" }}>
+            {packedTallies
+              .map((t) => `${t.count}× ${t.flavourName}`)
+              .join(" · ")}
+          </p>
+        ) : (
+          <p className="empty" style={{ marginTop: "0.45rem" }}>
+            Nothing packed yet tonight.
+          </p>
+        )}
+        {packedByFlavour.length > 0 ? (
+          <ul className="collect-ledger" style={{ marginTop: "0.75rem" }}>
+            {packedByFlavour.map((group) => (
+              <li key={group.flavourName} className="collect-ledger__row">
+                <div className="collect-ledger__main">
+                  <span className="collect-badge collect-badge--ok">
+                    {group.count}×
+                  </span>
+                  <strong>{group.flavourName}</strong>
+                </div>
+                <div className="collect-ledger__meta">
+                  {group.items
+                    .map((item) =>
+                      [
+                        prepKindLabel(item.kind),
+                        item.modelNumber != null ? `#${item.modelNumber}` : null,
+                        item.status === "out"
+                          ? "on floor"
+                          : item.status === "staged"
+                            ? "ready to send"
+                            : item.status === "resolved"
+                              ? "delivered"
+                              : "awaiting floor",
+                      ]
+                        .filter(Boolean)
+                        .join(" "),
+                    )
+                    .join(" · ")}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </section>
     </div>
   );

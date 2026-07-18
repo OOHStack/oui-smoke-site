@@ -8,7 +8,7 @@ import {
   serviceRequests,
 } from "@/lib/db/schema";
 import { guestRefillPaymentMap } from "@/lib/refill-payment-link";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 export type PrepItemKind = "new_unit" | "refill" | "order_unit";
 
@@ -29,6 +29,8 @@ export type PrepItem = {
   paymentStatus: string | null;
   payPreference: "phone" | "terminal" | null;
   createdAt: string;
+  /** Set when kitchen marked this flavour packed. */
+  packedAt: string | null;
   assignmentId: number | null;
   serviceRequestId: number | null;
 };
@@ -38,15 +40,26 @@ export type PrepFlavourTally = {
   count: number;
 };
 
+export type PrepFlavourGroup = {
+  flavourName: string;
+  flavourComponents: string | null;
+  count: number;
+  items: PrepItem[];
+};
+
 export type PrepQueueSnapshot = {
   items: PrepItem[];
   tallies: PrepFlavourTally[];
+  packed: PrepItem[];
+  packedTallies: PrepFlavourTally[];
+  packedByFlavour: PrepFlavourGroup[];
   counts: {
     total: number;
     newUnits: number;
     refills: number;
     extras: number;
     needsFlavour: number;
+    packed: number;
   };
   serverTime: string;
 };
@@ -70,9 +83,49 @@ function parsePrepItemId(id: string): {
   return null;
 }
 
+function tallyFlavours(items: PrepItem[]): PrepFlavourTally[] {
+  const tallyMap = new Map<string, number>();
+  for (const item of items) {
+    tallyMap.set(item.flavourName, (tallyMap.get(item.flavourName) ?? 0) + 1);
+  }
+  return [...tallyMap.entries()]
+    .map(([flavourName, count]) => ({ flavourName, count }))
+    .sort(
+      (a, b) =>
+        b.count - a.count || a.flavourName.localeCompare(b.flavourName),
+    );
+}
+
+function groupByFlavour(items: PrepItem[]): PrepFlavourGroup[] {
+  const map = new Map<string, PrepItem[]>();
+  for (const item of items) {
+    const list = map.get(item.flavourName) ?? [];
+    list.push(item);
+    map.set(item.flavourName, list);
+  }
+  return [...map.entries()]
+    .map(([flavourName, groupItems]) => {
+      const sorted = [...groupItems].sort((a, b) => {
+        const aT = a.packedAt ? new Date(a.packedAt).getTime() : 0;
+        const bT = b.packedAt ? new Date(b.packedAt).getTime() : 0;
+        return bT - aT;
+      });
+      return {
+        flavourName,
+        flavourComponents: sorted[0]?.flavourComponents ?? null,
+        count: sorted.length,
+        items: sorted,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.count - a.count || a.flavourName.localeCompare(b.flavourName),
+    );
+}
+
 /**
  * Kitchen marks a flavour packed. Unit stays staged / call stays open for floor;
- * item drops off the prep board until flavour changes (staged) or a new call.
+ * item moves to the packed list until flavour changes or the night wraps.
  */
 export async function completePrepItem(
   itemId: string,
@@ -181,8 +234,8 @@ export async function completePrepItem(
 
 /**
  * Kitchen queue for packing heads:
- * - Staged units on draft/confirmed/active jobs with a flavour, not yet marked packed
- * - Open/acked guest refill + extra-hookah calls not yet marked packed
+ * - To pack: staged / open calls with flavour, not yet marked packed
+ * - Packed: marked packed on active jobs (still staged, out on floor, or call still open/resolved)
  */
 export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
   const db = getDb();
@@ -201,17 +254,18 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
   const jobMap = new Map(activeJobs.map((j) => [j.id, j]));
 
   const items: PrepItem[] = [];
+  const packed: PrepItem[] = [];
 
   if (jobIds.length > 0) {
-    // Staged units with a flavour set feed the prep board. No flavour = hidden
-    // until staff assign one on Ready to send. Packed heads leave until flavour changes.
     const staged = await db
       .select({
         assignmentId: jobHookahs.id,
         jobId: jobHookahs.jobId,
+        status: jobHookahs.status,
         flavourLabel: jobHookahs.flavourLabel,
         guestPayTier: jobHookahs.guestPayTier,
         createdAt: jobHookahs.createdAt,
+        prepCompletedAt: jobHookahs.prepCompletedAt,
         modelNumber: hookahs.modelNumber,
         flavourName: flavours.name,
         flavourComponents: flavours.components,
@@ -222,8 +276,7 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
       .where(
         and(
           inArray(jobHookahs.jobId, jobIds),
-          eq(jobHookahs.status, "staged"),
-          isNull(jobHookahs.prepCompletedAt),
+          inArray(jobHookahs.status, ["staged", "out"]),
         ),
       )
       .orderBy(asc(jobHookahs.createdAt));
@@ -233,7 +286,8 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
       if (!job) continue;
       const flavourName = (row.flavourName || row.flavourLabel || "").trim();
       if (!flavourName) continue;
-      items.push({
+
+      const item: PrepItem = {
         id: `staged:${row.assignmentId}`,
         kind: "new_unit",
         jobId: row.jobId,
@@ -248,13 +302,22 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
           row.guestPayTier === "standard" || row.guestPayTier === "unlimited"
             ? row.guestPayTier
             : null,
-        status: "staged",
+        status: row.status,
         paymentStatus: null,
         payPreference: null,
         createdAt: new Date(row.createdAt).toISOString(),
+        packedAt: row.prepCompletedAt
+          ? new Date(row.prepCompletedAt).toISOString()
+          : null,
         assignmentId: row.assignmentId,
         serviceRequestId: null,
-      });
+      };
+
+      if (row.prepCompletedAt) {
+        packed.push(item);
+      } else if (row.status === "staged") {
+        items.push(item);
+      }
     }
 
     const calls = await db
@@ -266,6 +329,7 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
         payPreference: serviceRequests.payPreference,
         requestedGuestPayTier: serviceRequests.requestedGuestPayTier,
         createdAt: serviceRequests.createdAt,
+        prepCompletedAt: serviceRequests.prepCompletedAt,
         jobId: serviceRequests.jobId,
         assignmentId: serviceRequests.jobHookahId,
         modelNumber: hookahs.modelNumber,
@@ -279,14 +343,20 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
       .where(
         and(
           inArray(serviceRequests.jobId, jobIds),
-          inArray(serviceRequests.status, ["open", "acknowledged"]),
           inArray(serviceRequests.type, ["refill", "order_unit"]),
-          isNull(serviceRequests.prepCompletedAt),
+          inArray(serviceRequests.status, [
+            "open",
+            "acknowledged",
+            "resolved",
+          ]),
         ),
       )
       .orderBy(asc(serviceRequests.createdAt));
 
-    const payMap = await guestRefillPaymentMap(calls.map((c) => c.id));
+    const activeCallIds = calls
+      .filter((c) => c.status === "open" || c.status === "acknowledged")
+      .map((c) => c.id);
+    const payMap = await guestRefillPaymentMap(activeCallIds);
 
     for (const row of calls) {
       const job = jobMap.get(row.jobId);
@@ -296,7 +366,7 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
       const kind: PrepItemKind =
         row.type === "order_unit" ? "order_unit" : "refill";
       const pay = payMap.get(row.id);
-      items.push({
+      const item: PrepItem = {
         id: `call:${row.id}`,
         kind,
         jobId: row.jobId,
@@ -316,9 +386,18 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
         paymentStatus: pay?.paymentStatus ?? null,
         payPreference: row.payPreference ?? null,
         createdAt: new Date(row.createdAt).toISOString(),
+        packedAt: row.prepCompletedAt
+          ? new Date(row.prepCompletedAt).toISOString()
+          : null,
         assignmentId: row.assignmentId,
         serviceRequestId: row.id,
-      });
+      };
+
+      if (row.prepCompletedAt) {
+        packed.push(item);
+      } else if (row.status === "open" || row.status === "acknowledged") {
+        items.push(item);
+      }
     }
   }
 
@@ -326,24 +405,29 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
     (a, b) =>
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
+  packed.sort((a, b) => {
+    const aT = a.packedAt ? new Date(a.packedAt).getTime() : 0;
+    const bT = b.packedAt ? new Date(b.packedAt).getTime() : 0;
+    return bT - aT;
+  });
 
-  const tallyMap = new Map<string, number>();
-  for (const item of items) {
-    tallyMap.set(item.flavourName, (tallyMap.get(item.flavourName) ?? 0) + 1);
-  }
-  const tallies = [...tallyMap.entries()]
-    .map(([flavourName, count]) => ({ flavourName, count }))
-    .sort((a, b) => b.count - a.count || a.flavourName.localeCompare(b.flavourName));
+  const tallies = tallyFlavours(items);
+  const packedTallies = tallyFlavours(packed);
+  const packedByFlavour = groupByFlavour(packed);
 
   return {
     items,
     tallies,
+    packed,
+    packedTallies,
+    packedByFlavour,
     counts: {
       total: items.length,
       newUnits: items.filter((i) => i.kind === "new_unit").length,
       refills: items.filter((i) => i.kind === "refill").length,
       extras: items.filter((i) => i.kind === "order_unit").length,
       needsFlavour: 0,
+      packed: packed.length,
     },
     serverTime: new Date().toISOString(),
   };
