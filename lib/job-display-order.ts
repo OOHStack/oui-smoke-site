@@ -148,8 +148,8 @@ export async function placeFloorDisplayOrder(
     title: `Floor order · ${job.title}`,
     body: `${tierLabel} · ${flavourLabel}${
       priceCents > 0 ? ` · $${(priceCents / 100).toFixed(0)}` : ""
-    } · bring terminal${guestLabel ? ` · ${guestLabel}` : ""}`,
-    url: `/admin/jobs/${jobId}`,
+    } · assign a hookah${guestLabel ? ` · ${guestLabel}` : ""}`,
+    url: `/admin`,
     tag: `floor-order-${created.id}`,
   });
 

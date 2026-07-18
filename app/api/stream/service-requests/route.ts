@@ -1,6 +1,7 @@
 import { requireApiSession } from "@/lib/auth/api";
 import { getDb } from "@/lib/db";
 import { hookahs, jobHookahs, jobs, serviceRequests } from "@/lib/db/schema";
+import { onsiteUnitPaymentMap } from "@/lib/ops/onsite-pay";
 import { guestRefillPaymentMap } from "@/lib/refill-payment-link";
 import { isSquareTerminalReady } from "@/lib/square-status";
 import { createSseResponse } from "@/lib/sse";
@@ -36,8 +37,8 @@ async function loadRequests() {
     })
     .from(serviceRequests)
     .innerJoin(jobs, eq(jobs.id, serviceRequests.jobId))
-    .innerJoin(jobHookahs, eq(jobHookahs.id, serviceRequests.jobHookahId))
-    .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
+    .leftJoin(jobHookahs, eq(jobHookahs.id, serviceRequests.jobHookahId))
+    .leftJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
     .where(inArray(serviceRequests.status, ["open", "acknowledged"]))
     .orderBy(desc(serviceRequests.createdAt))
     .limit(50);
@@ -47,12 +48,21 @@ async function loadRequests() {
       .filter((r) => r.type === "refill" || r.type === "order_unit")
       .map((r) => r.id),
   );
+  const unitPayMap = await onsiteUnitPaymentMap(
+    rows
+      .filter((r) => r.type === "order_unit" && r.assignmentId != null)
+      .map((r) => r.assignmentId as number),
+  );
 
   const requests = rows.map((r) => {
     const pay = payMap.get(r.id);
+    const unitPay =
+      r.type === "order_unit" && r.assignmentId != null
+        ? unitPayMap.get(r.assignmentId)
+        : undefined;
     return {
       ...r,
-      paymentStatus: pay?.paymentStatus ?? null,
+      paymentStatus: pay?.paymentStatus ?? unitPay?.status ?? null,
       checkoutUrl: pay?.checkoutUrl ?? null,
     };
   });

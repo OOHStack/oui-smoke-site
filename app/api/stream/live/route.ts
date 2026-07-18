@@ -82,6 +82,7 @@ async function loadLiveFloor() {
       assignmentId: serviceRequests.jobHookahId,
       modelNumber: hookahs.modelNumber,
       jobTitle: jobs.title,
+      clientName: jobs.clientName,
       acknowledgedBy: serviceRequests.acknowledgedBy,
       acknowledgedAt: serviceRequests.acknowledgedAt,
     })
@@ -98,12 +99,21 @@ async function loadLiveFloor() {
       .filter((c) => c.type === "refill" || c.type === "order_unit")
       .map((c) => c.id),
   );
+  const unitPayMap = await onsiteUnitPaymentMap(
+    callRows
+      .filter((c) => c.type === "order_unit" && c.assignmentId != null)
+      .map((c) => c.assignmentId as number),
+  );
 
   const calls = callRows.map((c) => {
     const pay = payMap.get(c.id);
+    const unitPay =
+      c.type === "order_unit" && c.assignmentId != null
+        ? unitPayMap.get(c.assignmentId)
+        : undefined;
     return {
       ...c,
-      paymentStatus: pay?.paymentStatus ?? null,
+      paymentStatus: pay?.paymentStatus ?? unitPay?.status ?? null,
       checkoutUrl: pay?.checkoutUrl ?? null,
     };
   });

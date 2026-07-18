@@ -1,5 +1,12 @@
 import { getDb } from "@/lib/db";
-import { hookahs, jobEvents, jobHookahs, jobs, payments } from "@/lib/db/schema";
+import {
+  hookahs,
+  jobEvents,
+  jobHookahs,
+  jobs,
+  payments,
+  serviceRequests,
+} from "@/lib/db/schema";
 import { maybeAutoSendBalance } from "@/lib/auto-balance";
 import { notifyDepositPaid } from "@/lib/email/workflow";
 import {
@@ -7,11 +14,13 @@ import {
   jobDueCents,
   jobPaidCents,
 } from "@/lib/job-balance";
+import { fulfillFloorOrder } from "@/lib/ops/fulfill-floor-order";
 import {
   guestRefillServiceRequestIdFromKey,
+  notifyStaffPush,
   notifyStaffPushForServiceRequest,
 } from "@/lib/push";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 /** Sum succeeded tip rows onto jobs.tipCents (source of truth for tip split). */
 export async function syncJobTipCents(jobId: number): Promise<number> {
@@ -131,6 +140,44 @@ export async function markPaymentSucceeded(opts: {
       }`,
       createdBy: "square",
     });
+
+    // Floor tablet orders: after Terminal clears, send out so the event display shows QR.
+    if (row.kind === "onsite_unit" && row.jobHookahId != null) {
+      try {
+        const [floorReq] = await db
+          .select({ id: serviceRequests.id })
+          .from(serviceRequests)
+          .where(
+            and(
+              eq(serviceRequests.jobId, row.jobId),
+              eq(serviceRequests.jobHookahId, row.jobHookahId),
+              eq(serviceRequests.type, "order_unit"),
+              inArray(serviceRequests.status, ["open", "acknowledged"]),
+            ),
+          )
+          .limit(1);
+        if (floorReq) {
+          const sent = await fulfillFloorOrder({
+            serviceRequestId: floorReq.id,
+            assignmentId: row.jobHookahId,
+            payChannel: "already_paid",
+            staffName: "square",
+            sendOnly: true,
+          });
+          if (sent.ok && sent.sentOut) {
+            void notifyStaffPush({
+              title: `Floor order out · #${sent.modelNumber}`,
+              body: `Paid · QR on event display`,
+              url: `/admin/jobs/${row.jobId}`,
+              tag: `floor-sent-${floorReq.id}`,
+            });
+          }
+        }
+      } catch (err) {
+        console.error("floor order auto-send after pay failed", err);
+      }
+    }
+
     return { ok: true as const, payment: updated, already: false };
   }
 

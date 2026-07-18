@@ -16,6 +16,12 @@ function callLabel(type: string, flavourLabel: string | null, priceCents: number
       priceCents != null ? ` · $${(priceCents / 100).toFixed(2)}` : "";
     return `Refill${flavour}${price}`;
   }
+  if (type === "order_unit") {
+    const flavour = flavourLabel ? `: ${flavourLabel}` : "";
+    const price =
+      priceCents != null ? ` · $${(priceCents / 100).toFixed(0)}` : "";
+    return `Floor order${flavour}${price}`;
+  }
   if (type === "coals") return "Fresh coals";
   if (type === "issue") return "Issue";
   return "Help";
@@ -230,7 +236,7 @@ export default async function AdminDashboardPage() {
                   <Link href={`/admin/jobs/${r.jobId}`} className="dash-feed__row">
                     <div>
                       <div className="dash-feed__title">
-                        #{r.modelNumber} ·{" "}
+                        {r.modelNumber != null ? `#${r.modelNumber}` : "Floor"} ·{" "}
                         {callLabel(r.type, r.flavourLabel, r.priceCents)}
                         {r.status === "acknowledged" ? " · on the way" : ""}
                       </div>

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import ActionErrorBanner from "@/components/admin/ActionErrorBanner";
 import Countdown from "@/components/admin/Countdown";
+import FloorOrderModal from "@/components/admin/FloorOrderModal";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { RefillCollectActions } from "@/components/admin/RefillCollectActions";
 import { readApiError } from "@/lib/api-error";
@@ -39,6 +40,7 @@ type ServiceCall = {
   assignmentId: number | null;
   modelNumber: number | null;
   jobTitle: string;
+  clientName?: string;
   requestedGuestPayTier?: "standard" | "unlimited" | null;
   acknowledgedBy?: string | null;
 };
@@ -60,6 +62,7 @@ export default function LiveFloorPage() {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<number | null>(null);
   const [actionError, setActionError] = useState("");
+  const [fulfillId, setFulfillId] = useState<number | null>(null);
   const retryRef = useRef<(() => void) | null>(null);
 
   function fail(message: string, retry?: () => void) {
@@ -207,12 +210,16 @@ export default function LiveFloorPage() {
   async function markCallDone(call: ServiceCall) {
     if (call.type === "refill") {
       await deliverRefill(call);
+    } else if (call.type === "order_unit") {
+      setFulfillId(call.id);
     } else {
       await serviceAct(call.id, "resolve");
     }
   }
 
   const callByAssignment = new Map(calls.map((c) => [c.assignmentId, c]));
+  const fulfillRow =
+    fulfillId != null ? calls.find((c) => c.id === fulfillId) : undefined;
 
   return (
     <div>
@@ -303,7 +310,7 @@ export default function LiveFloorPage() {
                   </div>
                 </div>
                 <div className="job-card-actions">
-                  {c.status === "open" ? (
+                  {c.status === "open" && c.type !== "order_unit" ? (
                     <button
                       type="button"
                       className="btn btn-sm btn-ok"
@@ -323,6 +330,14 @@ export default function LiveFloorPage() {
                       onPushTerminal={() => pushRefillTerminal(c)}
                       onDeliver={(channel) => deliverRefill(c, channel)}
                     />
+                  ) : c.type === "order_unit" ? (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ok"
+                      onClick={() => setFulfillId(c.id)}
+                    >
+                      Assign & collect
+                    </button>
                   ) : (
                     <button
                       type="button"
@@ -487,6 +502,31 @@ export default function LiveFloorPage() {
           })}
         </div>
       )}
+
+      {fulfillRow && fulfillRow.type === "order_unit" ? (
+        <FloorOrderModal
+          row={{
+            id: fulfillRow.id,
+            jobId: fulfillRow.jobId,
+            jobTitle: fulfillRow.jobTitle,
+            clientName: fulfillRow.clientName ?? "",
+            message: fulfillRow.message,
+            flavourLabel: fulfillRow.flavourLabel,
+            priceCents: fulfillRow.priceCents,
+            requestedGuestPayTier: fulfillRow.requestedGuestPayTier,
+            paymentStatus: fulfillRow.paymentStatus,
+            assignmentId: fulfillRow.assignmentId,
+            modelNumber: fulfillRow.modelNumber,
+          }}
+          terminalReady={terminalReady}
+          onClose={() => setFulfillId(null)}
+          onDone={() => {
+            setCalls((prev) => prev.filter((c) => c.id !== fulfillRow.id));
+            setFulfillId(null);
+          }}
+          onError={(message, retry) => fail(message, retry)}
+        />
+      ) : null}
     </div>
   );
 }

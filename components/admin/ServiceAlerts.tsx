@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ActionErrorBanner from "@/components/admin/ActionErrorBanner";
+import FloorOrderModal from "@/components/admin/FloorOrderModal";
 import { RefillCollectActions } from "@/components/admin/RefillCollectActions";
 import { readApiError } from "@/lib/api-error";
 import { useSse } from "@/lib/hooks/useSse";
@@ -50,9 +51,14 @@ function playChime() {
 function typeLabel(type: string) {
   if (type === "coals") return "Coals";
   if (type === "refill") return "Refill";
-  if (type === "order_unit") return "Extra hookah";
+  if (type === "order_unit") return "Floor order";
   if (type === "issue") return "Issue";
   return "Help";
+}
+
+function unitLabel(row: ServiceRequestRow) {
+  if (row.modelNumber != null) return `#${row.modelNumber}`;
+  return "Floor";
 }
 
 export default function ServiceAlerts() {
@@ -61,6 +67,7 @@ export default function ServiceAlerts() {
   const [terminalReady, setTerminalReady] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [actionError, setActionError] = useState("");
+  const [fulfillId, setFulfillId] = useState<number | null>(null);
   const retryRef = useRef<(() => void) | null>(null);
   const knownOpen = useRef<Set<number>>(new Set());
   const knownPay = useRef<Map<number, string>>(new Map());
@@ -77,13 +84,29 @@ export default function ServiceAlerts() {
       for (const row of rows) {
         if (row.status === "open" && !knownOpen.current.has(row.id)) {
           playChime();
-          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-            new Notification(`Service · Hookah #${row.modelNumber}`, {
-              body: `${typeLabel(row.type)} — ${row.jobTitle}`,
-              tag: `service-${row.id}`,
-            });
+          if (
+            typeof Notification !== "undefined" &&
+            Notification.permission === "granted"
+          ) {
+            new Notification(
+              row.type === "order_unit"
+                ? `Floor order · ${row.jobTitle}`
+                : `Service · ${unitLabel(row)}`,
+              {
+                body:
+                  row.type === "order_unit"
+                    ? `${typeLabel(row.type)}${
+                        row.flavourLabel ? ` · ${row.flavourLabel}` : ""
+                      } — assign a hookah`
+                    : `${typeLabel(row.type)} — ${row.jobTitle}`,
+                tag: `service-${row.id}`,
+              },
+            );
           }
           setOpen(true);
+          if (row.type === "order_unit") {
+            setFulfillId(row.id);
+          }
         }
         const prevPay = knownPay.current.get(row.id);
         if (
@@ -92,29 +115,38 @@ export default function ServiceAlerts() {
           prevPay !== "succeeded"
         ) {
           playChime();
-          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          if (
+            typeof Notification !== "undefined" &&
+            Notification.permission === "granted"
+          ) {
             const dollars =
               row.priceCents != null
                 ? `$${(row.priceCents / 100).toFixed(0)}`
                 : "Payment";
             new Notification(
               row.type === "order_unit"
-                ? `Extra hookah paid · #${row.modelNumber}`
-                : `Refill paid · #${row.modelNumber}`,
+                ? `Floor order paid · ${unitLabel(row)}`
+                : `Refill paid · ${unitLabel(row)}`,
               {
-              body:
-                row.type === "order_unit"
-                  ? `${dollars} received — stage a new unit when ready`
-                  : `${dollars} received via Square — deliver when ready`,
-              tag: `${row.type}-paid-${row.id}`,
-            });
+                body:
+                  row.type === "order_unit"
+                    ? `${dollars} received — QR should show on the event display`
+                    : `${dollars} received via Square — deliver when ready`,
+                tag: `${row.type}-paid-${row.id}`,
+              },
+            );
           }
           setOpen(true);
+          if (row.type === "order_unit") {
+            setFulfillId(row.id);
+          }
         }
       }
     }
 
-    knownOpen.current = new Set(rows.filter((r) => r.status === "open").map((r) => r.id));
+    knownOpen.current = new Set(
+      rows.filter((r) => r.status === "open").map((r) => r.id),
+    );
     knownPay.current = new Map(
       rows
         .filter(
@@ -138,7 +170,10 @@ export default function ServiceAlerts() {
   );
 
   useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+    if (
+      typeof Notification !== "undefined" &&
+      Notification.permission === "default"
+    ) {
       Notification.requestPermission();
     }
   }, []);
@@ -234,6 +269,9 @@ export default function ServiceAlerts() {
   async function markDone(row: ServiceRequestRow) {
     if (row.type === "refill") {
       await deliverRefill(row);
+    } else if (row.type === "order_unit") {
+      setFulfillId(row.id);
+      setOpen(true);
     } else {
       setActionError("");
       const res = await fetch(`/api/service-requests/${row.id}`, {
@@ -251,8 +289,10 @@ export default function ServiceAlerts() {
 
   const openCount = requests.filter((r) => r.status === "open").length;
   const waiting = requests.length;
+  const fulfillRow =
+    fulfillId != null ? requests.find((r) => r.id === fulfillId) : undefined;
 
-  if (waiting === 0 && !open) return null;
+  if (waiting === 0 && !open && !fulfillRow) return null;
 
   return (
     <div className="service-alerts">
@@ -263,14 +303,20 @@ export default function ServiceAlerts() {
         aria-expanded={open}
       >
         Calls
-        {waiting > 0 ? <span className="service-alerts__count">{waiting}</span> : null}
+        {waiting > 0 ? (
+          <span className="service-alerts__count">{waiting}</span>
+        ) : null}
       </button>
 
       {open ? (
         <div className="service-alerts__panel">
           <div className="service-alerts__head">
             <strong>Guest service</strong>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setOpen(false)}
+            >
               Close
             </button>
           </div>
@@ -291,7 +337,10 @@ export default function ServiceAlerts() {
             }}
           />
           {!terminalReady ? (
-            <p className="terminal-ready-banner" style={{ margin: "0.5rem 0.75rem" }}>
+            <p
+              className="terminal-ready-banner"
+              style={{ margin: "0.5rem 0.75rem" }}
+            >
               Terminal not ready —{" "}
               <Link href="/admin/settings">Settings → Square</Link>
             </p>
@@ -301,11 +350,13 @@ export default function ServiceAlerts() {
           ) : (
             <ul className="service-alerts__list">
               {requests.map((r) => (
-                <li key={r.id} className={`service-alerts__item service-alerts__item--${r.status}`}>
+                <li
+                  key={r.id}
+                  className={`service-alerts__item service-alerts__item--${r.status}`}
+                >
                   <div>
                     <div className="service-alerts__title">
-                      {r.modelNumber != null ? `#${r.modelNumber}` : "Floor"} ·{" "}
-                      {typeLabel(r.type)}
+                      {unitLabel(r)} · {typeLabel(r.type)}
                       {r.type === "refill" && r.flavourLabel
                         ? `: ${r.flavourLabel}`
                         : ""}
@@ -332,11 +383,12 @@ export default function ServiceAlerts() {
                             paymentStatus: r.paymentStatus,
                           });
                           if (!chip) return null;
-                          const tone = chip.startsWith("PAID") || chip === "INCLUDED"
-                            ? "paid"
-                            : chip.includes("TERMINAL")
-                              ? "terminal"
-                              : "awaiting";
+                          const tone =
+                            chip.startsWith("PAID") || chip === "INCLUDED"
+                              ? "paid"
+                              : chip.includes("TERMINAL")
+                                ? "terminal"
+                                : "awaiting";
                           return (
                             <div
                               className={`pay-chip pay-chip--${tone}`}
@@ -350,18 +402,19 @@ export default function ServiceAlerts() {
                     <div className="list-meta">
                       {r.jobTitle} · {r.clientName}
                       {r.type === "order_unit"
-                        ? r.modelNumber == null
-                          ? " · Floor tablet · stage a unit on the job, then Done"
-                          : " · Stage new unit on job, then Done"
+                        ? " · Assign unit, collect, QR on table display"
                         : ""}
                       {r.message ? ` · ${r.message}` : ""}
                     </div>
-                    <Link href={`/admin/jobs/${r.jobId}`} className="service-alerts__link">
+                    <Link
+                      href={`/admin/jobs/${r.jobId}`}
+                      className="service-alerts__link"
+                    >
                       Open job
                     </Link>
                   </div>
                   <div className="service-alerts__actions">
-                    {r.status === "open" ? (
+                    {r.status === "open" && r.type !== "order_unit" ? (
                       <button
                         type="button"
                         className="btn btn-sm btn-ok"
@@ -381,6 +434,14 @@ export default function ServiceAlerts() {
                         onPushTerminal={() => pushRefillTerminal(r)}
                         onDeliver={(channel) => deliverRefill(r, channel)}
                       />
+                    ) : r.type === "order_unit" ? (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-ok"
+                        onClick={() => setFulfillId(r.id)}
+                      >
+                        Assign & collect
+                      </button>
                     ) : (
                       <button
                         type="button"
@@ -396,6 +457,19 @@ export default function ServiceAlerts() {
             </ul>
           )}
         </div>
+      ) : null}
+
+      {fulfillRow && fulfillRow.type === "order_unit" ? (
+        <FloorOrderModal
+          row={fulfillRow}
+          terminalReady={terminalReady}
+          onClose={() => setFulfillId(null)}
+          onDone={() => {
+            setRequests((prev) => prev.filter((r) => r.id !== fulfillRow.id));
+            setFulfillId(null);
+          }}
+          onError={(message, retry) => fail(message, retry)}
+        />
       ) : null}
     </div>
   );
