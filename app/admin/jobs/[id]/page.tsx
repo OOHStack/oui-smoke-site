@@ -2126,8 +2126,18 @@ function JobHookahBoard({
 }) {
   const [modalId, setModalId] = useState<number | null>(null);
   const [modalPrompt, setModalPrompt] = useState("");
+  const [modalAssignment, setModalAssignment] = useState<Assignment | null>(null);
+  // Ref only — setState on focus would re-render and close the native <select>.
+  const flavourPickerOpenRef = useRef(false);
 
-  const modalAssignment = assignments.find((a) => a.id === modalId) ?? null;
+  useEffect(() => {
+    if (modalId == null) {
+      setModalAssignment(null);
+      return;
+    }
+    if (flavourPickerOpenRef.current) return;
+    setModalAssignment(assignments.find((a) => a.id === modalId) ?? null);
+  }, [assignments, modalId]);
 
   async function boardPlace(payload: {
     assignmentId: number;
@@ -2231,9 +2241,19 @@ function JobHookahBoard({
           prompt={modalPrompt}
           onAction={onAction}
           onRefresh={onRefresh}
+          onFlavourPickerOpenChange={(open) => {
+            flavourPickerOpenRef.current = open;
+            if (!open && modalId != null) {
+              setModalAssignment(
+                assignments.find((a) => a.id === modalId) ?? null,
+              );
+            }
+          }}
           onClose={() => {
+            flavourPickerOpenRef.current = false;
             setModalId(null);
             setModalPrompt("");
+            setModalAssignment(null);
           }}
         />
       ) : null}
@@ -2250,6 +2270,7 @@ function HookahModal({
   prompt,
   onAction,
   onRefresh,
+  onFlavourPickerOpenChange,
   onClose,
 }: {
   assignment: Assignment;
@@ -2262,6 +2283,7 @@ function HookahModal({
     body: Record<string, unknown>,
   ) => boolean | Promise<boolean> | void | Promise<void>;
   onRefresh: () => void | Promise<void>;
+  onFlavourPickerOpenChange?: (open: boolean) => void;
   onClose: () => void;
 }) {
   const [note, setNote] = useState("");
@@ -2280,12 +2302,23 @@ function HookahModal({
   const [qrUrl, setQrUrl] = useState("");
   const [qrLoading, setQrLoading] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const flavourDirtyRef = useRef(false);
+  const pendingFlavourRef = useRef<number | null | undefined>(undefined);
+  const lastServerFlavourRef = useRef<number | null>(a.flavourId ?? null);
+  const flavourIdRef = useRef(flavourId);
+  flavourIdRef.current = flavourId;
 
+  // Reset modal chrome only when opening a different unit — live SSE must not
+  // wipe an in-progress flavour pick.
   useEffect(() => {
     setNote("");
     setFormError("");
     setFormOk("");
     setCheckLogged(false);
+    setQrOpen(false);
+    flavourDirtyRef.current = false;
+    pendingFlavourRef.current = undefined;
+    lastServerFlavourRef.current = a.flavourId ?? null;
     setFlavourId(a.flavourId ? String(a.flavourId) : "");
     const guestRefillFlavour =
       a.activeCall?.type === "refill" && a.activeCall.flavourId
@@ -2294,7 +2327,34 @@ function HookahModal({
     setRefillFlavourId(
       guestRefillFlavour ?? (a.flavourId ? String(a.flavourId) : ""),
     );
-    setQrOpen(false);
+  }, [a.id]);
+
+  // Adopt server flavour after save catches up; ignore stale SSE while pending.
+  useEffect(() => {
+    const server = a.flavourId ?? null;
+    if (flavourDirtyRef.current) {
+      if (pendingFlavourRef.current === server) {
+        flavourDirtyRef.current = false;
+        pendingFlavourRef.current = undefined;
+        lastServerFlavourRef.current = server;
+      }
+      return;
+    }
+    if (server === lastServerFlavourRef.current) return;
+    lastServerFlavourRef.current = server;
+    setFlavourId(server != null ? String(server) : "");
+  }, [a.flavourId]);
+
+  // Keep refill default in sync with guest call / assignment, without touching
+  // the staged flavour picker.
+  useEffect(() => {
+    const guestRefillFlavour =
+      a.activeCall?.type === "refill" && a.activeCall.flavourId
+        ? String(a.activeCall.flavourId)
+        : null;
+    setRefillFlavourId(
+      guestRefillFlavour ?? (a.flavourId ? String(a.flavourId) : ""),
+    );
   }, [a.id, a.flavourId, a.activeCall?.id, a.activeCall?.flavourId, a.activeCall?.type]);
 
   useEffect(() => {
@@ -2323,12 +2383,18 @@ function HookahModal({
     };
   }, [onClose, qrOpen]);
 
-  const flavourName = a.flavour?.name ?? a.flavourLabel ?? "Not set";
+  const flavourName = flavourId
+    ? flavours.find((f) => String(f.id) === flavourId)?.name ??
+      a.flavour?.name ??
+      a.flavourLabel ??
+      "Not set"
+    : "Not set";
   const overdue =
     a.status === "out" &&
     !!a.nextCheckAt &&
     new Date(a.nextCheckAt).getTime() < Date.now();
-  const canSendOut = !!flavourId || assignmentHasFlavour(a);
+  // Trust the select — empty means cleared (don't keep old assignment flavour).
+  const canSendOut = !!flavourId;
   const needsGuestTier = paymentModel === "pay_at_event";
   const canSendOutFully =
     canSendOut && (!needsGuestTier || !!a.guestPayTier);
@@ -2348,7 +2414,7 @@ function HookahModal({
     a.unitPaymentStatus !== "succeeded";
 
   function assertReadyToSend(): boolean {
-    if (!flavourId && !assignmentHasFlavour(a)) {
+    if (!flavourId) {
       setFormError("Choose a flavour before sending to the floor");
       return false;
     }
@@ -2357,6 +2423,57 @@ function HookahModal({
       return false;
     }
     return true;
+  }
+
+  async function commitFlavourChoice(next: string) {
+    const nextId = next ? parseInt(next, 10) : 0;
+    const pending = nextId > 0 ? nextId : null;
+    const server = lastServerFlavourRef.current;
+    if (pending === server && !flavourDirtyRef.current) return;
+
+    flavourDirtyRef.current = true;
+    pendingFlavourRef.current = pending;
+    setFormError("");
+
+    // Quiet save — no actionBusy toggle (that re-render closes the <select>).
+    const result = await onAction({
+      action: "set_flavour",
+      assignmentId: a.id,
+      flavourId: pending,
+      flavourLabel: pending == null ? "" : undefined,
+    });
+    const ok = result !== false;
+    if (ok) {
+      setFormOk(
+        pending != null
+          ? "Flavour set — shows on prep board (still Ready to send)"
+          : "Flavour cleared — removed from prep board",
+      );
+      return;
+    }
+    setFormError("Couldn’t update flavour — try again");
+    if (pendingFlavourRef.current === pending) {
+      flavourDirtyRef.current = false;
+      pendingFlavourRef.current = undefined;
+      setFlavourId(server != null ? String(server) : "");
+    }
+  }
+
+  function onFlavourSelectChange(next: string) {
+    const nextId = next ? parseInt(next, 10) : 0;
+    flavourDirtyRef.current = true;
+    pendingFlavourRef.current = nextId > 0 ? nextId : null;
+    flavourIdRef.current = next;
+    setFlavourId(next);
+  }
+
+  function onFlavourSelectFocus() {
+    onFlavourPickerOpenChange?.(true);
+  }
+
+  function onFlavourSelectBlur() {
+    onFlavourPickerOpenChange?.(false);
+    void commitFlavourChoice(flavourIdRef.current);
   }
 
   async function run(body: Record<string, unknown>, close = false) {
@@ -2763,49 +2880,19 @@ function HookahModal({
               <div className="hookah-card__fields">
                 <label className="hookah-field">
                   <span>Flavour</span>
-                  <div className="hookah-field__with-chip">
-                    <select
-                      value={flavourId}
-                      onChange={(e) => setFlavourId(e.target.value)}
-                    >
-                      <option value="">Choose flavour…</option>
-                      {flavours.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className={`chip${
-                        flavourId &&
-                        flavourId !== String(a.flavourId ?? "")
-                          ? " active"
-                          : ""
-                      }`}
-                      disabled={
-                        actionBusy ||
-                        !flavourId ||
-                        flavourId === String(a.flavourId ?? "")
-                      }
-                      onClick={() => {
-                        void (async () => {
-                          const ok = await run({
-                            action: "set_flavour",
-                            assignmentId: a.id,
-                            flavourId: parseInt(flavourId, 10),
-                          });
-                          if (ok) {
-                            setFormOk(
-                              "Flavour set — shows on prep board (still Ready to send)",
-                            );
-                          }
-                        })();
-                      }}
-                    >
-                      Set flavour
-                    </button>
-                  </div>
+                  <select
+                    value={flavourId}
+                    onFocus={onFlavourSelectFocus}
+                    onChange={(e) => onFlavourSelectChange(e.target.value)}
+                    onBlur={onFlavourSelectBlur}
+                  >
+                    <option value="">Select a flavour</option>
+                    {flavours.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="hookah-field">
                   <span>Note for the send-out (optional)</span>
@@ -2828,18 +2915,13 @@ function HookahModal({
                       className="btn btn-ok hookah-modal__btn-main"
                       disabled={!canSendOut}
                       onClick={() => {
-                        if (!flavourId && !assignmentHasFlavour(a)) {
-                          setFormError("Choose a flavour before sending to the floor");
-                          return;
-                        }
+                        if (!assertReadyToSend()) return;
                         run(
                           {
                             action: "send_out",
                             assignmentId: a.id,
                             guestPayTier: "standard",
-                            flavourId: flavourId
-                              ? parseInt(flavourId, 10)
-                              : undefined,
+                            flavourId: parseInt(flavourId, 10),
                             note: note || undefined,
                           },
                           true,
@@ -2853,18 +2935,13 @@ function HookahModal({
                       className="btn btn-ok hookah-modal__btn-main"
                       disabled={!canSendOut}
                       onClick={() => {
-                        if (!flavourId && !assignmentHasFlavour(a)) {
-                          setFormError("Choose a flavour before sending to the floor");
-                          return;
-                        }
+                        if (!assertReadyToSend()) return;
                         run(
                           {
                             action: "send_out",
                             assignmentId: a.id,
                             guestPayTier: "unlimited",
-                            flavourId: flavourId
-                              ? parseInt(flavourId, 10)
-                              : undefined,
+                            flavourId: parseInt(flavourId, 10),
                             note: note || undefined,
                           },
                           true,
@@ -2885,7 +2962,7 @@ function HookahModal({
                         {
                           action: "send_out",
                           assignmentId: a.id,
-                          flavourId: flavourId ? parseInt(flavourId, 10) : undefined,
+                          flavourId: parseInt(flavourId, 10),
                           note: note || undefined,
                         },
                         true,
@@ -3156,8 +3233,13 @@ function HookahModal({
               </p>
               <label className="hookah-field">
                 <span>Flavour for next send-out</span>
-                <select value={flavourId} onChange={(e) => setFlavourId(e.target.value)}>
-                  <option value="">Choose flavour…</option>
+                <select
+                  value={flavourId}
+                  onFocus={onFlavourSelectFocus}
+                  onChange={(e) => onFlavourSelectChange(e.target.value)}
+                  onBlur={onFlavourSelectBlur}
+                >
+                  <option value="">Select a flavour</option>
                   {flavours.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.name}

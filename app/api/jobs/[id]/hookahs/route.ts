@@ -1039,31 +1039,40 @@ export async function POST(request: Request, context: RouteContext) {
         }
 
         const updates: Partial<typeof jobHookahs.$inferInsert> = {};
-        if (typeof body.flavourId === "number") {
-          updates.flavourId = body.flavourId;
-          if (body.flavourId > 0) {
-            const [flav] = await db
-              .select({ id: flavours.id, name: flavours.name })
-              .from(flavours)
-              .where(eq(flavours.id, body.flavourId))
-              .limit(1);
-            if (!flav) {
-              return NextResponse.json({ error: "Flavour not found" }, { status: 400 });
-            }
-            updates.flavourLabel = flav.name;
-          } else {
-            updates.flavourId = null;
-            updates.flavourLabel = "";
+        const clearFlavour =
+          body.flavourId === null ||
+          body.flavourId === 0 ||
+          body.flavourId === "" ||
+          (typeof body.flavourLabel === "string" &&
+            !body.flavourLabel.trim() &&
+            body.flavourId == null);
+
+        if (clearFlavour) {
+          updates.flavourId = null;
+          updates.flavourLabel = "";
+        } else if (typeof body.flavourId === "number" && body.flavourId > 0) {
+          const [flav] = await db
+            .select({ id: flavours.id, name: flavours.name })
+            .from(flavours)
+            .where(eq(flavours.id, body.flavourId))
+            .limit(1);
+          if (!flav) {
+            return NextResponse.json({ error: "Flavour not found" }, { status: 400 });
           }
+          updates.flavourId = flav.id;
+          updates.flavourLabel = flav.name;
         } else if (typeof body.flavourLabel === "string") {
           updates.flavourLabel = body.flavourLabel;
+          if (!body.flavourLabel.trim()) {
+            updates.flavourId = null;
+          }
         }
 
         if (Object.keys(updates).length === 0) {
           return NextResponse.json({ error: "flavourId or flavourLabel required" }, { status: 400 });
         }
 
-        // Flavour change means kitchen needs to pack again.
+        // Flavour change / clear means kitchen queue should update.
         updates.prepCompletedAt = null;
 
         const [updated] = await db
@@ -1076,12 +1085,12 @@ export async function POST(request: Request, context: RouteContext) {
           return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
         }
 
-        const label = updated.flavourLabel?.trim() || "cleared";
+        const label = updated.flavourLabel?.trim();
         await db.insert(jobEvents).values({
           jobId,
           jobHookahId: assignmentId,
           type: "note",
-          message: `Flavour set · ${label}`,
+          message: label ? `Flavour set · ${label}` : "Flavour cleared",
           createdBy: session.name,
         });
 
