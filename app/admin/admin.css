@@ -3245,37 +3245,359 @@ button.fleet-tile {
   gap: 0.35rem;
 }
 
-.analytics-grid {
+.analytics {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+  max-width: 1100px;
+}
+
+.analytics__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.analytics__hero {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.65rem;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 0.85rem;
+  padding: 1.15rem 1.2rem 1.2rem;
+  border-radius: calc(var(--radius) + 4px);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  background:
+    radial-gradient(
+      ellipse 80% 70% at 0% 0%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(155deg, #1a1412 0%, var(--panel) 52%, #0f0d0c 100%);
 }
 
-.metric-card {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.85rem;
+.analytics__kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 80%, var(--muted));
 }
 
-.metric-value {
-  font-size: 1.35rem;
+.analytics__hero-value {
+  margin: 0.2rem 0 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(2.8rem, 6vw, 3.6rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+}
+
+.analytics__hero-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.analytics__hero-side {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  align-content: center;
+}
+
+.analytics__kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+}
+
+.analytics__kpi-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.analytics__kpi-value {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.75rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.analytics__section-head {
+  margin-bottom: 0.75rem;
+}
+
+.analytics__section-head--row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.analytics__section-title {
+  margin: 0;
+  font-size: 0.78rem;
   font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
 }
 
-.metric-value.warn {
-  color: var(--warn);
+.analytics__section-lede {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
-.metric-value.accent {
+.analytics__count {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.45rem;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.analytics__health,
+.analytics__service,
+.analytics__feedback,
+.analytics__panel {
+  padding: 0.95rem 1rem 1.05rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.analytics__health--alert {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.analytics__health-grid,
+.analytics__service-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.analytics__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.analytics__stat--panel {
+  padding: 0.65rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: color-mix(in srgb, var(--bg) 40%, transparent);
+}
+
+.analytics__stat-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.analytics__stat-value {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.85rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.analytics__stat-value.is-accent {
   color: var(--accent);
 }
 
-.metric-label {
-  font-size: 0.72rem;
+.analytics__stat-value.is-warn {
+  color: var(--warn);
+}
+
+.analytics__stat-suffix {
+  font-size: 0.95rem;
   color: var(--muted);
+}
+
+.analytics__stat-meta {
+  margin-top: 0.1rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.analytics__breakdowns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.analytics__bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.analytics__bar-row {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.analytics__bar-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  text-transform: capitalize;
+}
+
+.analytics__bar-meta strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics__rank {
+  display: inline-block;
+  min-width: 1.1rem;
+  margin-right: 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.analytics__bar-track {
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 90%, transparent);
+  overflow: hidden;
+}
+
+.analytics__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--text) 55%, transparent);
+}
+
+.analytics__bar-fill--accent {
+  background: var(--accent);
+}
+
+.analytics__bar-fill--warn {
+  background: var(--warn);
+}
+
+.analytics__bar-fill--soft {
+  background: color-mix(in srgb, var(--accent) 55%, var(--text));
+}
+
+.analytics__feedback-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.analytics__feedback-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  color: inherit;
+  text-decoration: none;
+}
+
+.analytics__feedback-list li:last-child .analytics__feedback-row {
+  border-bottom: none;
+  padding-bottom: 0.15rem;
+}
+
+.analytics__feedback-row:hover {
+  color: inherit;
+}
+
+.analytics__feedback-row:hover .analytics__feedback-go {
+  color: #ff6b61;
+}
+
+.analytics__feedback-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.1rem;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.7rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.analytics__feedback-score span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.analytics__feedback-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.analytics__feedback-meta {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.analytics__feedback-go {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+
+@media (max-width: 960px) {
+  .analytics__breakdowns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .analytics__hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .analytics__health-grid,
+  .analytics__service-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .analytics__hero-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .quick-links {
