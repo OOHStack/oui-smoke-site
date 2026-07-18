@@ -329,7 +329,12 @@ export default function JobDisplayPage() {
                     <span className="jdisplay__order-choice-price">
                       {dollars(board.ordering.standardCents)}
                     </span>
-                    <span>Refills extra</span>
+                    <span className="jdisplay__order-choice-note">
+                      Refills extra{" "}
+                      <em className="jdisplay__order-choice-accent">
+                        {dollars(board.ordering.refillCents)}
+                      </em>
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -343,7 +348,9 @@ export default function JobDisplayPage() {
                     <span className="jdisplay__order-choice-price">
                       {dollars(board.ordering.unlimitedCents)}
                     </span>
-                    <span>Refills included</span>
+                    <span className="jdisplay__order-choice-note">
+                      Refills included
+                    </span>
                   </button>
                 </div>
                 <button

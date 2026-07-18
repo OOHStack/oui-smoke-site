@@ -75,6 +75,8 @@ export type JobDisplaySnapshot = {
     enabled: boolean;
     standardCents: number;
     unlimitedCents: number;
+    /** Standard plan refill add-on (exclusive of HST). */
+    refillCents: number;
   };
   takeover: JobDisplayTakeover | null;
   serverTime: string;
@@ -311,6 +313,7 @@ export async function loadJobDisplayBoard(
         job.status !== "draft",
       standardCents: guestPayTierUnitCents("standard", pricing),
       unlimitedCents: guestPayTierUnitCents("unlimited", pricing),
+      refillCents: pricing.refillPriceCents,
     },
     takeover,
     serverTime: new Date(now).toISOString(),

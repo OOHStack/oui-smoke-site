@@ -302,9 +302,18 @@
   line-height: 1;
 }
 
-.jdisplay__order-choice span:last-child {
+.jdisplay__order-choice-note {
   color: var(--ink-mute);
   font-size: 0.88rem;
+  font-style: normal;
+}
+
+.jdisplay__order-choice-accent {
+  margin-left: 0.2em;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.02em;
 }
 
 .jdisplay__order-flavours {
