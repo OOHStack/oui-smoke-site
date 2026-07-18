@@ -95,118 +95,6 @@ function callTypeLabel(type: string) {
   return "Help";
 }
 
-/** One clear “do this next” line for the unit modal. */
-function hookahModalGuide(opts: {
-  status: string;
-  paymentModel?: string;
-  guestPayTier?: string | null;
-  unitPaymentStatus?: string | null;
-  hasFlavour: boolean;
-  overdue: boolean;
-  issueFlag: boolean;
-  activeCall: ActiveCall | null;
-}): { step: string; title: string; detail: string } {
-  const {
-    status,
-    paymentModel,
-    guestPayTier,
-    unitPaymentStatus,
-    hasFlavour,
-    overdue,
-    issueFlag,
-    activeCall,
-  } = opts;
-  const onsite = paymentModel === "pay_at_event";
-
-  if (status === "staged") {
-    if (onsite && !guestPayTier) {
-      return {
-        step: "1 of 3",
-        title: "Choose Standard or Unlimited",
-        detail: "Set the guest plan first — then collect and send.",
-      };
-    }
-    if (onsite && guestPayTier && unitPaymentStatus !== "succeeded") {
-      return {
-        step: "2 of 3",
-        title:
-          unitPaymentStatus === "pending"
-            ? "Finish payment on the Terminal"
-            : "Collect payment for this unit",
-        detail:
-          unitPaymentStatus === "pending"
-            ? "Complete the charge on Square Terminal, or mark paid if already collected."
-            : "Push to Terminal, or mark paid if you already took cash/card.",
-      };
-    }
-    if (!hasFlavour) {
-      return {
-        step: onsite ? "3 of 3" : "1 of 2",
-        title: "Set the flavour",
-        detail: "Shows on the prep board. Set it before sending to the floor.",
-      };
-    }
-    return {
-      step: onsite ? "Ready" : "2 of 2",
-      title: "Send to the floor when ready",
-      detail: "Head packed? Walk it out, then show the guest QR if needed.",
-    };
-  }
-
-  if (status === "out") {
-    if (activeCall) {
-      if (activeCall.status === "open") {
-        return {
-          step: "Guest call",
-          title: `Claim: ${callTypeLabel(activeCall.type).toLowerCase()}`,
-          detail: "Tap I’m on it, then finish the request below.",
-        };
-      }
-      if (activeCall.type === "refill") {
-        return {
-          step: "Guest call",
-          title: "Collect & deliver this refill",
-          detail: "Use the buttons on the call — prep the head, then deliver.",
-        };
-      }
-      return {
-        step: "Guest call",
-        title: `Finish: ${callTypeLabel(activeCall.type).toLowerCase()}`,
-        detail: "Help the guest, then mark the request done.",
-      };
-    }
-    if (issueFlag) {
-      return {
-        step: "Issue",
-        title: "Issue flagged on this unit",
-        detail: "Fix it on the floor, then resolve the flag when clear.",
-      };
-    }
-    if (overdue) {
-      return {
-        step: "Check",
-        title: "Staff check is overdue",
-        detail: "Visit the table and log a check to reset the timer.",
-      };
-    }
-    return {
-      step: "On floor",
-      title: "Unit is with the guest",
-      detail: "Log checks as you go. Refill when needed. Close out when they’re done.",
-    };
-  }
-
-  if (status === "returned") {
-    return {
-      step: "Closed",
-      title: "Back from the floor",
-      detail: "Send it out again, or move it to Ready for the next guest.",
-    };
-  }
-
-  return { step: "", title: "Unit details", detail: "" };
-}
-
 type JobEvent = {
   id: number;
   type: string;
@@ -2500,9 +2388,7 @@ function HookahModal({
   onRefresh: () => void | Promise<void>;
   onClose: () => void;
 }) {
-  const [sendNote, setSendNote] = useState("");
-  const [checkNote, setCheckNote] = useState("");
-  const [closeNote, setCloseNote] = useState("");
+  const [note, setNote] = useState("");
   const [flavourId, setFlavourId] = useState(
     a.flavourId ? String(a.flavourId) : "",
   );
@@ -2517,7 +2403,6 @@ function HookahModal({
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [qrUrl, setQrUrl] = useState("");
   const [qrLoading, setQrLoading] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const flavourDirtyRef = useRef(false);
   const pendingFlavourRef = useRef<number | null | undefined>(undefined);
@@ -2526,14 +2411,11 @@ function HookahModal({
 
   // Reset modal chrome only when opening a different unit.
   useEffect(() => {
-    setSendNote("");
-    setCheckNote("");
-    setCloseNote("");
+    setNote("");
     setFormError("");
     setFormOk("");
     setCheckLogged(false);
     setQrOpen(false);
-    setMoreOpen(false);
     flavourDirtyRef.current = false;
     pendingFlavourRef.current = undefined;
     lastServerFlavourRef.current = a.flavourId ?? null;
@@ -2629,25 +2511,6 @@ function HookahModal({
     paymentModel === "pay_at_event" &&
     !!a.guestPayTier &&
     a.unitPaymentStatus !== "succeeded";
-  const guide = hookahModalGuide({
-    status: a.status,
-    paymentModel,
-    guestPayTier: a.guestPayTier,
-    unitPaymentStatus: a.unitPaymentStatus,
-    hasFlavour: !!flavourId,
-    overdue,
-    issueFlag: a.issueFlag,
-    activeCall: a.activeCall,
-  });
-  const guestRefillActive = !!guestRefill;
-  const stagedStep =
-    paymentModel === "pay_at_event" && !a.guestPayTier
-      ? "plan"
-      : unitUnpaid
-        ? "pay"
-        : !flavourId
-          ? "flavour"
-          : "send";
 
   function assertReadyToSend(): boolean {
     if (!flavourId) {
@@ -2711,7 +2574,7 @@ function HookahModal({
         return false;
       }
       if (body.action === "check") {
-        setCheckNote("");
+        setNote("");
         setCheckLogged(true);
         setFormOk("Check logged — next timer reset");
       }
@@ -2752,44 +2615,6 @@ function HookahModal({
       setQrDataUrl(qr.qrDataUrl);
       setQrUrl(qr.url);
       setQrOpen(true);
-    } finally {
-      setQrLoading(false);
-    }
-  }
-
-  async function regenerateGuestQr() {
-    setQrLoading(true);
-    setFormError("");
-    try {
-      const ensureRes = await fetch(`/api/jobs/${jobId}/hookahs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "ensure_guest_token",
-          assignmentId: a.id,
-          regenerate: true,
-        }),
-      });
-      if (!ensureRes.ok) {
-        setFormError("Couldn’t regenerate guest link");
-        return;
-      }
-      const updated = await ensureRes.json();
-      const token = updated.guestToken as string | undefined;
-      if (!token) {
-        setFormError("Couldn’t regenerate guest link");
-        return;
-      }
-      const qrRes = await fetch(`/api/qr?token=${encodeURIComponent(token)}`);
-      if (!qrRes.ok) {
-        setFormError("Couldn’t generate QR");
-        return;
-      }
-      const qr = await qrRes.json();
-      setQrDataUrl(qr.qrDataUrl);
-      setQrUrl(qr.url);
-      setQrOpen(true);
-      await onRefresh();
     } finally {
       setQrLoading(false);
     }
@@ -2844,70 +2669,16 @@ function HookahModal({
         </div>
 
         {prompt ? <p className="hookah-modal__prompt">{prompt}</p> : null}
-        {guide.title ? (
-          <div className="hookah-modal__next" aria-live="polite">
-            {guide.step ? (
-              <span className="hookah-modal__next-step">{guide.step}</span>
-            ) : null}
-            <strong className="hookah-modal__next-title">{guide.title}</strong>
-            <p className="hookah-modal__next-detail">{guide.detail}</p>
-          </div>
-        ) : null}
         {formError ? <p className="login-error">{formError}</p> : null}
         {formOk ? <p className="collect-toast">{formOk}</p> : null}
 
-        {a.status === "staged" && paymentModel === "pay_at_event" ? (
-          <ol className="hookah-modal__steps" aria-label="Send-out checklist">
-            <li
-              className={`hookah-modal__step${
-                a.guestPayTier ? " is-done" : ""
-              }${stagedStep === "plan" ? " is-current" : ""}`}
-            >
-              <span className="hookah-modal__step-n">1</span>
-              Plan
-            </li>
-            <li
-              className={`hookah-modal__step${
-                a.guestPayTier && a.unitPaymentStatus === "succeeded"
-                  ? " is-done"
-                  : ""
-              }${stagedStep === "pay" ? " is-current" : ""}`}
-            >
-              <span className="hookah-modal__step-n">2</span>
-              Pay
-            </li>
-            <li
-              className={`hookah-modal__step${
-                stagedStep === "flavour" || stagedStep === "send"
-                  ? " is-current"
-                  : flavourId
-                    ? " is-done"
-                    : ""
-              }`}
-            >
-              <span className="hookah-modal__step-n">3</span>
-              Flavour &amp; send
-            </li>
-          </ol>
-        ) : null}
-
-        {paymentModel === "pay_at_event" &&
-        (a.status === "staged" || a.status === "out") &&
-        (!a.guestPayTier || a.status === "staged") ? (
-          <section
-            className={`hookah-modal__section${
-              stagedStep === "plan" && a.status === "staged"
-                ? " hookah-modal__section--focus"
-                : ""
-            }`}
-          >
-            <h3 className="hookah-modal__section-title">
-              {a.guestPayTier ? "Guest plan" : "1 · Choose guest plan"}
-            </h3>
+        {paymentModel === "pay_at_event" ? (
+          <section className="hookah-modal__section">
+            <h3 className="hookah-modal__section-title">Guest pay tier</h3>
             <p className="hookah-modal__hint">
-              {a.guestPayTier
-                ? `Selected ${a.guestPayTier}. Change only if the guest switches. Rates exclude HST — Square adds ${Math.round(pricing.hstRate * 100)}%.`
-                : `Required first. Rates exclude HST — Square adds ${Math.round(pricing.hstRate * 100)}%. Standard refills ${formatMoney(pricing.refillPriceCents)} + HST; Unlimited refills included.`}
+              Required before send-out. Catalog rates exclude HST — Square adds{" "}
+              {Math.round(pricing.hstRate * 100)}% at charge. Standard refills $
+              {pricing.refillPriceCents / 100} + HST; Unlimited refills included.
             </p>
             <div className="guest-tier-picker__row">
               <button
@@ -2945,19 +2716,12 @@ function HookahModal({
         ) : null}
 
         {unitUnpaid ? (
-          <section
-            className={`hookah-modal__section${
-              stagedStep === "pay" ? " hookah-modal__section--focus" : ""
-            }`}
-          >
-            <h3 className="hookah-modal__section-title">
-              {a.status === "staged" ? "2 · Collect payment" : "Collect unit payment"}
-            </h3>
+          <section className="hookah-modal__section">
+            <h3 className="hookah-modal__section-title">Collect unit</h3>
             <p className="hookah-modal__hint">
-              Charge this hookah before walking it out. Terminal pushes the amount to
-              Square; Mark paid if you already collected another way.
+              Charge the guest for this hookah before or as you send it out.
             </p>
-            <div className="hookah-modal__btn-row hookah-modal__btn-row--split">
+            <div className="hookah-modal__btn-row">
               <button
                 type="button"
                 className="btn btn-ok hookah-modal__btn-main"
@@ -2976,8 +2740,8 @@ function HookahModal({
                 }
               >
                 {a.unitPaymentStatus === "pending"
-                  ? "Waiting on Terminal…"
-                  : "Push to Terminal"}
+                  ? "Terminal pending…"
+                  : "Push unit to terminal"}
               </button>
               <button
                 type="button"
@@ -2990,7 +2754,7 @@ function HookahModal({
                   })
                 }
               >
-                Mark paid
+                Mark unit paid
               </button>
             </div>
           </section>
@@ -3128,15 +2892,15 @@ function HookahModal({
                           pricing,
                         ),
                       source: "guest",
+                      note: note || undefined,
                       ...(collectChannel ? { collectChannel } : {}),
                     });
                   }}
-                  deliverLabel="Deliver guest refill"
                 />
               ) : (
                 <button
                   type="button"
-                  className="btn btn-sm btn-ok"
+                  className="btn btn-sm"
                   onClick={async () => {
                     await fetch(`/api/service-requests/${a.activeCall!.id}`, {
                       method: "PATCH",
@@ -3153,67 +2917,51 @@ function HookahModal({
           </div>
         ) : null}
 
-        {a.status !== "staged" ? (
-          <div className="hookah-modal__summary">
-            <div className="hookah-modal__summary-item">
-              <span className="hookah-card__meta-label">Flavour</span>
-              <div>{flavourName}</div>
-            </div>
-            {a.status === "out" && a.nextCheckAt ? (
-              <div className="hookah-modal__summary-item">
-                <span className="hookah-card__meta-label">Next check</span>
-                <Countdown target={a.nextCheckAt} />
-              </div>
-            ) : null}
-            <div className="hookah-modal__summary-item">
-              <span className="hookah-card__meta-label">Logged</span>
-              <div className="list-meta">
-                {a.checkCount} check{a.checkCount === 1 ? "" : "s"}
-                {a.refillCount > 0
-                  ? ` · ${a.refillCount} refill${a.refillCount === 1 ? "" : "s"}`
-                  : ""}
-              </div>
-            </div>
-            {a.status === "returned" && returnOutcomeLabel(a.returnOutcome) ? (
-              <div className="hookah-modal__summary-item">
-                <span className="hookah-card__meta-label">Close-out</span>
-                <div>{returnOutcomeLabel(a.returnOutcome)}</div>
-              </div>
-            ) : null}
-            {a.guestFeedbackAt && a.guestRating != null ? (
-              <div className="hookah-modal__summary-item">
-                <span className="hookah-card__meta-label">Guest feedback</span>
-                <div>
-                  {a.guestRating}/5
-                  {a.guestComment ? (
-                    <div className="list-meta" style={{ marginTop: "0.25rem" }}>
-                      “{a.guestComment}”
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
+        <div className="hookah-modal__summary">
+          <div className="hookah-modal__summary-item">
+            <span className="hookah-card__meta-label">Flavour</span>
+            <div>{flavourName}</div>
           </div>
-        ) : null}
+          {a.status === "out" && a.nextCheckAt ? (
+            <div className="hookah-modal__summary-item">
+              <span className="hookah-card__meta-label">Next check</span>
+              <Countdown target={a.nextCheckAt} />
+            </div>
+          ) : null}
+          <div className="hookah-modal__summary-item">
+            <span className="hookah-card__meta-label">Logged</span>
+            <div className="list-meta">
+              {a.checkCount} check{a.checkCount === 1 ? "" : "s"}
+              {a.refillCount > 0
+                ? ` · ${a.refillCount} refill${a.refillCount === 1 ? "" : "s"}`
+                : ""}
+            </div>
+          </div>
+          {a.status === "returned" && returnOutcomeLabel(a.returnOutcome) ? (
+            <div className="hookah-modal__summary-item">
+              <span className="hookah-card__meta-label">Close-out</span>
+              <div>{returnOutcomeLabel(a.returnOutcome)}</div>
+            </div>
+          ) : null}
+          {a.guestFeedbackAt && a.guestRating != null ? (
+            <div className="hookah-modal__summary-item">
+              <span className="hookah-card__meta-label">Guest feedback</span>
+              <div>
+                {a.guestRating}/5
+                {a.guestComment ? (
+                  <div className="list-meta" style={{ marginTop: "0.25rem" }}>
+                    “{a.guestComment}”
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         {a.status === "staged" ? (
           <div className="hookah-modal__sections">
-            <section
-              className={`hookah-modal__section${
-                stagedStep === "flavour" || stagedStep === "send"
-                  ? " hookah-modal__section--focus"
-                  : ""
-              }`}
-            >
-              <h3 className="hookah-modal__section-title">
-                {paymentModel === "pay_at_event"
-                  ? "3 · Flavour & send"
-                  : "Flavour & send"}
-              </h3>
-              <p className="hookah-modal__hint">
-                Flavour saves to the prep board. Send when the head is packed and
-                you’re walking it out.
-              </p>
+            <section className="hookah-modal__section">
+              <h3 className="hookah-modal__section-title">Prep before it goes out</h3>
               <div className="hookah-card__fields">
                 <div className="hookah-field">
                   <span>Flavour</span>
@@ -3224,45 +2972,83 @@ function HookahModal({
                   />
                 </div>
                 <label className="hookah-field">
-                  <span>Send note (optional)</span>
+                  <span>Note for the send-out (optional)</span>
                   <input
-                    placeholder="e.g. table 4, extra ice…"
-                    value={sendNote}
-                    onChange={(e) => setSendNote(e.target.value)}
+                    placeholder="e.g. extra ice, table 4…"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
                   />
                 </label>
               </div>
+            </section>
+
+            <section className="hookah-modal__section">
+              <h3 className="hookah-modal__section-title">Actions</h3>
               <div className="hookah-modal__btn-stack">
-                <button
-                  type="button"
-                  className="btn btn-ok hookah-modal__btn-main"
-                  disabled={!canSendOutFully}
-                  title={
-                    !flavourId
-                      ? "Set flavour first"
-                      : needsGuestTier && !a.guestPayTier
-                        ? "Choose Standard or Unlimited first"
-                        : undefined
-                  }
-                  onClick={() => {
-                    if (!assertReadyToSend()) return;
-                    run(
-                      {
-                        action: "send_out",
-                        assignmentId: a.id,
-                        flavourId: parseInt(flavourId, 10),
-                        note: sendNote || undefined,
-                      },
-                      true,
-                    );
-                  }}
-                >
-                  {!flavourId
-                    ? "Set flavour to send"
-                    : needsGuestTier && !a.guestPayTier
-                      ? "Choose plan to send"
-                      : "Send to floor"}
-                </button>
+                {needsGuestTier && !a.guestPayTier ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-ok hookah-modal__btn-main"
+                      disabled={!canSendOut}
+                      onClick={() => {
+                        if (!assertReadyToSend()) return;
+                        run(
+                          {
+                            action: "send_out",
+                            assignmentId: a.id,
+                            guestPayTier: "standard",
+                            flavourId: parseInt(flavourId, 10),
+                            note: note || undefined,
+                          },
+                          true,
+                        );
+                      }}
+                    >
+                      Send as Standard · ${pricing.onsiteUnitRate} + HST
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ok hookah-modal__btn-main"
+                      disabled={!canSendOut}
+                      onClick={() => {
+                        if (!assertReadyToSend()) return;
+                        run(
+                          {
+                            action: "send_out",
+                            assignmentId: a.id,
+                            guestPayTier: "unlimited",
+                            flavourId: parseInt(flavourId, 10),
+                            note: note || undefined,
+                          },
+                          true,
+                        );
+                      }}
+                    >
+                      Send as Unlimited · ${pricing.onsiteUnlimitedRate} + HST
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-ok hookah-modal__btn-main"
+                    disabled={!canSendOutFully}
+                    onClick={() => {
+                      if (!assertReadyToSend()) return;
+                      run(
+                        {
+                          action: "send_out",
+                          assignmentId: a.id,
+                          flavourId: parseInt(flavourId, 10),
+                          note: note || undefined,
+                        },
+                        true,
+                      );
+                    }}
+                  >
+                    Send to floor
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn-ghost"
@@ -3277,259 +3063,248 @@ function HookahModal({
 
         {a.status === "out" ? (
           <div className="hookah-modal__sections">
-            <section
-              className={`hookah-modal__section${
-                overdue && !a.activeCall ? " hookah-modal__section--focus" : ""
-              }`}
-            >
+            <section className="hookah-modal__section">
               <h3 className="hookah-modal__section-title">Staff check</h3>
               <p className="hookah-modal__hint">
-                Log a quick table visit when the timer pings. Refills are separate.
+                Checks happen randomly or when the timer notifies you. Log the visit — refill delivery is separate below.
               </p>
               <label className="hookah-field">
                 <span>Check note (optional)</span>
                 <input
                   placeholder="What did you notice?"
-                  value={checkNote}
-                  onChange={(e) => setCheckNote(e.target.value)}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
                 />
               </label>
-              <button
-                type="button"
-                className={`btn btn-ok hookah-modal__btn-main ${
-                  checkLogged ? "is-logged" : ""
-                }`}
-                disabled={actionBusy}
-                onClick={() =>
-                  void run({
-                    action: "check",
-                    assignmentId: a.id,
-                    note: checkNote || undefined,
-                  })
-                }
-              >
-                {actionBusy
-                  ? "Logging…"
-                  : checkLogged
-                    ? "Check logged ✓"
-                    : overdue
-                      ? "Log overdue check"
+              <div className="hookah-modal__btn-row">
+                <button
+                  type="button"
+                  className={`btn btn-ok hookah-modal__btn-main ${
+                    checkLogged ? "is-logged" : ""
+                  }`}
+                  disabled={actionBusy}
+                  onClick={() =>
+                    void run({
+                      action: "check",
+                      assignmentId: a.id,
+                      note: note || undefined,
+                    })
+                  }
+                >
+                  {actionBusy
+                    ? "Logging…"
+                    : checkLogged
+                      ? "Check logged ✓"
                       : "Log check"}
-              </button>
+                </button>
+              </div>
             </section>
 
-            {!guestRefillActive ? (
-              <section className="hookah-modal__section">
-                <h3 className="hookah-modal__section-title">Staff refill</h3>
-                <p className="hookah-modal__hint">
-                  Use when you decide to swap a head (no guest request). Prep,
-                  then collect if needed and deliver.
-                </p>
-                <div className="hookah-card__fields">
-                  <div className="hookah-field">
-                    <span>Flavour on the new head</span>
-                    <FlavourPicker
-                      value={refillFlavourId}
-                      emptyLabel="Choose flavour…"
-                      flavours={flavours.map((f) =>
-                        a.flavourId === f.id
-                          ? { ...f, name: `${f.name} (current)` }
-                          : f,
-                      )}
-                      onChange={setRefillFlavourId}
-                    />
-                  </div>
-                  <div className="hookah-modal__price-row">
-                    <span>Charge</span>
-                    <strong>
-                      {refillPrice <= 0
-                        ? "Included"
-                        : `${formatMoney(refillPrice)} + HST`}
-                    </strong>
-                  </div>
+            <section className="hookah-modal__section">
+              <h3 className="hookah-modal__section-title">Deliver refill</h3>
+              <p className="hookah-modal__hint">
+                {guestRefill
+                  ? (guestRefill.priceCents ?? 0) <= 0
+                    ? "Prep the new head — this refill is included (no payment)."
+                    : guestRefill.paymentStatus === "succeeded"
+                      ? "Prep the new head — guest already paid. Deliver when ready."
+                      : guestRefill.payPreference === "terminal"
+                        ? "Prep the new head, bring the terminal, collect payment, then deliver."
+                        : "Prep the new head. Guest is paying on their phone — wait for Paid, or collect on terminal/cash if needed."
+                  : "Prep the new head at the station, then bring it back. Same flavour or a change — both are tracked."}
+              </p>
+              <div className="hookah-card__fields">
+                <div className="hookah-field">
+                  <span>Flavour on the new head</span>
+                  <FlavourPicker
+                    value={refillFlavourId}
+                    emptyLabel="Choose flavour…"
+                    flavours={flavours.map((f) =>
+                      a.flavourId === f.id
+                        ? { ...f, name: `${f.name} (current)` }
+                        : f,
+                    )}
+                    onChange={setRefillFlavourId}
+                  />
                 </div>
-                {refillPrice <= 0 ? (
-                  <button
-                    type="button"
-                    className="btn btn-ok hookah-modal__btn-main"
-                    disabled={!refillFlavourId}
-                    onClick={() => {
-                      if (!refillFlavourId) {
-                        setFormError("Choose the refill flavour");
-                        return;
-                      }
-                      run({
-                        action: "deliver_refill",
-                        assignmentId: a.id,
-                        flavourId: parseInt(refillFlavourId, 10),
-                        priceCents: refillPrice,
-                        source: "staff",
-                      });
-                    }}
-                  >
-                    Deliver refill
-                  </button>
-                ) : (
+                <div className="hookah-modal__price-row">
+                  <span>Charge</span>
+                  <strong>
+                    {refillPrice <= 0
+                      ? "Included"
+                      : `${formatMoney(refillPrice)} + HST`}
+                  </strong>
+                </div>
+              </div>
+              {refillPrice <= 0 ||
+              guestRefill?.paymentStatus === "succeeded" ? (
+                <button
+                  type="button"
+                  className="btn btn-ok hookah-modal__btn-main"
+                  disabled={!refillFlavourId && !guestRefill}
+                  onClick={() => {
+                    if (!refillFlavourId && !guestRefill?.flavourId) {
+                      setFormError("Choose the refill flavour");
+                      return;
+                    }
+                    run({
+                      action: "deliver_refill",
+                      assignmentId: a.id,
+                      flavourId: refillFlavourId
+                        ? parseInt(refillFlavourId, 10)
+                        : guestRefill?.flavourId ?? undefined,
+                      priceCents: refillPrice,
+                      source: guestRefill ? "guest" : "staff",
+                      serviceRequestId: guestRefill?.id,
+                      note: note || undefined,
+                    });
+                  }}
+                >
+                  {guestRefill ? "Deliver guest refill" : "Deliver refill"}
+                </button>
+              ) : (
+                <div style={{ marginTop: "0.35rem" }}>
                   <RefillCollectActions
                     priceCents={refillPrice}
+                    paymentStatus={guestRefill?.paymentStatus}
+                    payPreference={guestRefill?.payPreference}
+                    checkoutUrl={guestRefill?.checkoutUrl}
                     terminalReady={terminalReady}
+                    onPushTerminal={
+                      guestRefill
+                        ? () => {
+                            void run({
+                              action: "push_refill_terminal",
+                              assignmentId: a.id,
+                              serviceRequestId: guestRefill.id,
+                              amountCents: refillPrice,
+                              flavourLabel:
+                                guestRefill.flavourLabel ?? undefined,
+                            });
+                          }
+                        : undefined
+                    }
                     onDeliver={(collectChannel) => {
-                      if (!refillFlavourId) {
+                      if (!refillFlavourId && !guestRefill?.flavourId) {
                         setFormError("Choose the refill flavour");
                         return;
                       }
                       void run({
                         action: "deliver_refill",
                         assignmentId: a.id,
-                        flavourId: parseInt(refillFlavourId, 10),
+                        flavourId: refillFlavourId
+                          ? parseInt(refillFlavourId, 10)
+                          : guestRefill?.flavourId ?? undefined,
                         priceCents: refillPrice,
-                        source: "staff",
+                        source: guestRefill ? "guest" : "staff",
+                        serviceRequestId: guestRefill?.id,
+                        note: note || undefined,
                         ...(collectChannel ? { collectChannel } : {}),
                       });
                     }}
                   />
-                )}
-              </section>
-            ) : (
-              <p className="hookah-modal__hint hookah-modal__hint--inline">
-                Guest refill is active above — collect and deliver from that call.
+                </div>
+              )}
+            </section>
+
+            <section className="hookah-modal__section">
+              <h3 className="hookah-modal__section-title">Close out</h3>
+              <p className="hookah-modal__hint">
+                When the client is done, mark how the unit came back. Notes are optional for each.
               </p>
-            )}
-
-            <details
-              className="hookah-modal__details"
-              open={moreOpen || (!!a.issueFlag && !a.activeCall)}
-              onToggle={(e) => setMoreOpen((e.target as HTMLDetailsElement).open)}
-            >
-              <summary className="hookah-modal__details-summary">
-                When guest is done · close out &amp; tools
-              </summary>
-              <div className="hookah-modal__details-body">
-                <section className="hookah-modal__section">
-                  <h3 className="hookah-modal__section-title">Close out</h3>
-                  <p className="hookah-modal__hint">
-                    Mark how the unit came back when the guest is finished.
-                  </p>
-                  <label className="hookah-field">
-                    <span>Close-out note (optional)</span>
-                    <input
-                      placeholder="Optional note for this outcome…"
-                      value={closeNote}
-                      onChange={(e) => setCloseNote(e.target.value)}
-                    />
-                  </label>
-                  <div className="hookah-modal__btn-stack">
-                    <button
-                      type="button"
-                      className="btn btn-ok hookah-modal__btn-main"
-                      onClick={() =>
-                        run(
-                          {
-                            action: "return",
-                            assignmentId: a.id,
-                            outcome: "returned",
-                            note: closeNote || undefined,
-                          },
-                          true,
-                        )
-                      }
-                    >
-                      Returned OK
-                    </button>
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() =>
-                        run(
-                          {
-                            action: "return",
-                            assignmentId: a.id,
-                            outcome: "returned_with_issue",
-                            note: closeNote || undefined,
-                          },
-                          true,
-                        )
-                      }
-                    >
-                      Returned with issue
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-danger-ghost"
-                      onClick={() =>
-                        run(
-                          {
-                            action: "return",
-                            assignmentId: a.id,
-                            outcome: "not_returned",
-                            note: closeNote || undefined,
-                          },
-                          true,
-                        )
-                      }
-                    >
-                      Not returned
-                    </button>
-                  </div>
-                </section>
-
-                <section className="hookah-modal__section hookah-modal__section--quiet">
-                  <button
-                    type="button"
-                    className={`btn hookah-modal__btn-main ${
-                      a.issueFlag ? "btn-ok" : "btn-danger-ghost"
-                    }`}
-                    onClick={() =>
-                      run({
-                        action: "flag_issue",
+              <label className="hookah-field">
+                <span>Close-out note (optional)</span>
+                <input
+                  placeholder="Optional note for this outcome…"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </label>
+              <div className="hookah-modal__btn-stack">
+                <button
+                  type="button"
+                  className="btn btn-ok hookah-modal__btn-main"
+                  onClick={() =>
+                    run(
+                      {
+                        action: "return",
                         assignmentId: a.id,
-                        note: closeNote || undefined,
-                      })
-                    }
-                  >
-                    {a.issueFlag ? "Resolve issue" : "Flag issue (keep on floor)"}
-                  </button>
-                </section>
-
-                <section className="hookah-modal__section hookah-modal__section--quiet">
-                  <h3 className="hookah-modal__section-title">Guest QR</h3>
-                  <p className="hookah-modal__hint">
-                    Pushes the serve QR to the event tablet. Guest scans for coals,
-                    refills, or help.
-                  </p>
-                  <div className="hookah-modal__btn-stack">
-                    <button
-                      type="button"
-                      className="btn btn-primary hookah-modal__btn-main"
-                      onClick={showGuestQr}
-                      disabled={qrLoading}
-                    >
-                      {qrLoading ? "Preparing QR…" : "Show guest QR on display"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      disabled={qrLoading}
-                      onClick={() => void regenerateGuestQr()}
-                    >
-                      Regenerate guest link
-                    </button>
-                  </div>
-                </section>
+                        outcome: "returned",
+                        note: note || undefined,
+                      },
+                      true,
+                    )
+                  }
+                >
+                  Returned OK
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() =>
+                    run(
+                      {
+                        action: "return",
+                        assignmentId: a.id,
+                        outcome: "returned_with_issue",
+                        note: note || undefined,
+                      },
+                      true,
+                    )
+                  }
+                >
+                  Returned with issue
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger-ghost"
+                  onClick={() =>
+                    run(
+                      {
+                        action: "return",
+                        assignmentId: a.id,
+                        outcome: "not_returned",
+                        note: note || undefined,
+                      },
+                      true,
+                    )
+                  }
+                >
+                  Not returned
+                </button>
               </div>
-            </details>
+            </section>
+
+            <section className="hookah-modal__section hookah-modal__section--quiet">
+              <button
+                type="button"
+                className={`btn hookah-modal__btn-main ${
+                  a.issueFlag ? "btn-ok" : "btn-danger-ghost"
+                }`}
+                onClick={() =>
+                  run({
+                    action: "flag_issue",
+                    assignmentId: a.id,
+                    note: note || undefined,
+                  })
+                }
+              >
+                {a.issueFlag ? "Resolve issue" : "Flag issue (keep on floor)"}
+              </button>
+            </section>
           </div>
         ) : null}
 
         {a.status === "returned" ? (
           <div className="hookah-modal__sections">
-            <section className="hookah-modal__section hookah-modal__section--focus">
-              <h3 className="hookah-modal__section-title">Next for this unit</h3>
+            <section className="hookah-modal__section">
+              <h3 className="hookah-modal__section-title">Back from the floor</h3>
               <p className="hookah-card__done">
                 {returnOutcomeLabel(a.returnOutcome)
                   ? `Closed as ${returnOutcomeLabel(a.returnOutcome)?.toLowerCase()}.`
                   : "This hookah is closed out."}
-                {a.returnNotes ? ` Note: ${a.returnNotes}` : ""}
+                {a.returnNotes ? ` Note: ${a.returnNotes}` : ""}{" "}
+                Send it out again or park it in ready.
               </p>
               <div className="hookah-field">
                 <span>Flavour for next send-out</span>
@@ -3571,18 +3346,66 @@ function HookahModal({
         ) : null}
         </div>
 
-        {a.status === "staged" ? (
+        {(a.status === "staged" || a.status === "out") ? (
           <div className="hookah-modal__footer">
             <button
               type="button"
-              className="btn btn-ghost hookah-modal__qr-btn"
+              className="btn btn-primary hookah-modal__qr-btn"
               onClick={showGuestQr}
               disabled={qrLoading}
             >
-              {qrLoading ? "Preparing QR…" : "Preview guest QR on display"}
+              {qrLoading ? "Preparing QR…" : "Show guest QR code"}
             </button>
+            {a.status === "out" ? (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={qrLoading}
+                onClick={async () => {
+                  setQrLoading(true);
+                  setFormError("");
+                  try {
+                    const ensureRes = await fetch(`/api/jobs/${jobId}/hookahs`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        action: "ensure_guest_token",
+                        assignmentId: a.id,
+                        regenerate: true,
+                      }),
+                    });
+                    if (!ensureRes.ok) {
+                      setFormError("Couldn’t regenerate guest link");
+                      return;
+                    }
+                    const updated = await ensureRes.json();
+                    const token = updated.guestToken as string | undefined;
+                    if (!token) {
+                      setFormError("Couldn’t regenerate guest link");
+                      return;
+                    }
+                    const qrRes = await fetch(
+                      `/api/qr?token=${encodeURIComponent(token)}`,
+                    );
+                    if (!qrRes.ok) {
+                      setFormError("Couldn’t generate QR");
+                      return;
+                    }
+                    const qr = await qrRes.json();
+                    setQrDataUrl(qr.qrDataUrl);
+                    setQrUrl(qr.url);
+                    setQrOpen(true);
+                    await onRefresh();
+                  } finally {
+                    setQrLoading(false);
+                  }
+                }}
+              >
+                Regenerate guest link
+              </button>
+            ) : null}
             <p className="hookah-modal__footer-hint">
-              Optional — usually shown after payment or when the unit is out.
+              Guest scans this to request coals, flavour refills, or help.
             </p>
           </div>
         ) : null}
