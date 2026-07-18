@@ -8,6 +8,7 @@ import Countdown from "@/components/admin/Countdown";
 import StatusBadge from "@/components/admin/StatusBadge";
 import HookahBoard from "@/components/admin/HookahBoard";
 import GuestLedger from "@/components/admin/GuestLedger";
+import { FlavourPicker } from "@/components/admin/FlavourPicker";
 import { PasswordField } from "@/components/admin/PasswordField";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { RefillCollectActions } from "@/components/admin/RefillCollectActions";
@@ -820,48 +821,67 @@ export default function JobDetailPage() {
           </p>
         </div>
         <div className="page-head-actions">
-          <button
-            type="button"
-            className="btn btn-sm"
-            disabled={portalBusy}
-            onClick={() => void copyClientPortal()}
-          >
-            {portalBusy ? "…" : "Copy client portal"}
-          </button>
-          <button type="button" className="btn btn-sm" onClick={openEdit}>
-            Edit
-          </button>
-          <Link href={`/admin/jobs/${jobId}/payments`} className="btn btn-sm">
-            Payments
-          </Link>
-          {isAdmin ? (
+          <div className="page-head-actions__group" aria-label="Job status">
+            <label className="page-head-status">
+              <span className="page-head-status__label">Status</span>
+              <select
+                className="inline-select page-head-status__select"
+                value={job.status}
+                onChange={(e) => patchJob({ status: e.target.value })}
+              >
+                {[
+                  "draft",
+                  "confirmed",
+                  "active",
+                  "completed",
+                  "cancelled",
+                ].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="page-head-actions__group" aria-label="Job tools">
+            <button type="button" className="btn btn-sm" onClick={openEdit}>
+              Edit
+            </button>
+            <Link href={`/admin/jobs/${jobId}/payments`} className="btn btn-sm">
+              Payments
+            </Link>
             <button
               type="button"
-              className="btn btn-sm btn-danger-ghost"
-              onClick={openReset}
+              className="btn btn-sm"
+              disabled={portalBusy}
+              onClick={() => void copyClientPortal()}
+              title="Copy client portal link"
             >
-              Reset
+              {portalBusy ? "…" : "Client portal"}
             </button>
-          ) : null}
-          <select
-            className="inline-select"
-            value={job.status}
-            onChange={(e) => patchJob({ status: e.target.value })}
-          >
-            {["draft", "confirmed", "active", "completed", "cancelled"].map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          </div>
+
           {isAdmin ? (
-            <button
-              type="button"
-              className="btn btn-sm btn-danger-ghost"
-              onClick={() => void deleteJob()}
+            <div
+              className="page-head-actions__group page-head-actions__group--danger"
+              aria-label="Destructive actions"
             >
-              Delete
-            </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger-ghost"
+                onClick={openReset}
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger-ghost"
+                onClick={() => void deleteJob()}
+              >
+                Delete
+              </button>
+            </div>
           ) : null}
         </div>
       </div>
@@ -2126,18 +2146,7 @@ function JobHookahBoard({
 }) {
   const [modalId, setModalId] = useState<number | null>(null);
   const [modalPrompt, setModalPrompt] = useState("");
-  const [modalAssignment, setModalAssignment] = useState<Assignment | null>(null);
-  // Ref only — setState on focus would re-render and close the native <select>.
-  const flavourPickerOpenRef = useRef(false);
-
-  useEffect(() => {
-    if (modalId == null) {
-      setModalAssignment(null);
-      return;
-    }
-    if (flavourPickerOpenRef.current) return;
-    setModalAssignment(assignments.find((a) => a.id === modalId) ?? null);
-  }, [assignments, modalId]);
+  const modalAssignment = assignments.find((a) => a.id === modalId) ?? null;
 
   async function boardPlace(payload: {
     assignmentId: number;
@@ -2241,19 +2250,9 @@ function JobHookahBoard({
           prompt={modalPrompt}
           onAction={onAction}
           onRefresh={onRefresh}
-          onFlavourPickerOpenChange={(open) => {
-            flavourPickerOpenRef.current = open;
-            if (!open && modalId != null) {
-              setModalAssignment(
-                assignments.find((a) => a.id === modalId) ?? null,
-              );
-            }
-          }}
           onClose={() => {
-            flavourPickerOpenRef.current = false;
             setModalId(null);
             setModalPrompt("");
-            setModalAssignment(null);
           }}
         />
       ) : null}
@@ -2270,7 +2269,6 @@ function HookahModal({
   prompt,
   onAction,
   onRefresh,
-  onFlavourPickerOpenChange,
   onClose,
 }: {
   assignment: Assignment;
@@ -2283,7 +2281,6 @@ function HookahModal({
     body: Record<string, unknown>,
   ) => boolean | Promise<boolean> | void | Promise<void>;
   onRefresh: () => void | Promise<void>;
-  onFlavourPickerOpenChange?: (open: boolean) => void;
   onClose: () => void;
 }) {
   const [note, setNote] = useState("");
@@ -2305,11 +2302,9 @@ function HookahModal({
   const flavourDirtyRef = useRef(false);
   const pendingFlavourRef = useRef<number | null | undefined>(undefined);
   const lastServerFlavourRef = useRef<number | null>(a.flavourId ?? null);
-  const flavourIdRef = useRef(flavourId);
-  flavourIdRef.current = flavourId;
+  const flavourSaveGen = useRef(0);
 
-  // Reset modal chrome only when opening a different unit — live SSE must not
-  // wipe an in-progress flavour pick.
+  // Reset modal chrome only when opening a different unit.
   useEffect(() => {
     setNote("");
     setFormError("");
@@ -2345,8 +2340,7 @@ function HookahModal({
     setFlavourId(server != null ? String(server) : "");
   }, [a.flavourId]);
 
-  // Keep refill default in sync with guest call / assignment, without touching
-  // the staged flavour picker.
+  // Keep refill default in sync with guest call / assignment.
   useEffect(() => {
     const guestRefillFlavour =
       a.activeCall?.type === "refill" && a.activeCall.flavourId
@@ -2425,55 +2419,42 @@ function HookahModal({
     return true;
   }
 
-  async function commitFlavourChoice(next: string) {
+  function applyFlavourChoice(next: string) {
     const nextId = next ? parseInt(next, 10) : 0;
     const pending = nextId > 0 ? nextId : null;
     const server = lastServerFlavourRef.current;
-    if (pending === server && !flavourDirtyRef.current) return;
-
-    flavourDirtyRef.current = true;
-    pendingFlavourRef.current = pending;
-    setFormError("");
-
-    // Quiet save — no actionBusy toggle (that re-render closes the <select>).
-    const result = await onAction({
-      action: "set_flavour",
-      assignmentId: a.id,
-      flavourId: pending,
-      flavourLabel: pending == null ? "" : undefined,
-    });
-    const ok = result !== false;
-    if (ok) {
-      setFormOk(
-        pending != null
-          ? "Flavour set — shows on prep board (still Ready to send)"
-          : "Flavour cleared — removed from prep board",
-      );
+    if (pending === server) {
+      setFlavourId(next);
       return;
     }
-    setFormError("Couldn’t update flavour — try again");
-    if (pendingFlavourRef.current === pending) {
+
+    const gen = ++flavourSaveGen.current;
+    flavourDirtyRef.current = true;
+    pendingFlavourRef.current = pending;
+    setFlavourId(next);
+    setFormError("");
+
+    void (async () => {
+      const result = await onAction({
+        action: "set_flavour",
+        assignmentId: a.id,
+        flavourId: pending,
+        flavourLabel: pending == null ? "" : undefined,
+      });
+      if (gen !== flavourSaveGen.current) return;
+      if (result !== false) {
+        setFormOk(
+          pending != null
+            ? "Flavour set — shows on prep board (still Ready to send)"
+            : "Flavour cleared — removed from prep board",
+        );
+        return;
+      }
+      setFormError("Couldn’t update flavour — try again");
       flavourDirtyRef.current = false;
       pendingFlavourRef.current = undefined;
       setFlavourId(server != null ? String(server) : "");
-    }
-  }
-
-  function onFlavourSelectChange(next: string) {
-    const nextId = next ? parseInt(next, 10) : 0;
-    flavourDirtyRef.current = true;
-    pendingFlavourRef.current = nextId > 0 ? nextId : null;
-    flavourIdRef.current = next;
-    setFlavourId(next);
-  }
-
-  function onFlavourSelectFocus() {
-    onFlavourPickerOpenChange?.(true);
-  }
-
-  function onFlavourSelectBlur() {
-    onFlavourPickerOpenChange?.(false);
-    void commitFlavourChoice(flavourIdRef.current);
+    })();
   }
 
   async function run(body: Record<string, unknown>, close = false) {
@@ -2880,19 +2861,11 @@ function HookahModal({
               <div className="hookah-card__fields">
                 <label className="hookah-field">
                   <span>Flavour</span>
-                  <select
+                  <FlavourPicker
                     value={flavourId}
-                    onFocus={onFlavourSelectFocus}
-                    onChange={(e) => onFlavourSelectChange(e.target.value)}
-                    onBlur={onFlavourSelectBlur}
-                  >
-                    <option value="">Select a flavour</option>
-                    {flavours.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
+                    flavours={flavours}
+                    onChange={applyFlavourChoice}
+                  />
                 </label>
                 <label className="hookah-field">
                   <span>Note for the send-out (optional)</span>
@@ -3039,18 +3012,16 @@ function HookahModal({
               <div className="hookah-card__fields">
                 <label className="hookah-field">
                   <span>Flavour on the new head</span>
-                  <select
+                  <FlavourPicker
                     value={refillFlavourId}
-                    onChange={(e) => setRefillFlavourId(e.target.value)}
-                  >
-                    <option value="">Choose flavour…</option>
-                    {flavours.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                        {a.flavourId === f.id ? " (current)" : ""}
-                      </option>
-                    ))}
-                  </select>
+                    emptyLabel="Choose flavour…"
+                    flavours={flavours.map((f) =>
+                      a.flavourId === f.id
+                        ? { ...f, name: `${f.name} (current)` }
+                        : f,
+                    )}
+                    onChange={setRefillFlavourId}
+                  />
                 </label>
                 <div className="hookah-modal__price-row">
                   <span>Charge</span>
@@ -3233,19 +3204,11 @@ function HookahModal({
               </p>
               <label className="hookah-field">
                 <span>Flavour for next send-out</span>
-                <select
+                <FlavourPicker
                   value={flavourId}
-                  onFocus={onFlavourSelectFocus}
-                  onChange={(e) => onFlavourSelectChange(e.target.value)}
-                  onBlur={onFlavourSelectBlur}
-                >
-                  <option value="">Select a flavour</option>
-                  {flavours.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
+                  flavours={flavours}
+                  onChange={applyFlavourChoice}
+                />
               </label>
               <div className="hookah-modal__btn-stack">
                 <button

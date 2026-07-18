@@ -307,7 +307,43 @@ a.admin-user.active {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 0.55rem 0.75rem;
+}
+
+.page-head-actions__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
+}
+
+.page-head-actions__group + .page-head-actions__group {
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--line);
+}
+
+.page-head-actions__group--danger {
+  border-left-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.page-head-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.page-head-status__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.page-head-status__select {
+  min-width: 7.5rem;
+  text-transform: capitalize;
 }
 
 .row-actions {
@@ -1528,6 +1564,103 @@ a.admin-user.active {
 .hookah-modal input:focus {
   outline: none;
   border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+/* Custom flavour listbox — survives live SSE re-renders (native <select> does not). */
+.flavour-picker {
+  position: relative;
+  width: 100%;
+}
+
+.flavour-picker__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  width: 100%;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  text-align: left;
+  background-color: #121212;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+}
+
+.flavour-picker__trigger.is-empty {
+  color: var(--muted);
+}
+
+.flavour-picker__trigger:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+.flavour-picker.is-disabled .flavour-picker__trigger {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.flavour-picker__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flavour-picker__caret {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.flavour-picker.is-open .flavour-picker__caret {
+  transform: rotate(180deg);
+}
+
+.flavour-picker__menu {
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  overflow: auto;
+  background: #161616;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.flavour-picker__menu--portal {
+  position: fixed;
+  z-index: 80;
+}
+
+.flavour-picker__option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.flavour-picker__option:hover,
+.flavour-picker__option:focus {
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.flavour-picker__option.is-active {
+  background: color-mix(in srgb, var(--ok) 22%, transparent);
+  font-weight: 600;
 }
 
 .hookah-card__primary-row {
