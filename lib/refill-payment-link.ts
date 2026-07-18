@@ -111,9 +111,10 @@ export async function createGuestRefillCheckoutLink(opts: {
     };
   }
 
-  const label = `Refill · ${opts.flavourLabel} + HST`.slice(0, 120);
+  const label = `Flavour refill · ${opts.flavourLabel}`.slice(0, 120);
   const idempotencyKey = guestRefillPaymentKey(opts.serviceRequestId);
   const createdBy = opts.createdBy || "guest";
+  const netCents = Math.round(opts.amountCents);
 
   let pendingId: number;
   if (existing && (existing.status === "failed" || existing.status === "cancelled")) {
@@ -165,10 +166,14 @@ export async function createGuestRefillCheckoutLink(opts: {
     const link = await createDepositPaymentLink({
       idempotencyKey: `${idempotencyKey}-${pendingId}`,
       name: label,
-      amountCents,
+      amountCents: netCents,
+      amountMode: "exclusive",
+      hstRate: pricing.hstRate,
       currency: "CAD",
       paymentNote: `oui:payment:${pendingId}`,
       redirectUrl: thanks.toString(),
+      lineNote: "Oui Smoke · guest refill at your event",
+      description: `Oui Smoke · refill · ${opts.flavourLabel}`,
     });
 
     await db
@@ -278,9 +283,10 @@ export async function createGuestOrderUnitCheckoutLink(opts: {
   }
 
   const label =
-    `Extra hookah · ${opts.tierLabel} · ${opts.flavourLabel} + HST`.slice(0, 120);
+    `Extra hookah · ${opts.tierLabel} · ${opts.flavourLabel}`.slice(0, 120);
   const idempotencyKey = guestOrderUnitPaymentKey(opts.serviceRequestId);
   const createdBy = opts.createdBy || "guest";
+  const netCents = Math.round(opts.amountCents);
 
   let pendingId: number;
   if (existing && (existing.status === "failed" || existing.status === "cancelled")) {
@@ -332,10 +338,14 @@ export async function createGuestOrderUnitCheckoutLink(opts: {
     const link = await createDepositPaymentLink({
       idempotencyKey: `${idempotencyKey}-${pendingId}`,
       name: label,
-      amountCents,
+      amountCents: netCents,
+      amountMode: "exclusive",
+      hstRate: pricing.hstRate,
       currency: "CAD",
       paymentNote: `oui:payment:${pendingId}`,
       redirectUrl: thanks.toString(),
+      lineNote: `${opts.tierLabel} plan · Oui Smoke floor order`,
+      description: `Oui Smoke · ${opts.tierLabel} · ${opts.flavourLabel}`,
     });
 
     await db

@@ -12,6 +12,7 @@ import {
   jobDueCents,
   jobPaidCents,
 } from "@/lib/job-balance";
+import { getPricingForJob } from "@/lib/pricing";
 import {
   createDepositPaymentLink,
   isSquareConfigured,
@@ -112,10 +113,11 @@ export async function createJobCheckoutLink(opts: {
   const createdBy = opts.createdBy || "ops";
   const defaultLabel =
     kind === "balance"
-      ? `Balance — ${job.title}`
-      : `Deposit (${percent}%) — ${job.title}`;
+      ? `Final balance — ${job.title}`
+      : `Booking deposit (${percent}%) — ${job.title}`;
   const label = (opts.label?.trim() || defaultLabel).slice(0, 120);
   const idempotencyKey = randomUUID();
+  const pricing = await getPricingForJob(job);
 
   const [pending] = await db
     .insert(payments)
@@ -136,10 +138,19 @@ export async function createJobCheckoutLink(opts: {
       idempotencyKey,
       name: label,
       amountCents,
+      amountMode: "inclusive",
+      hstRate: pricing.hstRate,
       currency: "CAD",
       buyerEmail: sanitizeBuyerEmail(job.clientEmail),
       paymentNote: `oui:payment:${pending.id}`,
       redirectUrl: `${getSiteUrl()}/pay/thanks?job=${opts.jobId}`,
+      lineNote: job.location
+        ? `${job.clientName || "Client"} · ${job.location}`
+        : job.clientName || "Oui Smoke booking",
+      description:
+        kind === "balance"
+          ? `Oui Smoke · final balance for ${job.title}`
+          : `Oui Smoke · deposit to confirm ${job.title}`,
     });
 
     await db

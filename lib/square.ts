@@ -1,5 +1,13 @@
 import { createHmac, randomUUID, timingSafeEqual } from "crypto";
+import { CONTACT_EMAIL } from "@/lib/brand-contact";
 import { getSiteUrl } from "@/lib/guest";
+import {
+  DEFAULT_PRICING,
+  hstCents,
+  hstPercentLabel,
+  splitInclusiveHstCents,
+  withHstCents,
+} from "@/lib/pricing-config";
 
 export type SquareMoney = {
   amount: number;
@@ -117,37 +125,115 @@ async function squareFetch<T>(
   return data;
 }
 
-/** Create a Square-hosted checkout link (quick pay). */
+export type CheckoutAmountMode =
+  /** amountCents is tax-inclusive (deposit / balance quotes). */
+  | "inclusive"
+  /** amountCents is before HST (guest unit / refill catalog). */
+  | "exclusive";
+
+/**
+ * Create a Square-hosted checkout with net + HST line items and Oui branding cues.
+ * Logo / button colours still come from Square Dashboard → Payment links → Branding.
+ */
 export async function createDepositPaymentLink(input: {
   idempotencyKey: string;
+  /** Primary line-item title (service / deposit / refill). */
   name: string;
   amountCents: number;
+  /** Defaults to inclusive for booking deposits. */
+  amountMode?: CheckoutAmountMode;
+  hstRate?: number;
   currency?: string;
   buyerEmail?: string | null;
+  buyerPhone?: string | null;
   paymentNote: string;
   redirectUrl?: string;
+  /** Optional note under the service line (event name, flavour, etc.). */
+  lineNote?: string | null;
+  /** Payment-link description (seller-facing + some checkout contexts). */
+  description?: string | null;
 }): Promise<SquarePaymentLink> {
+  const currency = input.currency || "CAD";
+  const hstRate = input.hstRate ?? DEFAULT_PRICING.hstRate;
+  const mode = input.amountMode ?? "inclusive";
+  const raw = Math.max(0, Math.round(input.amountCents));
+
+  let netCents: number;
+  let taxCents: number;
+  if (mode === "exclusive") {
+    netCents = raw;
+    taxCents = hstCents(raw, hstRate);
+  } else {
+    const split = splitInclusiveHstCents(raw, hstRate);
+    netCents = split.netCents;
+    taxCents = split.taxCents;
+  }
+
+  const totalCents =
+    mode === "exclusive" ? withHstCents(netCents, hstRate) : raw;
+  if (totalCents < 100) {
+    throw new Error("Checkout amount must be at least $1.00");
+  }
+
+  // Keep total exact: if reverse-split drifted, put remainder on tax line.
+  if (mode === "inclusive" && netCents + taxCents !== totalCents) {
+    taxCents = Math.max(0, totalCents - netCents);
+  }
+
+  const hstLabel = `HST (${hstPercentLabel(hstRate)}%)`;
+  const title = input.name.replace(/\s*\+?\s*HST\s*$/i, "").trim().slice(0, 120);
+  const lineNote = (input.lineNote || "").trim().slice(0, 500) || undefined;
+
+  const lineItems: Array<Record<string, unknown>> = [
+    {
+      name: title || "Oui Smoke",
+      quantity: "1",
+      item_type: "ITEM",
+      base_price_money: { amount: netCents, currency },
+      ...(lineNote ? { note: lineNote } : {}),
+    },
+  ];
+  if (taxCents > 0) {
+    lineItems.push({
+      name: hstLabel,
+      quantity: "1",
+      item_type: "ITEM",
+      base_price_money: { amount: taxCents, currency },
+      note: "Ontario HST",
+    });
+  }
+
   const body = {
     idempotency_key: input.idempotencyKey,
-    quick_pay: {
-      name: input.name.slice(0, 120),
-      price_money: {
-        amount: input.amountCents,
-        currency: input.currency || "CAD",
-      },
+    description: (
+      input.description ||
+      "Oui Smoke — mobile hookah catering"
+    ).slice(0, 500),
+    order: {
       location_id: getSquareLocationId(),
+      reference_id: input.paymentNote.slice(0, 40),
+      line_items: lineItems,
     },
     checkout_options: {
       redirect_url: input.redirectUrl || `${getSiteUrl()}/pay/thanks`,
       ask_for_shipping_address: false,
+      merchant_support_email: CONTACT_EMAIL,
       accepted_payment_methods: {
         apple_pay: true,
         google_pay: true,
+        cash_app_pay: false,
       },
     },
     payment_note: input.paymentNote,
-    ...(input.buyerEmail
-      ? { pre_populated_data: { buyer_email: input.buyerEmail } }
+    ...(input.buyerEmail || input.buyerPhone
+      ? {
+          pre_populated_data: {
+            ...(input.buyerEmail ? { buyer_email: input.buyerEmail } : {}),
+            ...(input.buyerPhone
+              ? { buyer_phone_number: input.buyerPhone }
+              : {}),
+          },
+        }
       : {}),
   };
 

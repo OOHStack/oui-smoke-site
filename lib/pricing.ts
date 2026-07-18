@@ -21,6 +21,7 @@ export {
   pricingToPublic,
   hstCents,
   withHstCents,
+  splitInclusiveHstCents,
   hstPercentLabel,
   mergeJobPricing,
   parseJobPricingOverride,

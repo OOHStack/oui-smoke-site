@@ -10,6 +10,7 @@ import {
 } from "@/lib/job-balance";
 import { getPaymentSettings } from "@/lib/payment-settings";
 import { requiresClientDeposit } from "@/lib/payment-model";
+import { getPricingForJob } from "@/lib/pricing";
 import {
   createDepositPaymentLink,
   isSquareConfigured,
@@ -85,8 +86,9 @@ export async function maybeAutoSendDeposit(
   }
 
   const idempotencyKey = randomUUID();
-  const label = `Deposit (${percent}%) — ${job.title}`.slice(0, 120);
+  const label = `Booking deposit (${percent}%) — ${job.title}`.slice(0, 120);
   const createdBy = source === "manual" ? "ops" : "auto";
+  const pricing = await getPricingForJob(job);
 
   const [pending] = await db
     .insert(payments)
@@ -107,10 +109,16 @@ export async function maybeAutoSendDeposit(
       idempotencyKey,
       name: label,
       amountCents,
+      amountMode: "inclusive",
+      hstRate: pricing.hstRate,
       currency: "CAD",
       buyerEmail: sanitizeBuyerEmail(job.clientEmail),
       paymentNote: `oui:payment:${pending.id}`,
       redirectUrl: `${getSiteUrl()}/pay/thanks?job=${jobId}`,
+      lineNote: job.location
+        ? `${job.clientName || "Client"} · ${job.location}`
+        : job.clientName || "Oui Smoke booking",
+      description: `Oui Smoke · deposit to confirm ${job.title}`,
     });
 
     await db
