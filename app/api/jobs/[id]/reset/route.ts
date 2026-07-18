@@ -3,6 +3,7 @@ import { requireApiAdmin } from "@/lib/auth/api";
 import { verifySessionPassword } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import {
+  flavours,
   hookahRefills,
   jobEvents,
   jobHookahs,
@@ -12,7 +13,7 @@ import {
   serviceRequests,
 } from "@/lib/db/schema";
 import { releaseJobHookahsToAvailable } from "@/lib/fleet";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -20,7 +21,8 @@ type RouteContext = { params: Promise<{ id: string }> };
 /**
  * Clear operational / test activity on a job while keeping the job shell
  * (details, packing notes, staged assignments, client portal token).
- * Clears prep-board packed marks and flavour assignments on units.
+ * Clears prep-board packed marks, flavour assignments, and analytics counters
+ * contributed by this job (outcome, refills, checks, flavour timesUsed).
  */
 export async function POST(request: Request, context: RouteContext) {
   const { session, error } = await requireApiAdmin();
@@ -68,6 +70,28 @@ export async function POST(request: Request, context: RouteContext) {
     }
   }
 
+  // Capture flavour usage before wiping so Top flavours / timesUsed stay honest.
+  const assignmentRows = await db
+    .select({ flavourId: jobHookahs.flavourId })
+    .from(jobHookahs)
+    .where(eq(jobHookahs.jobId, jobId));
+  const refillRows = await db
+    .select({ flavourId: hookahRefills.flavourId })
+    .from(hookahRefills)
+    .where(eq(hookahRefills.jobId, jobId));
+
+  const flavourDecrements = new Map<number, number>();
+  const bumpFlavour = (flavourId: number | null | undefined) => {
+    if (flavourId == null) return;
+    flavourDecrements.set(
+      flavourId,
+      (flavourDecrements.get(flavourId) ?? 0) + 1,
+    );
+  };
+  for (const row of refillRows) bumpFlavour(row.flavourId);
+  // Reverse assignment / send-out flavour bumps (best-effort; clamped at 0).
+  for (const row of assignmentRows) bumpFlavour(row.flavourId);
+
   await db.delete(jobPhotos).where(eq(jobPhotos.jobId, jobId));
   await db.delete(hookahRefills).where(eq(hookahRefills.jobId, jobId));
   await db.delete(jobEvents).where(eq(jobEvents.jobId, jobId));
@@ -81,6 +105,15 @@ export async function POST(request: Request, context: RouteContext) {
         inArray(payments.kind, ["onsite_unit", "refill", "tip", "other"]),
       ),
     );
+
+  for (const [flavourId, amount] of flavourDecrements) {
+    await db
+      .update(flavours)
+      .set({
+        timesUsed: sql`greatest(${flavours.timesUsed} - ${amount}, 0)`,
+      })
+      .where(eq(flavours.id, flavourId));
+  }
 
   await db
     .update(jobHookahs)
@@ -136,7 +169,7 @@ export async function POST(request: Request, context: RouteContext) {
     jobId,
     type: "note",
     message:
-      "Job reset — cleared floor activity, flavours, prep board, ledger, requests, photos, and outcomes",
+      "Job reset — cleared floor activity, flavours, prep board, ledger, requests, photos, outcomes, and analytics counters",
     createdBy: session.name,
   });
 
