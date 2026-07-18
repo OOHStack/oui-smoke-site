@@ -180,10 +180,11 @@ export default function FloorOrderModal({
   const finishPaid =
     row.paymentStatus === "succeeded" && row.assignmentId != null;
   const canCollect = Boolean(pick) && !busy && !waitingTerminal && !finishPaid;
-  const noUnits =
+  const noUnits = Boolean(
     candidates &&
-    candidates.staged.length === 0 &&
-    candidates.available.length === 0;
+      candidates.staged.length === 0 &&
+      candidates.available.length === 0,
+  );
 
   return (
     <div
