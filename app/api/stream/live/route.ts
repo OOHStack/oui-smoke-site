@@ -111,9 +111,13 @@ async function loadLiveFloor() {
       c.type === "order_unit" && c.assignmentId != null
         ? unitPayMap.get(c.assignmentId)
         : undefined;
+    const paymentStatus =
+      pay?.paymentStatus === "succeeded" || unitPay?.status === "succeeded"
+        ? "succeeded"
+        : pay?.paymentStatus ?? unitPay?.status ?? null;
     return {
       ...c,
-      paymentStatus: pay?.paymentStatus ?? unitPay?.status ?? null,
+      paymentStatus,
       checkoutUrl: pay?.checkoutUrl ?? null,
     };
   });

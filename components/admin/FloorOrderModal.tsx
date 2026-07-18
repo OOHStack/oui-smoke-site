@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { OpenCheckoutActions } from "@/components/admin/OpenCheckoutActions";
 import { readApiError } from "@/lib/api-error";
 
 type FloorOrderRow = {
@@ -12,7 +13,9 @@ type FloorOrderRow = {
   flavourLabel?: string | null;
   priceCents?: number | null;
   requestedGuestPayTier?: "standard" | "unlimited" | null;
+  payPreference?: "phone" | "terminal" | null;
   paymentStatus?: string | null;
+  checkoutUrl?: string | null;
   assignmentId: number | null;
   modelNumber: number | null;
 };
@@ -59,6 +62,21 @@ export default function FloorOrderModal({
   const [loadError, setLoadError] = useState("");
   const [pick, setPick] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(
+    row.checkoutUrl ?? null,
+  );
+  const [payPreference, setPayPreference] = useState<
+    "phone" | "terminal" | null
+  >(row.payPreference ?? null);
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(
+    row.paymentStatus ?? null,
+  );
+  const [assignedModel, setAssignedModel] = useState<number | null>(
+    row.modelNumber,
+  );
+  const [hasAssignment, setHasAssignment] = useState(
+    row.assignmentId != null,
+  );
 
   const tierLabel =
     row.requestedGuestPayTier === "unlimited"
@@ -98,6 +116,20 @@ export default function FloorOrderModal({
   }, [pick, candidates]);
 
   useEffect(() => {
+    if (row.checkoutUrl) setCheckoutUrl(row.checkoutUrl);
+    if (row.payPreference) setPayPreference(row.payPreference);
+    if (row.paymentStatus) setPaymentStatus(row.paymentStatus);
+    if (row.modelNumber != null) setAssignedModel(row.modelNumber);
+    if (row.assignmentId != null) setHasAssignment(true);
+  }, [
+    row.checkoutUrl,
+    row.payPreference,
+    row.paymentStatus,
+    row.modelNumber,
+    row.assignmentId,
+  ]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoadError("");
@@ -106,9 +138,31 @@ export default function FloorOrderModal({
         if (!cancelled) setLoadError(await readApiError(res));
         return;
       }
-      const data = (await res.json()) as { candidates: Candidates };
+      const data = (await res.json()) as {
+        candidates: Candidates;
+        payment?: {
+          status: string;
+          checkoutUrl: string | null;
+        } | null;
+        request?: {
+          payPreference?: "phone" | "terminal" | null;
+          jobHookahId?: number | null;
+        };
+      };
       if (cancelled) return;
       setCandidates(data.candidates);
+      if (data.payment?.checkoutUrl) {
+        setCheckoutUrl(data.payment.checkoutUrl);
+      }
+      if (data.payment?.status) {
+        setPaymentStatus(data.payment.status);
+      }
+      if (data.request?.payPreference) {
+        setPayPreference(data.request.payPreference);
+      }
+      if (data.request?.jobHookahId != null) {
+        setHasAssignment(true);
+      }
       const staged0 = data.candidates.staged[0];
       const avail0 = data.candidates.available[0];
       if (row.assignmentId != null) {
@@ -148,7 +202,9 @@ export default function FloorOrderModal({
     return {};
   }
 
-  async function fulfill(payChannel: "cash" | "already_paid" | "terminal") {
+  async function fulfill(
+    payChannel: "cash" | "already_paid" | "terminal" | "phone",
+  ) {
     setBusy(true);
     try {
       const res = await fetch(`/api/service-requests/${row.id}`, {
@@ -164,8 +220,24 @@ export default function FloorOrderModal({
         onError(await readApiError(res), () => void fulfill(payChannel));
         return;
       }
-      const data = (await res.json()) as { ready?: boolean };
+      const data = (await res.json()) as {
+        ready?: boolean;
+        checkoutUrl?: string;
+        modelNumber?: number;
+        assignmentId?: number;
+      };
+      if (data.modelNumber != null) setAssignedModel(data.modelNumber);
+      if (data.assignmentId != null) setHasAssignment(true);
+
+      if (payChannel === "phone") {
+        setPayPreference("phone");
+        setPaymentStatus("pending");
+        if (data.checkoutUrl) setCheckoutUrl(data.checkoutUrl);
+        return;
+      }
       if (payChannel === "terminal" && !data.ready) {
+        setPayPreference("terminal");
+        setPaymentStatus("pending");
         onClose();
         return;
       }
@@ -175,11 +247,19 @@ export default function FloorOrderModal({
     }
   }
 
-  const waitingTerminal =
-    row.paymentStatus === "pending" && row.assignmentId != null;
   const finishPaid =
-    row.paymentStatus === "succeeded" && row.assignmentId != null;
-  const canCollect = Boolean(pick) && !busy && !waitingTerminal && !finishPaid;
+    paymentStatus === "succeeded" && hasAssignment;
+  const waitingPhone =
+    !finishPaid &&
+    paymentStatus === "pending" &&
+    (payPreference === "phone" || Boolean(checkoutUrl));
+  const waitingTerminal =
+    !finishPaid &&
+    !waitingPhone &&
+    paymentStatus === "pending" &&
+    hasAssignment;
+  const canCollect =
+    Boolean(pick) && !busy && !waitingTerminal && !waitingPhone && !finishPaid;
   const noUnits = Boolean(
     candidates &&
       candidates.staged.length === 0 &&
@@ -247,10 +327,29 @@ export default function FloorOrderModal({
             <p className="floor-order-modal__error">{loadError}</p>
           ) : null}
 
-          {waitingTerminal ? (
+          {waitingPhone ? (
             <div className="floor-order-status floor-order-status--wait">
               <div className="floor-order-status__unit">
-                {row.modelNumber != null ? `#${row.modelNumber}` : "Unit"}
+                {assignedModel != null ? `#${assignedModel}` : "Unit"}
+              </div>
+              <div>
+                <strong>Waiting on phone pay</strong>
+                <p>
+                  Send the Square link to the guest. When it clears, the guest QR
+                  shows on the event display and this unit parks on Ready to send.
+                </p>
+                {checkoutUrl ? (
+                  <OpenCheckoutActions
+                    url={checkoutUrl}
+                    className="checkout-link-actions floor-order-checkout"
+                  />
+                ) : null}
+              </div>
+            </div>
+          ) : waitingTerminal ? (
+            <div className="floor-order-status floor-order-status--wait">
+              <div className="floor-order-status__unit">
+                {assignedModel != null ? `#${assignedModel}` : "Unit"}
               </div>
               <div>
                 <strong>Waiting on Square Terminal</strong>
@@ -263,7 +362,7 @@ export default function FloorOrderModal({
           ) : finishPaid ? (
             <div className="floor-order-status floor-order-status--paid">
               <div className="floor-order-status__unit">
-                {row.modelNumber != null ? `#${row.modelNumber}` : "Unit"}
+                {assignedModel != null ? `#${assignedModel}` : "Unit"}
               </div>
               <div>
                 <strong>Paid — ready to finish</strong>
@@ -348,8 +447,9 @@ export default function FloorOrderModal({
                   Collect {priceLabel}
                 </h3>
                 <p className="floor-order-step__hint">
-                  Choose how you took payment. After collect, the guest QR goes to
-                  the event display and the unit stays on Ready to send.
+                  Cash or Square. Phone creates a pay link; Terminal pushes the
+                  charge. After paid, guest QR goes to the event display and the
+                  unit stays on Ready to send.
                 </p>
                 <div className="floor-order-pay">
                   <button
@@ -363,16 +463,16 @@ export default function FloorOrderModal({
                   </button>
                   <button
                     type="button"
-                    className="floor-order-pay__btn"
+                    className="floor-order-pay__btn floor-order-pay__btn--primary"
                     disabled={!canCollect || noUnits}
-                    onClick={() => void fulfill("already_paid")}
+                    onClick={() => void fulfill("phone")}
                   >
-                    <strong>Already paid</strong>
-                    <span>Phone link / Square already shows paid</span>
+                    <strong>Phone pay</strong>
+                    <span>Create Square link · open or copy for guest</span>
                   </button>
                   <button
                     type="button"
-                    className="floor-order-pay__btn floor-order-pay__btn--primary"
+                    className="floor-order-pay__btn"
                     disabled={!canCollect || noUnits || !terminalReady}
                     title={
                       terminalReady
@@ -401,7 +501,7 @@ export default function FloorOrderModal({
             onClick={onClose}
             disabled={busy}
           >
-            {waitingTerminal ? "Close" : "Later"}
+            {waitingTerminal || waitingPhone ? "Close" : "Later"}
           </button>
           {finishPaid ? (
             <button
@@ -411,6 +511,10 @@ export default function FloorOrderModal({
               onClick={() => void fulfill("already_paid")}
             >
               {busy ? "Working…" : "Show QR · Ready to send"}
+            </button>
+          ) : waitingPhone ? (
+            <button type="button" className="btn" disabled>
+              Waiting on phone…
             </button>
           ) : waitingTerminal ? (
             <button type="button" className="btn" disabled>

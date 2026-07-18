@@ -6,6 +6,7 @@ import {
   listFloorAssignCandidates,
   type FloorPayChannel,
 } from "@/lib/ops/fulfill-floor-order";
+import { findGuestOrderUnitPayment } from "@/lib/refill-payment-link";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -32,9 +33,21 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const candidates = await listFloorAssignCandidates(existing.jobId);
+  const payment =
+    existing.type === "order_unit"
+      ? await findGuestOrderUnitPayment(id)
+      : null;
   return NextResponse.json({
     request: existing,
     candidates,
+    payment: payment
+      ? {
+          id: payment.id,
+          status: payment.status,
+          checkoutUrl: payment.checkoutUrl,
+          amountCents: payment.amountCents,
+        }
+      : null,
   });
 }
 
@@ -86,10 +99,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (
       payChannel !== "cash" &&
       payChannel !== "already_paid" &&
-      payChannel !== "terminal"
+      payChannel !== "terminal" &&
+      payChannel !== "phone"
     ) {
       return NextResponse.json(
-        { error: "Choose cash, already paid, or terminal" },
+        { error: "Choose cash, phone, already paid, or terminal" },
         { status: 400 },
       );
     }

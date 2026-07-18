@@ -2820,6 +2820,10 @@ button.fleet-tile {
   background: color-mix(in srgb, var(--ok) 18%, var(--panel));
 }
 
+.floor-order-checkout {
+  margin-top: 0.65rem;
+}
+
 .floor-order-modal__footer {
   align-items: center;
 }

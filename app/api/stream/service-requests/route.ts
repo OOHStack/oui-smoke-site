@@ -60,9 +60,13 @@ async function loadRequests() {
       r.type === "order_unit" && r.assignmentId != null
         ? unitPayMap.get(r.assignmentId)
         : undefined;
+    const paymentStatus =
+      pay?.paymentStatus === "succeeded" || unitPay?.status === "succeeded"
+        ? "succeeded"
+        : pay?.paymentStatus ?? unitPay?.status ?? null;
     return {
       ...r,
-      paymentStatus: pay?.paymentStatus ?? unitPay?.status ?? null,
+      paymentStatus,
       checkoutUrl: pay?.checkoutUrl ?? null,
     };
   });

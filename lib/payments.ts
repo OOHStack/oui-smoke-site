@@ -142,8 +142,14 @@ export async function markPaymentSucceeded(opts: {
       createdBy: "square",
     });
 
-    // Floor tablet orders: after Terminal clears, park on Ready to send (not out yet).
-    if (row.kind === "onsite_unit" && row.jobHookahId != null) {
+    // Floor tablet orders: after Terminal / phone link clears, park Ready to send.
+    const floorPayKey =
+      typeof row.idempotencyKey === "string" &&
+      row.idempotencyKey.startsWith("guest-order-unit-");
+    const canAutoFloor =
+      row.jobHookahId != null &&
+      (row.kind === "onsite_unit" || floorPayKey);
+    if (canAutoFloor && row.jobHookahId != null) {
       try {
         const [floorReq] = await db
           .select({ id: serviceRequests.id })
@@ -172,7 +178,7 @@ export async function markPaymentSucceeded(opts: {
               tag: `floor-ready-${floorReq.id}`,
             });
           }
-        } else {
+        } else if (row.kind === "onsite_unit") {
           // Regular onsite unit (not a floor-tablet order) — still show QR on paid.
           await pushAssignmentDisplayQr({
             assignmentId: row.jobHookahId,

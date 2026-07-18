@@ -15,9 +15,13 @@ import {
   isGuestPayTier,
 } from "@/lib/ops/guest-pay";
 import { getPricingForJob, withHstCents } from "@/lib/pricing";
+import {
+  createGuestOrderUnitCheckoutLink,
+  findGuestOrderUnitPayment,
+} from "@/lib/refill-payment-link";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
-export type FloorPayChannel = "cash" | "already_paid" | "terminal";
+export type FloorPayChannel = "cash" | "already_paid" | "terminal" | "phone";
 
 async function nextSortOrder(
   db: ReturnType<typeof getDb>,
@@ -72,6 +76,46 @@ export async function listFloorAssignCandidates(jobId: number) {
   return { staged, available };
 }
 
+async function findSucceededFloorPayment(opts: {
+  jobId: number;
+  assignmentId: number;
+  serviceRequestId: number;
+}) {
+  const guestPay = await findGuestOrderUnitPayment(opts.serviceRequestId);
+  if (guestPay?.status === "succeeded") {
+    return { paymentId: guestPay.id, source: "phone" as const };
+  }
+
+  const db = getDb();
+  const [unitPaid] = await db
+    .select({ id: payments.id })
+    .from(payments)
+    .where(
+      and(
+        eq(payments.jobId, opts.jobId),
+        eq(payments.jobHookahId, opts.assignmentId),
+        eq(payments.kind, "onsite_unit"),
+        eq(payments.status, "succeeded"),
+      ),
+    )
+    .limit(1);
+
+  if (unitPaid) {
+    return { paymentId: unitPaid.id, source: "unit" as const };
+  }
+  return null;
+}
+
+async function cancelPendingGuestOrderPayment(serviceRequestId: number) {
+  const guestPay = await findGuestOrderUnitPayment(serviceRequestId);
+  if (guestPay?.status !== "pending") return;
+  const db = getDb();
+  await db
+    .update(payments)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(eq(payments.id, guestPay.id));
+}
+
 export async function fulfillFloorOrder(opts: {
   serviceRequestId: number;
   assignmentId?: number;
@@ -87,6 +131,7 @@ export async function fulfillFloorOrder(opts: {
       ready: boolean;
       terminalCheckoutId?: string;
       paymentId?: number;
+      checkoutUrl?: string;
     }
   | { ok: false; error: string; status: number; code?: string }
 > {
@@ -235,8 +280,58 @@ export async function fulfillFloorOrder(opts: {
       : guestPayTierUnitCents(tier, pricing);
   const amountCents = withHstCents(exclusiveCents, pricing.hstRate);
   const label = `${guestPayTierLabel(tier, pricing)} + HST`;
+  const tierLabel = tier === "unlimited" ? "Unlimited" : "Standard";
+
+  if (opts.payChannel === "phone") {
+    const link = await createGuestOrderUnitCheckoutLink({
+      jobId: job.id,
+      jobHookahId: assignmentId,
+      serviceRequestId: request.id,
+      amountCents: exclusiveCents,
+      flavourLabel: flavourLabel || "flavour",
+      tierLabel,
+      createdBy: opts.staffName,
+    });
+    if (!link.ok) {
+      return {
+        ok: false,
+        error:
+          link.reason === "square_not_configured"
+            ? "Square isn’t configured for payment links"
+            : link.reason === "amount_too_small"
+              ? "Amount is too small for Square checkout"
+              : link.reason,
+        status: link.reason === "square_not_configured" ? 503 : 400,
+        code: "PHONE_CHECKOUT_FAILED",
+      };
+    }
+
+    await db
+      .update(serviceRequests)
+      .set({ payPreference: "phone" })
+      .where(eq(serviceRequests.id, request.id));
+
+    await db.insert(jobEvents).values({
+      jobId: job.id,
+      jobHookahId: assignmentId,
+      type: "note",
+      message: `Floor order assigned to #${hookah.modelNumber} · phone pay link · ${flavourLabel}`,
+      createdBy: opts.staffName,
+    });
+
+    return {
+      ok: true,
+      assignmentId,
+      modelNumber: hookah.modelNumber,
+      ready: false,
+      paymentId: link.paymentId,
+      checkoutUrl: link.url,
+    };
+  }
 
   if (opts.payChannel === "terminal") {
+    await cancelPendingGuestOrderPayment(request.id);
+
     const { pushJobPaymentToTerminal } = await import(
       "@/lib/terminal-checkout"
     );
@@ -258,6 +353,12 @@ export async function fulfillFloorOrder(opts: {
         status: result.reason === "terminal_not_configured" ? 503 : 400,
       };
     }
+
+    await db
+      .update(serviceRequests)
+      .set({ payPreference: "terminal" })
+      .where(eq(serviceRequests.id, request.id));
+
     await db.insert(jobEvents).values({
       jobId: job.id,
       jobHookahId: assignmentId,
@@ -275,24 +376,26 @@ export async function fulfillFloorOrder(opts: {
     };
   }
 
-  // Cash / already paid — stay staged on Ready to send (prep + carry out next).
-  const succeeded = await db
-    .select({ id: payments.id })
-    .from(payments)
-    .where(
-      and(
-        eq(payments.jobId, job.id),
-        eq(payments.jobHookahId, assignmentId),
-        eq(payments.kind, "onsite_unit"),
-        eq(payments.status, "succeeded"),
-      ),
-    )
-    .limit(1);
+  // Cash invents a succeeded payment. Already paid only finishes when Square (or
+  // a prior cash invent) already shows succeeded.
+  const already = await findSucceededFloorPayment({
+    jobId: job.id,
+    assignmentId,
+    serviceRequestId: request.id,
+  });
 
-  let paymentId: number | undefined;
-  if (succeeded[0]) {
-    paymentId = succeeded[0].id;
-  } else {
+  if (opts.payChannel === "already_paid" && !already) {
+    return {
+      ok: false,
+      error: "Payment isn’t confirmed yet — wait for Square or use Cash",
+      status: 409,
+      code: "PAYMENT_NOT_CONFIRMED",
+    };
+  }
+
+  let paymentId: number | undefined = already?.paymentId;
+  if (!already) {
+    await cancelPendingGuestOrderPayment(request.id);
     const paidAt = new Date();
     const [row] = await db
       .insert(payments)
@@ -313,9 +416,7 @@ export async function fulfillFloorOrder(opts: {
       jobId: job.id,
       jobHookahId: assignmentId,
       type: "note",
-      message: `Floor order paid · ${label}${
-        opts.payChannel === "cash" ? " · cash" : ""
-      }`,
+      message: `Floor order paid · ${label} · cash`,
       createdBy: opts.staffName,
     });
   }

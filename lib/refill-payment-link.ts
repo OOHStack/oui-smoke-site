@@ -234,7 +234,8 @@ export async function findGuestOrderUnitPayment(serviceRequestId: number) {
  */
 export async function createGuestOrderUnitCheckoutLink(opts: {
   jobId: number;
-  jobHookahId: number;
+  /** Prefer set once ops assigns a unit — enables onsite_unit ledger + auto Ready. */
+  jobHookahId?: number | null;
   serviceRequestId: number;
   amountCents: number;
   flavourLabel: string;
@@ -274,6 +275,20 @@ export async function createGuestOrderUnitCheckoutLink(opts: {
     };
   }
   if (existing?.status === "pending" && existing.checkoutUrl) {
+    // Keep assignment linked if ops assigned after the link was minted.
+    if (
+      opts.jobHookahId != null &&
+      existing.jobHookahId == null
+    ) {
+      await db
+        .update(payments)
+        .set({
+          jobHookahId: opts.jobHookahId,
+          kind: "onsite_unit",
+          updatedAt: new Date(),
+        })
+        .where(eq(payments.id, existing.id));
+    }
     return {
       ok: true,
       url: existing.checkoutUrl,
@@ -287,6 +302,9 @@ export async function createGuestOrderUnitCheckoutLink(opts: {
   const idempotencyKey = guestOrderUnitPaymentKey(opts.serviceRequestId);
   const createdBy = opts.createdBy || "guest";
   const netCents = Math.round(opts.amountCents);
+  const jobHookahId = opts.jobHookahId ?? null;
+  // Prefer onsite_unit once assigned so webhook parks Ready + QR like Terminal.
+  const kind = jobHookahId != null ? "onsite_unit" : "other";
 
   let pendingId: number;
   if (existing && (existing.status === "failed" || existing.status === "cancelled")) {
@@ -296,6 +314,8 @@ export async function createGuestOrderUnitCheckoutLink(opts: {
         status: "pending",
         amountCents,
         label,
+        kind,
+        jobHookahId,
         checkoutUrl: null,
         squarePaymentLinkId: null,
         squareOrderId: null,
@@ -309,13 +329,25 @@ export async function createGuestOrderUnitCheckoutLink(opts: {
     pendingId = revived.id;
   } else if (existing) {
     pendingId = existing.id;
+    await db
+      .update(payments)
+      .set({
+        status: "pending",
+        amountCents,
+        label,
+        kind,
+        jobHookahId,
+        updatedAt: new Date(),
+        createdBy,
+      })
+      .where(eq(payments.id, existing.id));
   } else {
     const [pending] = await db
       .insert(payments)
       .values({
         jobId: opts.jobId,
-        jobHookahId: opts.jobHookahId,
-        kind: "other",
+        jobHookahId,
+        kind,
         status: "pending",
         amountCents,
         currency: "CAD",
@@ -354,6 +386,8 @@ export async function createGuestOrderUnitCheckoutLink(opts: {
         checkoutUrl: link.url,
         squarePaymentLinkId: link.id,
         squareOrderId: link.orderId ?? null,
+        kind,
+        jobHookahId,
         updatedAt: new Date(),
       })
       .where(eq(payments.id, pendingId));
@@ -361,7 +395,7 @@ export async function createGuestOrderUnitCheckoutLink(opts: {
     const dollars = (amountCents / 100).toFixed(2);
     await db.insert(jobEvents).values({
       jobId: opts.jobId,
-      jobHookahId: opts.jobHookahId,
+      jobHookahId: jobHookahId,
       type: "note",
       message: `Guest extra-hookah link created — $${dollars} CAD incl. HST · ${opts.tierLabel} · ${opts.flavourLabel}`,
       createdBy,
