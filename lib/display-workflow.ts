@@ -97,10 +97,11 @@ export function displayQrDurationMs(settings: DisplayWorkflowSettings): number {
 /**
  * Mint guest token (if needed) and start/refresh the event-tablet QR takeover.
  * Honours Settings → Display trigger (paid vs send-out).
+ * `manual` always shows (ops “Show guest QR code”).
  */
 export async function pushAssignmentDisplayQr(opts: {
   assignmentId: number;
-  reason: "paid" | "send_out";
+  reason: "paid" | "send_out" | "manual";
 }): Promise<
   | { ok: true; guestToken: string; displayQrAt: Date }
   | { ok: false; skipped: true; reason: string }

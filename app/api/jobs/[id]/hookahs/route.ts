@@ -1546,26 +1546,38 @@ export async function POST(request: Request, context: RouteContext) {
           return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
         }
 
-        if (assignment.guestToken && body.regenerate !== true) {
-          return NextResponse.json(assignment);
+        const regenerate = body.regenerate === true;
+        let guestToken = assignment.guestToken;
+
+        if (!guestToken || regenerate) {
+          guestToken = createGuestToken();
+          await db
+            .update(jobHookahs)
+            .set({ guestToken })
+            .where(eq(jobHookahs.id, assignmentId));
+
+          await db.insert(jobEvents).values({
+            jobId,
+            jobHookahId: assignmentId,
+            type: "note",
+            message: regenerate ? "Guest QR regenerated" : "Guest QR created",
+            createdBy: session.name,
+          });
         }
 
-        const guestToken = createGuestToken();
-        const [updated] = await db
-          .update(jobHookahs)
-          .set({ guestToken })
-          .where(eq(jobHookahs.id, assignmentId))
-          .returning();
-
-        await db.insert(jobEvents).values({
-          jobId,
-          jobHookahId: assignmentId,
-          type: "note",
-          message: body.regenerate === true ? "Guest QR regenerated" : "Guest QR created",
-          createdBy: session.name,
+        // Always push to the event tablet when ops opens / refreshes the guest QR.
+        await pushAssignmentDisplayQr({
+          assignmentId,
+          reason: "manual",
         });
 
-        return NextResponse.json(updated);
+        const [updated] = await db
+          .select()
+          .from(jobHookahs)
+          .where(eq(jobHookahs.id, assignmentId))
+          .limit(1);
+
+        return NextResponse.json(updated ?? { ...assignment, guestToken });
       }
 
       default:
