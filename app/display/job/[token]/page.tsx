@@ -2,9 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import OuiMark from "@/components/brand/OuiMark";
+import { useOuiMarkMotion } from "@/components/brand/useOuiMarkMotion";
 import { useSse } from "@/lib/hooks/useSse";
 import type { JobDisplaySnapshot } from "@/lib/job-display-board";
 import "./job-display.css";
+
+const HERO_PHOTO = "/images/model-2-web.jpg";
 
 function playTakeoverChime() {
   try {
@@ -36,9 +40,12 @@ function playTakeoverChime() {
 export default function JobDisplayPage() {
   const params = useParams<{ token: string }>();
   const token = params?.token ?? "";
+  const rootRef = useRef<HTMLDivElement>(null);
   const [board, setBoard] = useState<JobDisplaySnapshot | null>(null);
   const [error, setError] = useState("");
   const lastTakeoverId = useRef<number | null>(null);
+
+  useOuiMarkMotion(rootRef, Boolean(board) && !error);
 
   useSse<JobDisplaySnapshot & { error?: string }>(
     token ? `/api/stream/display/job/${encodeURIComponent(token)}` : null,
@@ -82,9 +89,6 @@ export default function JobDisplayPage() {
       lastTakeoverId.current = id;
       playTakeoverChime();
     }
-    if (id == null) {
-      /* keep last id so re-show of same unit after window doesn't re-chime mid-window */
-    }
   }, [board?.takeover?.assignmentId]);
 
   if (error) {
@@ -114,8 +118,18 @@ export default function JobDisplayPage() {
       : [];
 
   return (
-    <div className="jdisplay">
+    <div
+      ref={rootRef}
+      className={`jdisplay${takeover ? " jdisplay--takeover" : ""}`}
+    >
       <div className="jdisplay__bg" aria-hidden />
+      <div
+        className="jdisplay__bg-photo"
+        style={{ backgroundImage: `url(${HERO_PHOTO})` }}
+        aria-hidden
+      />
+      <div className="jdisplay__veil" aria-hidden />
+
       <div className="jdisplay__shell">
         <header className="jdisplay__top">
           <div>
@@ -135,14 +149,6 @@ export default function JobDisplayPage() {
                 .join(" · ") || "Oui Smoke"}
             </p>
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            className="jdisplay__logo"
-            src="/logo-white.png"
-            alt=""
-            width={96}
-            height={36}
-          />
         </header>
 
         <div className="jdisplay__stage">
@@ -150,6 +156,7 @@ export default function JobDisplayPage() {
             className={`jdisplay__idle${takeover ? " is-dimmed" : ""}`}
             aria-hidden={Boolean(takeover)}
           >
+            <OuiMark className="jdisplay__mark oui-mark" />
             <h2 className="jdisplay__headline">{board.idle.headline}</h2>
             <p className="jdisplay__lede">{board.idle.lede}</p>
 

@@ -4,10 +4,12 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useRef,
   useState,
-  type CSSProperties,
 } from "react";
 import { useParams } from "next/navigation";
+import OuiMark from "@/components/brand/OuiMark";
+import { useOuiMarkMotion } from "@/components/brand/useOuiMarkMotion";
 import type { DisplayBoardSnapshot } from "@/lib/display-board";
 import "./display.css";
 
@@ -28,10 +30,13 @@ const HERO_PHOTO = "/images/model-2-web.jpg";
 export default function DisplayPage() {
   const params = useParams<{ token: string }>();
   const token = params?.token ?? "";
+  const rootRef = useRef<HTMLDivElement>(null);
   const [board, setBoard] = useState<DisplayBoardSnapshot | null>(null);
   const [error, setError] = useState("");
   const [panel, setPanel] = useState(0);
   const [paused, setPaused] = useState(false);
+
+  useOuiMarkMotion(rootRef, Boolean(board) && !error);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -108,6 +113,7 @@ export default function DisplayPage() {
 
   return (
     <div
+      ref={rootRef}
       className="display"
       onClick={(e) => {
         const t = e.target as HTMLElement;
@@ -118,18 +124,9 @@ export default function DisplayPage() {
     >
       <div className="display__bg" aria-hidden />
       <div
-        className={`display__bg-photo${active === "welcome" ? " is-on" : ""}`}
-        style={{ backgroundImage: `url(${HERO_PHOTO})` } as CSSProperties}
+        className="display__bg-photo"
+        style={{ backgroundImage: `url(${HERO_PHOTO})` }}
         aria-hidden
-      />
-
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        className="display__logo-mark"
-        src="/logo-white.png"
-        alt=""
-        width={110}
-        height={40}
       />
 
       <div className="display__shell">
@@ -138,8 +135,8 @@ export default function DisplayPage() {
             className={`display__panel${active === "welcome" ? " is-active" : ""}`}
             aria-hidden={active !== "welcome"}
           >
+            <OuiMark className="display__mark oui-mark" />
             <p className="display__kicker">Live at your event</p>
-            <h1 className="display__brand">{board.brand.name}</h1>
             <p className="display__tagline">{board.brand.tagline}</p>
             <div className="display__welcome-meta">
               <span>
