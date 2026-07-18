@@ -16,6 +16,7 @@ import {
 } from "@/lib/fleet";
 import { pushAssignmentDisplayQr } from "@/lib/display-workflow";
 import { createGuestToken } from "@/lib/guest";
+import { computeNextCheckAt } from "@/lib/ops/check-interval";
 import {
   defaultRefillCentsForTier,
   guestPayTierLabel,
@@ -352,7 +353,7 @@ export async function POST(request: Request, context: RouteContext) {
           }
 
           const now = new Date();
-          const nextCheckAt = new Date(now.getTime() + job.checkIntervalMinutes * 60_000);
+          const nextCheckAt = computeNextCheckAt(job.checkIntervalMinutes, now);
           const guestToken = assignment.guestToken || createGuestToken();
 
           await db
@@ -534,7 +535,7 @@ export async function POST(request: Request, context: RouteContext) {
         }
 
         const now = new Date();
-        const nextCheckAt = new Date(now.getTime() + job.checkIntervalMinutes * 60_000);
+        const nextCheckAt = computeNextCheckAt(job.checkIntervalMinutes, now);
         const guestToken = assignment.guestToken || createGuestToken();
         const sortOrder =
           assignment.status === "out"
@@ -767,7 +768,7 @@ export async function POST(request: Request, context: RouteContext) {
         }
 
         const now = new Date();
-        const nextCheckAt = new Date(now.getTime() + job.checkIntervalMinutes * 60_000);
+        const nextCheckAt = computeNextCheckAt(job.checkIntervalMinutes, now);
         const note = typeof body.note === "string" ? body.note.trim() : "";
 
         const [updated] = await db
@@ -873,7 +874,7 @@ export async function POST(request: Request, context: RouteContext) {
 
         const previousLabel = assignment.flavourLabel || "";
         const now = new Date();
-        const nextCheckAt = new Date(now.getTime() + job.checkIntervalMinutes * 60_000);
+        const nextCheckAt = computeNextCheckAt(job.checkIntervalMinutes, now);
 
         // Gate unpaid charged refills before mutating assignment / ledger
         let terminalPushId: number | null = null;

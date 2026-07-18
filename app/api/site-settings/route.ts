@@ -49,11 +49,12 @@ export async function PATCH(request: Request) {
     );
   }
   if (
-    next.defaultCheckIntervalMinutes < 10 ||
-    next.defaultCheckIntervalMinutes > 180
+    next.defaultCheckIntervalMinutes !== 0 &&
+    (next.defaultCheckIntervalMinutes < 10 ||
+      next.defaultCheckIntervalMinutes > 180)
   ) {
     return NextResponse.json(
-      { error: "Check interval must be 10–180 minutes" },
+      { error: "Check interval must be Off (0) or 10–180 minutes" },
       { status: 400 },
     );
   }

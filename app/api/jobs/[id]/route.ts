@@ -22,6 +22,7 @@ import { maybeAutoSendDeposit } from "@/lib/auto-deposit";
 import { summarizeJobMoney } from "@/lib/job-balance";
 import { normalizePaymentModel } from "@/lib/payment-model";
 import { jobEvents, jobHookahs, jobs, payments, serviceRequests } from "@/lib/db/schema";
+import { computeNextCheckAt } from "@/lib/ops/check-interval";
 import { onsiteUnitPaymentMap } from "@/lib/ops/onsite-pay";
 import {
   getPricingForJob,
@@ -275,7 +276,21 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
     if (body.bookedHours !== undefined) updates.bookedHours = body.bookedHours;
     if (body.checkIntervalMinutes !== undefined) {
-      updates.checkIntervalMinutes = body.checkIntervalMinutes;
+      const mins = Number(body.checkIntervalMinutes);
+      if (!Number.isFinite(mins)) {
+        return NextResponse.json(
+          { error: "Check interval must be a number" },
+          { status: 400 },
+        );
+      }
+      const rounded = Math.round(mins);
+      if (rounded !== 0 && (rounded < 10 || rounded > 180)) {
+        return NextResponse.json(
+          { error: "Check interval must be Off (0) or 10–180 minutes" },
+          { status: 400 },
+        );
+      }
+      updates.checkIntervalMinutes = rounded;
     }
     if (body.guestCount !== undefined) updates.guestCount = body.guestCount;
     if (body.quotedCents !== undefined) updates.quotedCents = body.quotedCents;
@@ -346,6 +361,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const [job] = await db.update(jobs).set(updates).where(eq(jobs.id, id)).returning();
+
+    // Sync floor timers when spot-check interval changes (0 = off → clear timers).
+    if (
+      updates.checkIntervalMinutes !== undefined &&
+      updates.checkIntervalMinutes !== existing.checkIntervalMinutes
+    ) {
+      const now = new Date();
+      const nextCheckAt = computeNextCheckAt(job.checkIntervalMinutes, now);
+      await db
+        .update(jobHookahs)
+        .set({ nextCheckAt })
+        .where(and(eq(jobHookahs.jobId, id), eq(jobHookahs.status, "out")));
+    }
 
     if (statusChanging) {
       await db.insert(jobEvents).values({

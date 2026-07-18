@@ -1022,7 +1022,10 @@ export default function JobDetailPage() {
             </span>
           ) : null}
           <span>
-            <strong>Check every:</strong> {job.checkIntervalMinutes}m
+            <strong>Spot checks:</strong>{" "}
+            {job.checkIntervalMinutes > 0
+              ? `every ${job.checkIntervalMinutes}m`
+              : "Off"}
           </span>
           <span>
             <strong>Payment:</strong>{" "}
@@ -1069,6 +1072,7 @@ export default function JobDetailPage() {
             flavours={flavours}
             paymentModel={job.paymentModel}
             pricing={pricing}
+            checkIntervalMinutes={job.checkIntervalMinutes}
             terminalReady={terminalReady}
             onAction={hookahAction}
             onRefresh={load}
@@ -1773,7 +1777,7 @@ export default function JobDetailPage() {
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="edit-interval">Check interval</label>
+                  <label htmlFor="edit-interval">Spot-check timer</label>
                   <select
                     id="edit-interval"
                     value={editForm.checkIntervalMinutes}
@@ -1784,9 +1788,12 @@ export default function JobDetailPage() {
                       }))
                     }
                   >
-                    <option value="30">30 min</option>
-                    <option value="45">45 min</option>
-                    <option value="60">60 min</option>
+                    <option value="0">Off — no timers</option>
+                    <option value="30">Every 30 min</option>
+                    <option value="45">Every 45 min</option>
+                    <option value="60">Every 60 min</option>
+                    <option value="90">Every 90 min</option>
+                    <option value="120">Every 120 min</option>
                   </select>
                 </div>
               </div>
@@ -2234,6 +2241,7 @@ function JobHookahBoard({
   flavours,
   paymentModel,
   pricing,
+  checkIntervalMinutes = 45,
   terminalReady = true,
   onAction,
   onRefresh,
@@ -2243,6 +2251,7 @@ function JobHookahBoard({
   flavours: Flavour[];
   paymentModel?: Job["paymentModel"];
   pricing: PricingConfig;
+  checkIntervalMinutes?: number;
   terminalReady?: boolean;
   onAction: (
     body: Record<string, unknown>,
@@ -2351,6 +2360,7 @@ function JobHookahBoard({
           flavours={flavours}
           paymentModel={paymentModel}
           pricing={pricing}
+          checkIntervalMinutes={checkIntervalMinutes}
           terminalReady={terminalReady}
           prompt={modalPrompt}
           onAction={onAction}
@@ -2370,6 +2380,7 @@ function HookahModal({
   flavours,
   paymentModel,
   pricing,
+  checkIntervalMinutes = 45,
   terminalReady = true,
   prompt,
   onAction,
@@ -2380,6 +2391,7 @@ function HookahModal({
   flavours: Flavour[];
   paymentModel?: Job["paymentModel"];
   pricing: PricingConfig;
+  checkIntervalMinutes?: number;
   terminalReady?: boolean;
   prompt?: string;
   onAction: (
@@ -2388,6 +2400,7 @@ function HookahModal({
   onRefresh: () => void | Promise<void>;
   onClose: () => void;
 }) {
+  const spotChecksOn = checkIntervalMinutes > 0;
   const [note, setNote] = useState("");
   const [flavourId, setFlavourId] = useState(
     a.flavourId ? String(a.flavourId) : "",
@@ -3066,7 +3079,9 @@ function HookahModal({
             <section className="hookah-modal__section">
               <h3 className="hookah-modal__section-title">Staff check</h3>
               <p className="hookah-modal__hint">
-                Checks happen randomly or when the timer notifies you. Log the visit — refill delivery is separate below.
+                {spotChecksOn
+                  ? "Checks happen when the timer notifies you. Log the visit — refill delivery is separate below."
+                  : "Spot-check timers are off for this job. You can still log a visit anytime — refill delivery is separate below."}
               </p>
               <label className="hookah-field">
                 <span>Check note (optional)</span>

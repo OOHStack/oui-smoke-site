@@ -6,6 +6,7 @@ import {
   PasswordField,
   PasswordInput,
 } from "@/components/admin/PasswordField";
+import { CONTACT_EMAIL } from "@/lib/brand-contact";
 import { DEPOSIT_PERCENT_PRESETS } from "@/lib/job-balance";
 import {
   estimateBooking,
@@ -1044,26 +1045,28 @@ export default function SettingsHub() {
                 Ops defaults
               </h3>
               <div className="field">
-                <label htmlFor="check-interval">Default check interval (min)</label>
-                <input
+                <label htmlFor="check-interval">Default spot-check timer</label>
+                <select
                   id="check-interval"
-                  type="number"
-                  min={10}
-                  max={180}
-                  value={pricingDraft.defaultCheckIntervalMinutes}
+                  value={String(pricingDraft.defaultCheckIntervalMinutes)}
                   onChange={(e) =>
                     updatePricing(
                       "defaultCheckIntervalMinutes",
-                      Math.min(
-                        180,
-                        Math.max(10, Math.round(Number(e.target.value) || 45)),
-                      ),
+                      Math.round(Number(e.target.value) || 0),
                     )
                   }
-                  style={{ width: "5.5rem" }}
-                />
+                  style={{ width: "12rem" }}
+                >
+                  <option value="0">Off — no timers</option>
+                  <option value="30">Every 30 min</option>
+                  <option value="45">Every 45 min</option>
+                  <option value="60">Every 60 min</option>
+                  <option value="90">Every 90 min</option>
+                  <option value="120">Every 120 min</option>
+                </select>
                 <p className="list-meta" style={{ marginTop: "0.35rem" }}>
-                  Used when creating new jobs (10–180 minutes).
+                  Used when creating new jobs. Per-job override is on Edit job.
+                  Off skips overdue beeps and countdowns.
                 </p>
               </div>
 
@@ -1392,7 +1395,9 @@ export default function SettingsHub() {
               <p className="list-meta" style={{ marginBottom: 0 }}>
                 Connection health for payment links, webhooks, and Terminal
                 collect. Secrets stay on the server — only masked values are
-                shown.
+                shown. New links show net + HST and use {CONTACT_EMAIL} as
+                support email — set your logo and button colours in Square
+                Dashboard → Payment links → Branding.
               </p>
             </div>
             <div className="square-status-actions">

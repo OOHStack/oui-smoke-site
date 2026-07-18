@@ -112,15 +112,14 @@ export function normalizePricing(
     brandingMin: Math.max(0, num(src.brandingMin, d.brandingMin)),
     brandingMedium: Math.max(0, num(src.brandingMedium, d.brandingMedium)),
     brandingLarge: Math.max(0, num(src.brandingLarge, d.brandingLarge)),
-    defaultCheckIntervalMinutes: Math.min(
-      180,
-      Math.max(
-        10,
-        Math.round(
-          num(src.defaultCheckIntervalMinutes, d.defaultCheckIntervalMinutes),
-        ),
-      ),
-    ),
+    defaultCheckIntervalMinutes: (() => {
+      const raw = Math.round(
+        num(src.defaultCheckIntervalMinutes, d.defaultCheckIntervalMinutes),
+      );
+      // 0 = spot checks off for new jobs; otherwise clamp to 10–180.
+      if (raw <= 0) return 0;
+      return Math.min(180, Math.max(10, raw));
+    })(),
   };
 }
 
@@ -154,6 +153,29 @@ export function withHstCents(
   const base = Math.max(0, Math.round(subtotalCents));
   if (base <= 0) return 0;
   return base + hstCents(base, rate);
+}
+
+/**
+ * Split a tax-inclusive total into net + HST for checkout line items.
+ * Prefers a net that re-adds to the same total via withHstCents.
+ */
+export function splitInclusiveHstCents(
+  totalCents: number,
+  rate: number = DEFAULT_PRICING.hstRate,
+): { netCents: number; taxCents: number } {
+  const total = Math.max(0, Math.round(totalCents));
+  if (total <= 0) return { netCents: 0, taxCents: 0 };
+  if (rate <= 0) return { netCents: total, taxCents: 0 };
+
+  const guess = Math.round(total / (1 + rate));
+  for (const net of [guess, guess - 1, guess + 1, guess - 2, guess + 2]) {
+    if (net > 0 && withHstCents(net, rate) === total) {
+      return { netCents: net, taxCents: total - net };
+    }
+  }
+
+  const netCents = Math.max(1, guess);
+  return { netCents, taxCents: Math.max(0, total - netCents) };
 }
 
 /** e.g. 0.13 → "13" for labels. */

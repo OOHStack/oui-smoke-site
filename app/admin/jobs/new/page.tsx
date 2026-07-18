@@ -245,15 +245,18 @@ export default function NewJobPage() {
             />
           </div>
           <div className="field">
-            <label htmlFor="checkInterval">Check interval</label>
+            <label htmlFor="checkInterval">Spot-check timer</label>
             <select
               id="checkInterval"
               value={form.checkIntervalMinutes}
               onChange={(e) => setField("checkIntervalMinutes", e.target.value)}
             >
-              <option value="30">30 min</option>
-              <option value="45">45 min</option>
-              <option value="60">60 min</option>
+              <option value="0">Off — no timers</option>
+              <option value="30">Every 30 min</option>
+              <option value="45">Every 45 min</option>
+              <option value="60">Every 60 min</option>
+              <option value="90">Every 90 min</option>
+              <option value="120">Every 120 min</option>
             </select>
           </div>
           <div className="field">
