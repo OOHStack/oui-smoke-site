@@ -1,0 +1,46 @@
+/* Prep kitchen tablets — lock document to the visible viewport.
+   Only .prep-scroller scrolls. Dark html/body removes white letterboxing. */
+
+html {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  background: #0a0908 !important;
+}
+
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  background: #0a0908 !important;
+}
+
+.prep-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  height: 100svh;
+  max-height: 100dvh;
+  max-height: 100svh;
+  overflow: hidden;
+  background: #0a0908;
+}
+
+.prep-scroller {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  background: #0a0908;
+}

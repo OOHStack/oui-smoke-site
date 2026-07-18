@@ -59,9 +59,7 @@ export function AdminToolbarMenu({
         onClick={() => setOpen((v) => !v)}
       >
         {label}
-        <span className="admin-toolbar-menu__caret" aria-hidden>
-          ▾
-        </span>
+        <span className="admin-toolbar-menu__caret" aria-hidden />
       </button>
       {open ? (
         <div className="admin-toolbar-menu__panel" id={menuId} role="menu">

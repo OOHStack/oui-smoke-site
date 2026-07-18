@@ -10,7 +10,8 @@
   --ok: #3d9a6a;
   --warn: #d4a017;
   --radius: 8px;
-  min-height: 100dvh;
+  box-sizing: border-box;
+  min-height: 100%;
   margin: 0;
   background: var(--bg);
   color: var(--text);
@@ -19,12 +20,22 @@
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   color-scheme: dark;
+  touch-action: manipulation;
+}
+
+.prep *,
+.prep *::before,
+.prep *::after {
+  box-sizing: border-box;
 }
 
 .prep__shell {
   max-width: 720px;
   margin: 0 auto;
-  padding: 1.25rem 1rem 2.5rem;
+  padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 0px));
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
 }
 
 .prep__head {
@@ -438,12 +449,40 @@
 }
 
 @media (max-width: 520px) {
+  .prep {
+    font-size: 14px;
+  }
+
+  .prep__shell {
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+    padding-bottom: max(1.75rem, env(safe-area-inset-bottom, 0px));
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+  }
+
   .prep__head {
     align-items: flex-start;
     flex-direction: column;
+    gap: 0.65rem;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.85rem;
   }
 
   .prep__counts {
     justify-items: start;
+  }
+
+  .prep__counts strong {
+    font-size: 2.35rem;
+  }
+
+  .prep__workflow {
+    font-size: 0.82rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .prep__done {
+    padding: 0.95rem 1rem;
+    font-size: 1.05rem;
   }
 }

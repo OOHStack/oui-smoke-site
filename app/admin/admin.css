@@ -334,13 +334,17 @@ a.admin-user.active {
 .admin-toolbar-menu__trigger {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .admin-toolbar-menu__caret {
-  font-size: 0.7em;
-  opacity: 0.75;
-  line-height: 1;
+  flex: 0 0 auto;
+  display: block;
+  width: 0.55rem;
+  height: 0.35rem;
+  background-color: currentColor;
+  opacity: 0.85;
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
 }
 
 .admin-toolbar-menu__panel {
