@@ -208,23 +208,7 @@ export function FlavourPicker({
         <span className="flavour-picker__label">
           {selected?.name ?? emptyLabel}
         </span>
-        <span className="flavour-picker__caret" aria-hidden>
-          <svg
-            width="12"
-            height="8"
-            viewBox="0 0 12 8"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M1.2 1.6 6 6.4 10.8 1.6"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
+        <span className="flavour-picker__caret" aria-hidden />
       </button>
       {menu}
     </div>

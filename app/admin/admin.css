@@ -1611,30 +1611,17 @@ a.admin-user.active {
 }
 
 .flavour-picker__caret {
-  display: inline-flex;
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 1.35rem;
-  height: 1.35rem;
-  color: #f7f4ef;
-  background: color-mix(in srgb, var(--text) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text) 22%, var(--line));
-  border-radius: 4px;
-  line-height: 0;
-}
-
-.flavour-picker__caret svg {
-  display: block;
+  width: 0.75rem;
+  height: 0.5rem;
+  margin-right: 0.15rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23cfc6bb' d='M1.4 1.4 6 6 10.6 1.4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 0.75rem 0.5rem;
 }
 
 .flavour-picker.is-open .flavour-picker__caret {
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
-}
-
-.flavour-picker.is-open .flavour-picker__caret svg {
   transform: rotate(180deg);
 }
 
