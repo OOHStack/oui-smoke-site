@@ -117,8 +117,31 @@ const COLUMN_IDS: BoardStatus[] = ["staged", "out", "returned"];
 function callTypeLabel(type: string) {
   if (type === "coals") return "Coals";
   if (type === "refill") return "Refill";
+  if (type === "order_unit") return "Floor order";
   if (type === "issue") return "Issue";
   return "Help";
+}
+
+function callChipText(call: BoardCall) {
+  if (call.type === "order_unit") {
+    return call.status === "acknowledged" ? "Floor order · claimed" : "Floor order";
+  }
+  if (call.status === "acknowledged") return "On the way";
+  if (call.type === "refill" && call.flavourLabel) {
+    return `Refill · ${call.flavourLabel}`;
+  }
+  return callTypeLabel(call.type);
+}
+
+function isRedundantHookahLabel(label: string, modelNumber: number) {
+  const n = String(modelNumber);
+  const normalized = label.trim().toLowerCase().replace(/\s+/g, " ");
+  return (
+    normalized === n ||
+    normalized === `#${n}` ||
+    normalized === `hookah #${n}` ||
+    normalized === `hookah ${n}`
+  );
 }
 
 function assignmentHasFlavour(a: BoardAssignment) {
@@ -954,7 +977,34 @@ function HookahTileContent({
     new Date(a.nextCheckAt).getTime() < Date.now();
   const flavourName = a.flavour?.name ?? a.flavourLabel ?? null;
   const call = a.activeCall;
-  const label = a.hookah.label?.trim() || null;
+  const rawLabel = a.hookah.label?.trim() || null;
+  const label =
+    rawLabel && !isRedundantHookahLabel(rawLabel, a.hookah.modelNumber)
+      ? rawLabel
+      : null;
+  const unitChip =
+    showUnitPay && a.guestPayTier ? unitPayChip(a.unitPaymentStatus) : null;
+  const unitTone =
+    a.unitPaymentStatus === "succeeded"
+      ? "paid"
+      : a.unitPaymentStatus === "pending"
+        ? "awaiting"
+        : "terminal";
+  const refillChip =
+    call?.type === "refill"
+      ? refillPayChip({
+          priceCents: call.priceCents,
+          payPreference: call.payPreference,
+          paymentStatus: call.paymentStatus,
+        })
+      : null;
+  const refillTone =
+    refillChip &&
+    (refillChip.startsWith("PAID") || refillChip === "INCLUDED"
+      ? "paid"
+      : refillChip.includes("TERMINAL")
+        ? "terminal"
+        : "awaiting");
 
   return (
     <button
@@ -977,9 +1027,11 @@ function HookahTileContent({
       aria-pressed={selected ? true : undefined}
       title={
         call
-          ? `${callTypeLabel(call.type)}${call.message ? `: ${call.message}` : ""}${
-              call.status === "acknowledged" ? " · on the way" : ""
-            }`
+          ? `${callTypeLabel(call.type)}${
+              call.message && call.type !== "order_unit"
+                ? `: ${call.message}`
+                : ""
+            }${call.status === "acknowledged" ? " · claimed" : ""}`
           : selectMode
             ? selected
               ? "Selected — tap to deselect"
@@ -998,46 +1050,33 @@ function HookahTileContent({
       {...attributes}
       {...listeners}
     >
-      <div className="fleet-num">#{a.hookah.modelNumber}</div>
-      {label ? <div className="job-fleet-tile__label">{label}</div> : null}
-      <StatusBadge status={a.status} kind="assignment" />
-      {a.guestPayTier ? (
-        <span className={`tier-chip tier-chip--${a.guestPayTier}`}>
-          {a.guestPayTier}
-        </span>
-      ) : null}
-      {showUnitPay && a.guestPayTier
-        ? (() => {
-            const chip = unitPayChip(a.unitPaymentStatus);
-            if (!chip) return null;
-            const tone =
-              a.unitPaymentStatus === "succeeded"
-                ? "paid"
-                : a.unitPaymentStatus === "pending"
-                  ? "awaiting"
-                  : "terminal";
-            return (
-              <span
-                className={`pay-chip pay-chip--${
-                  tone === "paid"
-                    ? "paid"
-                    : tone === "awaiting"
-                      ? "awaiting"
-                      : "terminal"
-                }`}
-              >
-                {chip}
-              </span>
-            );
-          })()
-        : null}
-      {flavourName ? (
-        <div className="list-meta job-fleet-tile__flavour">{flavourName}</div>
-      ) : a.status === "staged" ? (
-        <div className="list-meta job-fleet-tile__flavour job-fleet-tile__flavour--warn">
-          Set flavour for prep
-        </div>
-      ) : null}
+      <div className="job-fleet-tile__top">
+        <div className="fleet-num">#{a.hookah.modelNumber}</div>
+        {label ? <div className="job-fleet-tile__label">{label}</div> : null}
+        {flavourName ? (
+          <div className="job-fleet-tile__flavour">{flavourName}</div>
+        ) : a.status === "staged" ? (
+          <div className="job-fleet-tile__flavour job-fleet-tile__flavour--warn">
+            Set flavour for prep
+          </div>
+        ) : null}
+      </div>
+
+      <div className="job-fleet-tile__chips">
+        <StatusBadge status={a.status} kind="assignment" />
+        {a.guestPayTier ? (
+          <span className={`tier-chip tier-chip--${a.guestPayTier}`}>
+            {a.guestPayTier}
+          </span>
+        ) : null}
+        {unitChip ? (
+          <span className={`pay-chip pay-chip--${unitTone}`}>{unitChip}</span>
+        ) : null}
+        {a.issueFlag && !call ? (
+          <span className="hookah-chip hookah-chip--issue">Issue</span>
+        ) : null}
+      </div>
+
       {a.status === "out" && a.nextCheckAt ? (
         <div className="job-fleet-tile__timer">
           <Countdown target={a.nextCheckAt} />
@@ -1048,43 +1087,19 @@ function HookahTileContent({
           {a.refillCount} refill{a.refillCount === 1 ? "" : "s"}
         </div>
       ) : null}
+
       {call ? (
-        <span className={`hookah-call-chip hookah-call-chip--${call.type}`}>
-          {call.status === "acknowledged"
-            ? "On the way"
-            : call.type === "refill" && call.flavourLabel
-              ? `Refill: ${call.flavourLabel}`
-              : callTypeLabel(call.type)}
-          {call.message && call.type !== "refill" ? (
-            <span className="hookah-call-chip__msg"> · {call.message}</span>
+        <div className={`job-fleet-tile__call hookah-call-chip--${call.type}`}>
+          <span className="job-fleet-tile__call-label">{callChipText(call)}</span>
+          {call.message &&
+          call.type !== "refill" &&
+          call.type !== "order_unit" ? (
+            <span className="job-fleet-tile__call-msg">{call.message}</span>
           ) : null}
-        </span>
+        </div>
       ) : null}
-      {call?.type === "refill"
-        ? (() => {
-            const chip = refillPayChip({
-              priceCents: call.priceCents,
-              payPreference: call.payPreference,
-              paymentStatus: call.paymentStatus,
-            });
-            if (!chip) return null;
-            const tone =
-              chip.startsWith("PAID") || chip === "INCLUDED"
-                ? "paid"
-                : chip.includes("TERMINAL")
-                  ? "terminal"
-                  : "awaiting";
-            return (
-              <span
-                className={`pay-chip pay-chip--${tone === "paid" ? "paid" : tone === "terminal" ? "terminal" : "awaiting"}`}
-              >
-                {chip}
-              </span>
-            );
-          })()
-        : null}
-      {a.issueFlag && !call ? (
-        <span className="hookah-chip hookah-chip--issue">Issue</span>
+      {refillChip && refillTone ? (
+        <span className={`pay-chip pay-chip--${refillTone}`}>{refillChip}</span>
       ) : null}
     </button>
   );
