@@ -1,13 +1,10 @@
 import Link from "next/link";
-import { and, count, eq, gte, inArray, lte, lt, or, sql } from "drizzle-orm";
-import { addDays, format } from "date-fns";
+import { and, count, eq, inArray, lt, sql } from "drizzle-orm";
+import { format } from "date-fns";
 import { getDb } from "@/lib/db";
 import { jobs, jobHookahs, hookahs, serviceRequests } from "@/lib/db/schema";
 import { getSession } from "@/lib/auth/session";
-import StatusBadge from "@/components/admin/StatusBadge";
 import DashboardMotion from "@/components/admin/DashboardMotion";
-import PartnerOnePagerCard from "@/components/admin/PartnerOnePagerCard";
-import PromoModeCard from "@/components/admin/PromoModeCard";
 
 function callLabel(type: string, flavourLabel: string | null, priceCents: number | null) {
   if (type === "refill") {
@@ -31,8 +28,6 @@ export default async function AdminDashboardPage() {
   const session = await getSession();
   const db = getDb();
   const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const weekAhead = addDays(now, 7);
 
   const [activeRow] = await db
     .select({ n: count() })
@@ -91,28 +86,6 @@ export default async function AdminDashboardPage() {
     .orderBy(serviceRequests.createdAt)
     .limit(12);
 
-  const [completedRow] = await db
-    .select({ n: count() })
-    .from(jobs)
-    .where(
-      and(eq(jobs.status, "completed"), gte(jobs.updatedAt, thirtyDaysAgo)),
-    );
-
-  const upcomingJobs = await db
-    .select()
-    .from(jobs)
-    .where(
-      and(
-        or(
-          and(gte(jobs.startsAt, now), lte(jobs.startsAt, weekAhead)),
-          and(lte(jobs.startsAt, now), gte(jobs.endsAt, now)),
-        ),
-        sql`${jobs.status} NOT IN ('cancelled', 'completed')`,
-      ),
-    )
-    .orderBy(jobs.startsAt)
-    .limit(20);
-
   let recentGuestFeedback: Array<{
     assignmentId: number;
     jobId: number;
@@ -149,7 +122,6 @@ export default async function AdminDashboardPage() {
   const out = Number(outRow?.n ?? 0);
   const calls = Number(serviceOpenRow?.n ?? 0);
   const overdue = overdueList.length;
-  const completed = Number(completedRow?.n ?? 0);
   const needsAttention = calls > 0 || overdue > 0;
 
   return (
@@ -187,6 +159,24 @@ export default async function AdminDashboardPage() {
             <Link href="/admin/jobs/new" className="btn">
               New job
             </Link>
+            <a
+              className="btn"
+              href="/partner"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Partner one-pager for warm DMs and venues"
+            >
+              Share kit
+            </a>
+            <a
+              className="btn"
+              href="/promo"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Static homepage kiosk (/promo)"
+            >
+              Site kiosk
+            </a>
           </div>
         </div>
       </section>
@@ -215,9 +205,6 @@ export default async function AdminDashboardPage() {
           <span className="dash-pulse__value">{overdue}</span>
         </Link>
       </section>
-
-      <PartnerOnePagerCard />
-      <PromoModeCard />
 
       <div className="dash-rails">
         <section className="dash-rail">
@@ -312,58 +299,6 @@ export default async function AdminDashboardPage() {
             ))}
           </ul>
         )}
-      </section>
-
-      <section className="dash-schedule">
-        <div className="dash-schedule__inner">
-          <div className="dash-rail__head">
-            <div>
-              <h2 className="dash-rail__title">This week</h2>
-              <p className="dash-schedule__sub">
-                {completed} completed in the last 30 days
-              </p>
-            </div>
-            <Link href="/admin/jobs" className="dash-rail__link">
-              All jobs
-            </Link>
-          </div>
-
-          {upcomingJobs.length === 0 ? (
-            <p className="dash-empty">No jobs scheduled in the next 7 days.</p>
-          ) : (
-            <ul className="dash-schedule__list">
-              {upcomingJobs.map((job) => (
-                <li key={job.id}>
-                  <Link href={`/admin/jobs/${job.id}`} className="dash-schedule__row">
-                    <div>
-                      <div className="dash-feed__title">{job.title}</div>
-                      <div className="dash-feed__meta">
-                        {job.clientName}
-                        {job.startsAt
-                          ? ` · ${format(new Date(job.startsAt), "MMM d, h:mm a")}`
-                          : ""}
-                        {job.location ? ` · ${job.location}` : ""}
-                      </div>
-                    </div>
-                    <StatusBadge status={job.status} kind="job" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="dash-schedule__actions">
-            <Link href="/admin/jobs/new" className="btn btn-primary">
-              New job
-            </Link>
-            <Link href="/admin/fleet" className="btn">
-              Fleet
-            </Link>
-            <Link href="/admin/analytics" className="btn">
-              Analytics
-            </Link>
-          </div>
-        </div>
       </section>
     </DashboardMotion>
   );

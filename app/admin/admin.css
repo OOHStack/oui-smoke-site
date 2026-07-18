@@ -455,36 +455,6 @@ a.admin-user.active {
   font-size: 0.85rem;
 }
 
-.partner-share-card {
-  display: grid;
-  gap: 0.85rem;
-  margin: 0 0 1rem;
-}
-
-.partner-share-card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.partner-share-card__url {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--muted);
-  word-break: break-all;
-}
-
-@media (min-width: 860px) {
-  .partner-share-card {
-    grid-template-columns: 1fr auto;
-    align-items: end;
-  }
-
-  .partner-share-card__url {
-    grid-column: 1 / -1;
-  }
-}
-
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -3791,97 +3761,6 @@ button.fleet-tile {
   color: var(--accent);
 }
 
-.dash-schedule {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  border-radius: calc(var(--radius) + 4px);
-  overflow: hidden;
-  isolation: isolate;
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
-  min-height: 16rem;
-  width: 100%;
-  min-width: 0;
-  background:
-    radial-gradient(
-      ellipse 90% 70% at 100% 0%,
-      color-mix(in srgb, var(--accent) 16%, transparent),
-      transparent 55%
-    ),
-    linear-gradient(155deg, #1a1412 0%, var(--panel) 48%, #0f0d0c 100%);
-  flex: 0 0 auto;
-  transform: none;
-}
-
-.dash-schedule__inner {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  gap: 0.75rem;
-  padding: 1rem 1.15rem 1.15rem;
-  min-width: 0;
-}
-
-.dash-schedule__sub {
-  margin: 0.2rem 0 0;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.dash-schedule__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0;
-  min-width: 0;
-}
-
-.dash-schedule__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.7rem 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
-  color: inherit;
-  text-decoration: none;
-  min-width: 0;
-}
-
-.dash-schedule__row > div {
-  min-width: 0;
-}
-
-.dash-schedule__row:hover {
-  color: inherit;
-}
-
-.dash-schedule__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.65rem;
-  margin-top: auto;
-  padding-top: 0.35rem;
-}
-
-.dash-schedule__actions > .btn {
-  position: relative;
-  flex: 0 0 auto;
-  margin: 0;
-  text-decoration: none;
-  background: color-mix(in srgb, var(--panel) 88%, black);
-  box-shadow: none;
-}
-
-.dash-schedule__actions > .btn-primary {
-  background: var(--accent);
-}
-
 @media (max-width: 900px) {
   .dash-pulse {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3912,14 +3791,6 @@ button.fleet-tile {
   .dash-pulse__item {
     min-height: 7rem;
     padding: 0.8rem;
-  }
-
-  .dash-schedule__inner {
-    padding: 0.85rem 1rem 1rem;
-  }
-
-  .dash-schedule__actions {
-    gap: 0.55rem;
   }
 }
 

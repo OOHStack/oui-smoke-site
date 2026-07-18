@@ -20,7 +20,7 @@ export default function DashboardMotion({
 
       // Opacity-only — never animate transform here. Transform tweens fight
       // CSS hover transitions on the metric tiles and leave sections overlapping.
-      gsap.from(".dash-hero__content > *, .dash-pulse__item, .dash-rails, .dash-schedule", {
+      gsap.from(".dash-hero__content > *, .dash-pulse__item, .dash-rails, .dash-rail--feedback", {
         opacity: 0,
         duration: 0.55,
         stagger: 0.05,
