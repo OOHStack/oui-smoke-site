@@ -245,8 +245,6 @@ export default function PrepKitchenPage() {
             <p className="prep__muted">
               {data.clientName}
               {data.location ? ` · ${data.location}` : ""}
-              {" · "}
-              Pack heads · tap Done · packed stays listed by flavour
             </p>
           </div>
           <div className="prep__counts" aria-live="polite">
