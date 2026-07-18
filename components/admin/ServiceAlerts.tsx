@@ -130,7 +130,7 @@ export default function ServiceAlerts() {
               {
                 body:
                   row.type === "order_unit"
-                    ? `${dollars} received — QR should show on the event display`
+                    ? `${dollars} received — on Ready to send`
                     : `${dollars} received via Square — deliver when ready`,
                 tag: `${row.type}-paid-${row.id}`,
               },
@@ -402,7 +402,7 @@ export default function ServiceAlerts() {
                     <div className="list-meta">
                       {r.jobTitle} · {r.clientName}
                       {r.type === "order_unit"
-                        ? " · Assign unit, collect, QR on table display"
+                        ? " · Assign, collect → Ready to send"
                         : ""}
                       {r.message ? ` · ${r.message}` : ""}
                     </div>

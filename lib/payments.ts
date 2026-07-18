@@ -141,7 +141,7 @@ export async function markPaymentSucceeded(opts: {
       createdBy: "square",
     });
 
-    // Floor tablet orders: after Terminal clears, send out so the event display shows QR.
+    // Floor tablet orders: after Terminal clears, park on Ready to send (not out yet).
     if (row.kind === "onsite_unit" && row.jobHookahId != null) {
       try {
         const [floorReq] = await db
@@ -157,24 +157,23 @@ export async function markPaymentSucceeded(opts: {
           )
           .limit(1);
         if (floorReq) {
-          const sent = await fulfillFloorOrder({
+          const ready = await fulfillFloorOrder({
             serviceRequestId: floorReq.id,
             assignmentId: row.jobHookahId,
             payChannel: "already_paid",
             staffName: "square",
-            sendOnly: true,
           });
-          if (sent.ok && sent.sentOut) {
+          if (ready.ok && ready.ready) {
             void notifyStaffPush({
-              title: `Floor order out · #${sent.modelNumber}`,
-              body: `Paid · QR on event display`,
+              title: `Floor order ready · #${ready.modelNumber}`,
+              body: `Paid · on Ready to send — make & carry out, then Send`,
               url: `/admin/jobs/${row.jobId}`,
-              tag: `floor-sent-${floorReq.id}`,
+              tag: `floor-ready-${floorReq.id}`,
             });
           }
         }
       } catch (err) {
-        console.error("floor order auto-send after pay failed", err);
+        console.error("floor order ready-after-pay failed", err);
       }
     }
 

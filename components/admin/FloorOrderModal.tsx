@@ -113,31 +113,24 @@ export default function FloorOrderModal({
     return {};
   }
 
-  async function fulfill(
-    payChannel: "cash" | "already_paid" | "terminal",
-    sendOnly = false,
-  ) {
+  async function fulfill(payChannel: "cash" | "already_paid" | "terminal") {
     setBusy(true);
     try {
-      const body: Record<string, unknown> = {
-        action: "fulfill_floor_order",
-        payChannel,
-        sendOnly,
-        ...parsePick(),
-      };
       const res = await fetch(`/api/service-requests/${row.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          action: "fulfill_floor_order",
+          payChannel,
+          ...parsePick(),
+        }),
       });
       if (!res.ok) {
-        onError(await readApiError(res), () =>
-          void fulfill(payChannel, sendOnly),
-        );
+        onError(await readApiError(res), () => void fulfill(payChannel));
         return;
       }
-      const data = (await res.json()) as { sentOut?: boolean };
-      if (payChannel === "terminal" && !data.sentOut) {
+      const data = (await res.json()) as { ready?: boolean };
+      if (payChannel === "terminal" && !data.ready) {
         onClose();
         return;
       }
@@ -149,7 +142,7 @@ export default function FloorOrderModal({
 
   const waitingTerminal =
     row.paymentStatus === "pending" && row.assignmentId != null;
-  const canSendPaid =
+  const finishPaid =
     row.paymentStatus === "succeeded" && row.assignmentId != null;
 
   return (
@@ -197,17 +190,21 @@ export default function FloorOrderModal({
             <p className="confirm-modal__message">
               Terminal checkout is open
               {row.modelNumber != null ? ` for #${row.modelNumber}` : ""}. When
-              it clears, the QR will push to the event display automatically —
-              or tap below if it already paid.
+              it clears, the unit lands on Ready to send — make it, carry it
+              out, then Send for the guest QR.
             </p>
-          ) : canSendPaid ? (
+          ) : finishPaid ? (
             <p className="confirm-modal__message">
               Paid
-              {row.modelNumber != null ? ` · #${row.modelNumber}` : ""}. Send out
-              to show the guest QR on the table display.
+              {row.modelNumber != null ? ` · #${row.modelNumber}` : ""}. Confirm
+              to park it on Ready to send.
             </p>
           ) : (
             <>
+              <p className="confirm-modal__message">
+                Assign a unit and collect — it goes to Ready to send so you can
+                prep and walk it out. Guest QR shows when you Send.
+              </p>
               <label className="field" style={{ display: "grid", gap: 6 }}>
                 <span>Assign to hookah</span>
                 <select
@@ -260,14 +257,23 @@ export default function FloorOrderModal({
           >
             Later
           </button>
-          {canSendPaid || waitingTerminal ? (
+          {finishPaid ? (
             <button
               type="button"
               className="btn btn-ok"
               disabled={busy}
-              onClick={() => void fulfill("already_paid", true)}
+              onClick={() => void fulfill("already_paid")}
             >
-              {busy ? "Sending…" : "Show QR on display"}
+              {busy ? "…" : "Ready to send"}
+            </button>
+          ) : waitingTerminal ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={busy}
+              onClick={onClose}
+            >
+              Waiting on terminal
             </button>
           ) : (
             <>
@@ -277,7 +283,7 @@ export default function FloorOrderModal({
                 disabled={busy || !pick}
                 onClick={() => void fulfill("cash")}
               >
-                {busy ? "…" : "Cash · send QR"}
+                {busy ? "…" : "Cash · ready"}
               </button>
               <button
                 type="button"
@@ -285,7 +291,7 @@ export default function FloorOrderModal({
                 disabled={busy || !pick}
                 onClick={() => void fulfill("already_paid")}
               >
-                Paid · send QR
+                Paid · ready
               </button>
               <button
                 type="button"

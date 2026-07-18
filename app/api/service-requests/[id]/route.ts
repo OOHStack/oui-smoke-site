@@ -53,7 +53,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     assignmentId?: number;
     hookahId?: number;
     payChannel?: string;
-    sendOnly?: boolean;
   };
   try {
     body = await request.json();
@@ -85,7 +84,6 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (action === "fulfill_floor_order") {
     const payChannel = body.payChannel as FloorPayChannel | undefined;
     if (
-      !body.sendOnly &&
       payChannel !== "cash" &&
       payChannel !== "already_paid" &&
       payChannel !== "terminal"
@@ -100,9 +98,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       assignmentId:
         typeof body.assignmentId === "number" ? body.assignmentId : undefined,
       hookahId: typeof body.hookahId === "number" ? body.hookahId : undefined,
-      payChannel: payChannel ?? "already_paid",
+      payChannel,
       staffName: session.name,
-      sendOnly: body.sendOnly === true,
     });
     if (!result.ok) {
       return NextResponse.json(

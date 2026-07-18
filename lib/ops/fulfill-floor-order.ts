@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db";
 import {
-  flavours,
   hookahs,
   jobEvents,
   jobHookahs,
@@ -9,7 +8,6 @@ import {
   payments,
   serviceRequests,
 } from "@/lib/db/schema";
-import { createGuestToken } from "@/lib/guest";
 import {
   guestPayTierLabel,
   guestPayTierUnitCents,
@@ -79,15 +77,13 @@ export async function fulfillFloorOrder(opts: {
   hookahId?: number;
   payChannel: FloorPayChannel;
   staffName: string;
-  /** When true, only send out an already-linked paid unit (no new payment). */
-  sendOnly?: boolean;
 }): Promise<
   | {
       ok: true;
       assignmentId: number;
       modelNumber: number;
-      guestToken: string | null;
-      sentOut: boolean;
+      /** Staged on Ready to send — not on the floor yet. */
+      ready: boolean;
       terminalCheckoutId?: string;
       paymentId?: number;
     }
@@ -239,7 +235,7 @@ export async function fulfillFloorOrder(opts: {
   const amountCents = withHstCents(exclusiveCents, pricing.hstRate);
   const label = `${guestPayTierLabel(tier, pricing)} + HST`;
 
-  if (opts.payChannel === "terminal" && !opts.sendOnly) {
+  if (opts.payChannel === "terminal") {
     const { pushJobPaymentToTerminal } = await import(
       "@/lib/terminal-checkout"
     );
@@ -272,15 +268,14 @@ export async function fulfillFloorOrder(opts: {
       ok: true,
       assignmentId,
       modelNumber: hookah.modelNumber,
-      guestToken: assignment.guestToken,
-      sentOut: false,
+      ready: false,
       terminalCheckoutId: result.terminalCheckoutId,
       paymentId: result.paymentId,
     };
   }
 
-  // Ensure paid (cash / already_paid / sendOnly after terminal)
-  const existingPay = await db
+  // Cash / already paid — stay staged on Ready to send (prep + carry out next).
+  const succeeded = await db
     .select({ id: payments.id })
     .from(payments)
     .where(
@@ -288,122 +283,62 @@ export async function fulfillFloorOrder(opts: {
         eq(payments.jobId, job.id),
         eq(payments.jobHookahId, assignmentId),
         eq(payments.kind, "onsite_unit"),
-        inArray(payments.status, ["succeeded", "pending"]),
+        eq(payments.status, "succeeded"),
       ),
     )
     .limit(1);
 
   let paymentId: number | undefined;
-  if (
-    !opts.sendOnly &&
-    (opts.payChannel === "cash" || opts.payChannel === "already_paid")
-  ) {
-    const succeeded = existingPay.length
-      ? await db
-          .select({ id: payments.id, status: payments.status })
-          .from(payments)
-          .where(
-            and(
-              eq(payments.jobId, job.id),
-              eq(payments.jobHookahId, assignmentId),
-              eq(payments.kind, "onsite_unit"),
-              eq(payments.status, "succeeded"),
-            ),
-          )
-          .limit(1)
-      : [];
-
-    if (succeeded[0]) {
-      paymentId = succeeded[0].id;
-    } else {
-      const now = new Date();
-      const [row] = await db
-        .insert(payments)
-        .values({
-          jobId: job.id,
-          jobHookahId: assignmentId,
-          kind: "onsite_unit",
-          status: "succeeded",
-          amountCents,
-          label,
-          idempotencyKey: `floor-${request.id}-${assignmentId}-${randomUUID()}`,
-          createdBy: opts.staffName,
-          paidAt: now,
-        })
-        .returning();
-      paymentId = row.id;
-      await db.insert(jobEvents).values({
+  if (succeeded[0]) {
+    paymentId = succeeded[0].id;
+  } else {
+    const paidAt = new Date();
+    const [row] = await db
+      .insert(payments)
+      .values({
         jobId: job.id,
         jobHookahId: assignmentId,
-        type: "note",
-        message: `Floor order paid · ${label}${
-          opts.payChannel === "cash" ? " · cash" : ""
-        }`,
+        kind: "onsite_unit",
+        status: "succeeded",
+        amountCents,
+        label,
+        idempotencyKey: `floor-${request.id}-${assignmentId}-${randomUUID()}`,
         createdBy: opts.staffName,
-      });
-    }
-  } else if (opts.sendOnly) {
-    const paid = await db
-      .select({ id: payments.id })
-      .from(payments)
-      .where(
-        and(
-          eq(payments.jobId, job.id),
-          eq(payments.jobHookahId, assignmentId),
-          eq(payments.kind, "onsite_unit"),
-          eq(payments.status, "succeeded"),
-        ),
-      )
-      .limit(1);
-    if (!paid[0]) {
-      return {
-        ok: false,
-        error: "Collect payment before sending to the floor display",
-        status: 409,
-        code: "NEED_PAYMENT",
-      };
-    }
-    paymentId = paid[0].id;
+        paidAt,
+      })
+      .returning();
+    paymentId = row.id;
+    await db.insert(jobEvents).values({
+      jobId: job.id,
+      jobHookahId: assignmentId,
+      type: "note",
+      message: `Floor order paid · ${label}${
+        opts.payChannel === "cash" ? " · cash" : ""
+      }`,
+      createdBy: opts.staffName,
+    });
   }
 
-  // Send out → event display QR takeover
   const now = new Date();
-  const nextCheckAt = new Date(
-    now.getTime() + job.checkIntervalMinutes * 60_000,
-  );
-  const guestToken = assignment.guestToken || createGuestToken();
   const sortOrder =
-    assignment.status === "out"
+    assignment.status === "staged"
       ? assignment.sortOrder
-      : await nextSortOrder(db, job.id, "out");
+      : await nextSortOrder(db, job.id, "staged");
 
   await db
     .update(jobHookahs)
     .set({
-      status: "out",
-      sentOutAt: now,
+      status: "staged",
+      sentOutAt: null,
       returnedAt: null,
-      nextCheckAt,
+      nextCheckAt: null,
       flavourId: flavourId ?? null,
       flavourLabel,
       guestPayTier: tier,
-      guestToken,
       sortOrder,
       prepCompletedAt: null,
     })
     .where(eq(jobHookahs.id, assignmentId));
-
-  await db
-    .update(hookahs)
-    .set({ status: "out" })
-    .where(eq(hookahs.id, assignment.hookahId));
-
-  if (flavourId) {
-    await db
-      .update(flavours)
-      .set({ timesUsed: sql`${flavours.timesUsed} + 1` })
-      .where(eq(flavours.id, flavourId));
-  }
 
   await db
     .update(serviceRequests)
@@ -418,8 +353,8 @@ export async function fulfillFloorOrder(opts: {
   await db.insert(jobEvents).values({
     jobId: job.id,
     jobHookahId: assignmentId,
-    type: "sent_out",
-    message: `Floor order sent out · #${hookah.modelNumber} · ${flavourLabel} · QR on event display`,
+    type: "note",
+    message: `Floor order ready to send · #${hookah.modelNumber} · ${flavourLabel} · make & carry out, then Send`,
     createdBy: opts.staffName,
   });
 
@@ -427,8 +362,7 @@ export async function fulfillFloorOrder(opts: {
     ok: true,
     assignmentId,
     modelNumber: hookah.modelNumber,
-    guestToken,
-    sentOut: true,
+    ready: true,
     paymentId,
   };
 }
