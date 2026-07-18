@@ -381,6 +381,11 @@ async function main() {
   `;
   console.log("✓ site_settings");
 
+  // --- prep kitchen completion ---
+  await sql`ALTER TABLE job_hookahs ADD COLUMN IF NOT EXISTS prep_completed_at timestamptz`;
+  await sql`ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS prep_completed_at timestamptz`;
+  console.log("✓ prep completion");
+
   // --- site media (marketing assets on Blob) ---
   await sql`
     CREATE TABLE IF NOT EXISTS site_media (
@@ -438,6 +443,7 @@ async function main() {
       "guest_comment",
       "guest_feedback_at",
       "guest_pay_tier",
+      "prep_completed_at",
     ],
     service_requests: [
       "flavour_id",
@@ -446,6 +452,7 @@ async function main() {
       "price_agreed",
       "pay_preference",
       "acknowledged_by_user_id",
+      "prep_completed_at",
     ],
     push_subscriptions: ["ops_user_id"],
     job_photos: [

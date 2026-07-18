@@ -152,6 +152,8 @@ export const jobHookahs = pgTable("job_hookahs", {
   guestRating: integer("guest_rating"),
   guestComment: text("guest_comment").default(""),
   guestFeedbackAt: timestamp("guest_feedback_at", { withTimezone: true }),
+  /** Kitchen marked this staged head packed / flavour done (still awaiting send-out). */
+  prepCompletedAt: timestamp("prep_completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -201,6 +203,8 @@ export const serviceRequests = pgTable("service_requests", {
   /** Ops user who claimed (“I’m on it”) — used to scope follow-up pushes. */
   acknowledgedByUserId: integer("acknowledged_by_user_id"),
   resolvedBy: text("resolved_by").default(""),
+  /** Kitchen marked this refill/extra flavour packed (floor still delivers). */
+  prepCompletedAt: timestamp("prep_completed_at", { withTimezone: true }),
 });
 
 export const refillSourceEnum = pgEnum("refill_source", ["staff", "guest"]);

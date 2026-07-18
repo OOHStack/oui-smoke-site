@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useSse } from "@/lib/hooks/useSse";
-import { prepKindLabel, type PrepQueueSnapshot } from "@/lib/prep-queue";
+import {
+  prepKindLabel,
+  type PrepItem,
+  type PrepQueueSnapshot,
+} from "@/lib/prep-queue";
 import "./prep.css";
 
 function playChime() {
@@ -39,6 +43,8 @@ export default function PrepKitchenPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
   const knownIds = useRef<Set<string>>(new Set());
   const primed = useRef(false);
 
@@ -73,6 +79,66 @@ export default function PrepKitchenPage() {
     },
   );
 
+  async function markComplete(item: PrepItem) {
+    if (!token || busyId) return;
+    setBusyId(item.id);
+    setActionError("");
+
+    // Optimistic remove
+    setData((prev) => {
+      if (!prev) return prev;
+      const items = prev.items.filter((i) => i.id !== item.id);
+      const tallyMap = new Map<string, number>();
+      for (const row of items) {
+        tallyMap.set(row.flavourName, (tallyMap.get(row.flavourName) ?? 0) + 1);
+      }
+      const tallies = [...tallyMap.entries()]
+        .map(([flavourName, count]) => ({ flavourName, count }))
+        .sort(
+          (a, b) =>
+            b.count - a.count || a.flavourName.localeCompare(b.flavourName),
+        );
+      return {
+        ...prev,
+        items,
+        tallies,
+        counts: {
+          total: items.length,
+          newUnits: items.filter((i) => i.kind === "new_unit").length,
+          refills: items.filter((i) => i.kind === "refill").length,
+          extras: items.filter((i) => i.kind === "order_unit").length,
+          needsFlavour: 0,
+        },
+      };
+    });
+    knownIds.current.delete(item.id);
+
+    try {
+      const res = await fetch(`/api/prep/${encodeURIComponent(token)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "complete", id: item.id }),
+      });
+      const body = (await res.json().catch(() => ({}))) as PrepQueueSnapshot & {
+        error?: string;
+        ok?: boolean;
+      };
+      if (!res.ok) {
+        setActionError(body.error || "Couldn’t mark complete");
+        // SSE will restore the card shortly
+        return;
+      }
+      if (body.items) {
+        knownIds.current = new Set(body.items.map((i) => i.id));
+        setData(body);
+      }
+    } catch {
+      setActionError("Network error — try again");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="prep">
@@ -103,7 +169,7 @@ export default function PrepKitchenPage() {
             <p className="prep__kicker">Oui Smoke</p>
             <h1 className="prep__title">Prep board</h1>
             <p className="prep__muted">
-              Pack heads for Ready-to-send · live as orders come in
+              Pack heads for Ready-to-send · tap Done when flavour is packed
             </p>
           </div>
           <div className="prep__counts" aria-live="polite">
@@ -114,9 +180,15 @@ export default function PrepKitchenPage() {
 
         <p className="prep__workflow">
           <strong>Workflow:</strong> Stage units → set flavour on the job → pack
-          here → send out to the floor. Only flavoured orders appear. Refills
-          and extra hookahs show when guests order.
+          here → mark Done → staff send out. Only flavoured orders appear.
+          Refills and extra hookahs show when guests order.
         </p>
+
+        {actionError ? (
+          <p className="prep__action-error" role="alert">
+            {actionError}
+          </p>
+        ) : null}
 
         {tallies.length > 0 ? (
           <section className="prep__tallies" aria-label="Flavour totals">
@@ -172,7 +244,7 @@ export default function PrepKitchenPage() {
                 ) : null}
                 {item.kind === "order_unit" ? (
                   <p className="prep__hint">
-                    Extra hookah — stage a free unit with this flavour, then
+                    Extra hookah — pack this flavour, then staff stage &amp;
                     send out
                   </p>
                 ) : item.kind === "new_unit" ? (
@@ -185,6 +257,14 @@ export default function PrepKitchenPage() {
                     {item.modelNumber != null ? ` #${item.modelNumber}` : ""}
                   </p>
                 )}
+                <button
+                  type="button"
+                  className="prep__done"
+                  disabled={busyId === item.id}
+                  onClick={() => void markComplete(item)}
+                >
+                  {busyId === item.id ? "Saving…" : "Done · flavour packed"}
+                </button>
               </li>
             ))}
           </ul>

@@ -391,6 +391,7 @@ export async function POST(request: Request, context: RouteContext) {
               returnedAt: null,
               nextCheckAt: null,
               guestToken: null,
+              prepCompletedAt: null,
             })
             .where(eq(jobHookahs.id, assignmentId));
 
@@ -610,6 +611,7 @@ export async function POST(request: Request, context: RouteContext) {
             nextCheckAt: null,
             returnedAt: null,
             guestToken: null,
+            prepCompletedAt: null,
             sortOrder,
           })
           .where(eq(jobHookahs.id, assignmentId))
@@ -1060,6 +1062,9 @@ export async function POST(request: Request, context: RouteContext) {
         if (Object.keys(updates).length === 0) {
           return NextResponse.json({ error: "flavourId or flavourLabel required" }, { status: 400 });
         }
+
+        // Flavour change means kitchen needs to pack again.
+        updates.prepCompletedAt = null;
 
         const [updated] = await db
           .update(jobHookahs)

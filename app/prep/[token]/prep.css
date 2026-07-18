@@ -247,6 +247,46 @@
   color: color-mix(in srgb, var(--muted) 80%, var(--text));
 }
 
+.prep__action-error {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--panel) 88%, var(--accent));
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.prep__done {
+  display: block;
+  width: 100%;
+  margin-top: 0.85rem;
+  padding: 0.85rem 1rem;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--ok);
+  color: #06140e;
+  font: inherit;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prep__done:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.prep__done:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.prep__done:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 .prep__foot {
   display: flex;
   justify-content: space-between;
