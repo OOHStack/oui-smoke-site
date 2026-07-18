@@ -132,7 +132,7 @@ export default function JobDisplayPage() {
 
       <div className="jdisplay__shell">
         <header className="jdisplay__top">
-          <div>
+          <div className="jdisplay__top-copy">
             <p className="jdisplay__kicker">
               {board.mode === "onsite"
                 ? "On-site sales"
@@ -149,6 +149,9 @@ export default function JobDisplayPage() {
                 .join(" · ") || "Oui Smoke"}
             </p>
           </div>
+          <div className="jdisplay__mark-slot">
+            <OuiMark className="jdisplay__mark oui-mark" />
+          </div>
         </header>
 
         <div className="jdisplay__stage">
@@ -156,7 +159,6 @@ export default function JobDisplayPage() {
             className={`jdisplay__idle${takeover ? " is-dimmed" : ""}`}
             aria-hidden={Boolean(takeover)}
           >
-            <OuiMark className="jdisplay__mark oui-mark" />
             <h2 className="jdisplay__headline">{board.idle.headline}</h2>
             <p className="jdisplay__lede">{board.idle.lede}</p>
 
