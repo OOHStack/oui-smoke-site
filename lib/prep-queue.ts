@@ -48,6 +48,10 @@ export type PrepFlavourGroup = {
 };
 
 export type PrepQueueSnapshot = {
+  jobId: number;
+  jobTitle: string;
+  clientName: string;
+  location: string | null;
   items: PrepItem[];
   tallies: PrepFlavourTally[];
   packed: PrepItem[];
@@ -129,6 +133,7 @@ function groupByFlavour(items: PrepItem[]): PrepFlavourGroup[] {
  */
 export async function completePrepItem(
   itemId: string,
+  jobId: number,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
   const parsed = parsePrepItemId(itemId);
   if (!parsed || !Number.isFinite(parsed.numericId)) {
@@ -152,7 +157,9 @@ export async function completePrepItem(
       .from(jobHookahs)
       .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
       .leftJoin(flavours, eq(flavours.id, jobHookahs.flavourId))
-      .where(eq(jobHookahs.id, parsed.numericId))
+      .where(
+        and(eq(jobHookahs.id, parsed.numericId), eq(jobHookahs.jobId, jobId)),
+      )
       .limit(1);
 
     if (!row) return { ok: false, error: "Not found", status: 404 };
@@ -198,7 +205,12 @@ export async function completePrepItem(
     .innerJoin(jobHookahs, eq(jobHookahs.id, serviceRequests.jobHookahId))
     .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
     .leftJoin(flavours, eq(flavours.id, serviceRequests.flavourId))
-    .where(eq(serviceRequests.id, parsed.numericId))
+    .where(
+      and(
+        eq(serviceRequests.id, parsed.numericId),
+        eq(serviceRequests.jobId, jobId),
+      ),
+    )
     .limit(1);
 
   if (!row) return { ok: false, error: "Not found", status: 404 };
@@ -233,14 +245,16 @@ export async function completePrepItem(
 }
 
 /**
- * Kitchen queue for packing heads:
+ * Kitchen queue for packing heads on one job:
  * - To pack: staged / open calls with flavour, not yet marked packed
- * - Packed: marked packed on active jobs (still staged, out on floor, or call still open/resolved)
+ * - Packed: marked packed (still staged, out on floor, or call still open/resolved)
  */
-export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
+export async function loadPrepQueue(
+  jobId: number,
+): Promise<PrepQueueSnapshot | null> {
   const db = getDb();
 
-  const activeJobs = await db
+  const [job] = await db
     .select({
       id: jobs.id,
       title: jobs.title,
@@ -248,156 +262,145 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
       location: jobs.location,
     })
     .from(jobs)
-    .where(inArray(jobs.status, ["draft", "confirmed", "active"]));
-
-  const jobIds = activeJobs.map((j) => j.id);
-  const jobMap = new Map(activeJobs.map((j) => [j.id, j]));
+    .where(eq(jobs.id, jobId))
+    .limit(1);
+  if (!job) return null;
 
   const items: PrepItem[] = [];
   const packed: PrepItem[] = [];
 
-  if (jobIds.length > 0) {
-    const staged = await db
-      .select({
-        assignmentId: jobHookahs.id,
-        jobId: jobHookahs.jobId,
-        status: jobHookahs.status,
-        flavourLabel: jobHookahs.flavourLabel,
-        guestPayTier: jobHookahs.guestPayTier,
-        createdAt: jobHookahs.createdAt,
-        prepCompletedAt: jobHookahs.prepCompletedAt,
-        modelNumber: hookahs.modelNumber,
-        flavourName: flavours.name,
-        flavourComponents: flavours.components,
-      })
-      .from(jobHookahs)
-      .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
-      .leftJoin(flavours, eq(flavours.id, jobHookahs.flavourId))
-      .where(
-        and(
-          inArray(jobHookahs.jobId, jobIds),
-          inArray(jobHookahs.status, ["staged", "out"]),
-        ),
-      )
-      .orderBy(asc(jobHookahs.createdAt));
+  const staged = await db
+    .select({
+      assignmentId: jobHookahs.id,
+      jobId: jobHookahs.jobId,
+      status: jobHookahs.status,
+      flavourLabel: jobHookahs.flavourLabel,
+      guestPayTier: jobHookahs.guestPayTier,
+      createdAt: jobHookahs.createdAt,
+      prepCompletedAt: jobHookahs.prepCompletedAt,
+      modelNumber: hookahs.modelNumber,
+      flavourName: flavours.name,
+      flavourComponents: flavours.components,
+    })
+    .from(jobHookahs)
+    .innerJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
+    .leftJoin(flavours, eq(flavours.id, jobHookahs.flavourId))
+    .where(
+      and(
+        eq(jobHookahs.jobId, jobId),
+        inArray(jobHookahs.status, ["staged", "out"]),
+      ),
+    )
+    .orderBy(asc(jobHookahs.createdAt));
 
-    for (const row of staged) {
-      const job = jobMap.get(row.jobId);
-      if (!job) continue;
-      const flavourName = (row.flavourName || row.flavourLabel || "").trim();
-      if (!flavourName) continue;
+  for (const row of staged) {
+    const flavourName = (row.flavourName || row.flavourLabel || "").trim();
+    if (!flavourName) continue;
 
-      const item: PrepItem = {
-        id: `staged:${row.assignmentId}`,
-        kind: "new_unit",
-        jobId: row.jobId,
-        jobTitle: job.title,
-        clientName: job.clientName,
-        location: job.location,
-        modelNumber: row.modelNumber,
-        flavourName,
-        flavourComponents: row.flavourComponents?.trim() || null,
-        hasFlavour: true,
-        tier:
-          row.guestPayTier === "standard" || row.guestPayTier === "unlimited"
-            ? row.guestPayTier
-            : null,
-        status: row.status,
-        paymentStatus: null,
-        payPreference: null,
-        createdAt: new Date(row.createdAt).toISOString(),
-        packedAt: row.prepCompletedAt
-          ? new Date(row.prepCompletedAt).toISOString()
+    const item: PrepItem = {
+      id: `staged:${row.assignmentId}`,
+      kind: "new_unit",
+      jobId: row.jobId,
+      jobTitle: job.title,
+      clientName: job.clientName,
+      location: job.location,
+      modelNumber: row.modelNumber,
+      flavourName,
+      flavourComponents: row.flavourComponents?.trim() || null,
+      hasFlavour: true,
+      tier:
+        row.guestPayTier === "standard" || row.guestPayTier === "unlimited"
+          ? row.guestPayTier
           : null,
-        assignmentId: row.assignmentId,
-        serviceRequestId: null,
-      };
+      status: row.status,
+      paymentStatus: null,
+      payPreference: null,
+      createdAt: new Date(row.createdAt).toISOString(),
+      packedAt: row.prepCompletedAt
+        ? new Date(row.prepCompletedAt).toISOString()
+        : null,
+      assignmentId: row.assignmentId,
+      serviceRequestId: null,
+    };
 
-      if (row.prepCompletedAt) {
-        packed.push(item);
-      } else if (row.status === "staged") {
-        items.push(item);
-      }
+    if (row.prepCompletedAt) {
+      packed.push(item);
+    } else if (row.status === "staged") {
+      items.push(item);
     }
+  }
 
-    const calls = await db
-      .select({
-        id: serviceRequests.id,
-        type: serviceRequests.type,
-        status: serviceRequests.status,
-        flavourLabel: serviceRequests.flavourLabel,
-        payPreference: serviceRequests.payPreference,
-        requestedGuestPayTier: serviceRequests.requestedGuestPayTier,
-        createdAt: serviceRequests.createdAt,
-        prepCompletedAt: serviceRequests.prepCompletedAt,
-        jobId: serviceRequests.jobId,
-        assignmentId: serviceRequests.jobHookahId,
-        modelNumber: hookahs.modelNumber,
-        flavourName: flavours.name,
-        flavourComponents: flavours.components,
-      })
-      .from(serviceRequests)
-      .leftJoin(jobHookahs, eq(jobHookahs.id, serviceRequests.jobHookahId))
-      .leftJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
-      .leftJoin(flavours, eq(flavours.id, serviceRequests.flavourId))
-      .where(
-        and(
-          inArray(serviceRequests.jobId, jobIds),
-          inArray(serviceRequests.type, ["refill", "order_unit"]),
-          inArray(serviceRequests.status, [
-            "open",
-            "acknowledged",
-            "resolved",
-          ]),
-        ),
-      )
-      .orderBy(asc(serviceRequests.createdAt));
+  const calls = await db
+    .select({
+      id: serviceRequests.id,
+      type: serviceRequests.type,
+      status: serviceRequests.status,
+      flavourLabel: serviceRequests.flavourLabel,
+      payPreference: serviceRequests.payPreference,
+      requestedGuestPayTier: serviceRequests.requestedGuestPayTier,
+      createdAt: serviceRequests.createdAt,
+      prepCompletedAt: serviceRequests.prepCompletedAt,
+      jobId: serviceRequests.jobId,
+      assignmentId: serviceRequests.jobHookahId,
+      modelNumber: hookahs.modelNumber,
+      flavourName: flavours.name,
+      flavourComponents: flavours.components,
+    })
+    .from(serviceRequests)
+    .leftJoin(jobHookahs, eq(jobHookahs.id, serviceRequests.jobHookahId))
+    .leftJoin(hookahs, eq(hookahs.id, jobHookahs.hookahId))
+    .leftJoin(flavours, eq(flavours.id, serviceRequests.flavourId))
+    .where(
+      and(
+        eq(serviceRequests.jobId, jobId),
+        inArray(serviceRequests.type, ["refill", "order_unit"]),
+        inArray(serviceRequests.status, ["open", "acknowledged", "resolved"]),
+      ),
+    )
+    .orderBy(asc(serviceRequests.createdAt));
 
-    const activeCallIds = calls
-      .filter((c) => c.status === "open" || c.status === "acknowledged")
-      .map((c) => c.id);
-    const payMap = await guestRefillPaymentMap(activeCallIds);
+  const activeCallIds = calls
+    .filter((c) => c.status === "open" || c.status === "acknowledged")
+    .map((c) => c.id);
+  const payMap = await guestRefillPaymentMap(activeCallIds);
 
-    for (const row of calls) {
-      const job = jobMap.get(row.jobId);
-      if (!job) continue;
-      const flavourName = (row.flavourName || row.flavourLabel || "").trim();
-      if (!flavourName) continue;
-      const kind: PrepItemKind =
-        row.type === "order_unit" ? "order_unit" : "refill";
-      const pay = payMap.get(row.id);
-      const item: PrepItem = {
-        id: `call:${row.id}`,
-        kind,
-        jobId: row.jobId,
-        jobTitle: job.title,
-        clientName: job.clientName,
-        location: job.location,
-        modelNumber: row.modelNumber ?? null,
-        flavourName,
-        flavourComponents: row.flavourComponents?.trim() || null,
-        hasFlavour: true,
-        tier:
-          row.requestedGuestPayTier === "standard" ||
-          row.requestedGuestPayTier === "unlimited"
-            ? row.requestedGuestPayTier
-            : null,
-        status: row.status,
-        paymentStatus: pay?.paymentStatus ?? null,
-        payPreference: row.payPreference ?? null,
-        createdAt: new Date(row.createdAt).toISOString(),
-        packedAt: row.prepCompletedAt
-          ? new Date(row.prepCompletedAt).toISOString()
+  for (const row of calls) {
+    const flavourName = (row.flavourName || row.flavourLabel || "").trim();
+    if (!flavourName) continue;
+    const kind: PrepItemKind =
+      row.type === "order_unit" ? "order_unit" : "refill";
+    const pay = payMap.get(row.id);
+    const item: PrepItem = {
+      id: `call:${row.id}`,
+      kind,
+      jobId: row.jobId,
+      jobTitle: job.title,
+      clientName: job.clientName,
+      location: job.location,
+      modelNumber: row.modelNumber ?? null,
+      flavourName,
+      flavourComponents: row.flavourComponents?.trim() || null,
+      hasFlavour: true,
+      tier:
+        row.requestedGuestPayTier === "standard" ||
+        row.requestedGuestPayTier === "unlimited"
+          ? row.requestedGuestPayTier
           : null,
-        assignmentId: row.assignmentId ?? null,
-        serviceRequestId: row.id,
-      };
+      status: row.status,
+      paymentStatus: pay?.paymentStatus ?? null,
+      payPreference: row.payPreference ?? null,
+      createdAt: new Date(row.createdAt).toISOString(),
+      packedAt: row.prepCompletedAt
+        ? new Date(row.prepCompletedAt).toISOString()
+        : null,
+      assignmentId: row.assignmentId ?? null,
+      serviceRequestId: row.id,
+    };
 
-      if (row.prepCompletedAt) {
-        packed.push(item);
-      } else if (row.status === "open" || row.status === "acknowledged") {
-        items.push(item);
-      }
+    if (row.prepCompletedAt) {
+      packed.push(item);
+    } else if (row.status === "open" || row.status === "acknowledged") {
+      items.push(item);
     }
   }
 
@@ -416,6 +419,10 @@ export async function loadPrepQueue(): Promise<PrepQueueSnapshot> {
   const packedByFlavour = groupByFlavour(packed);
 
   return {
+    jobId: job.id,
+    jobTitle: job.title,
+    clientName: job.clientName,
+    location: job.location,
     items,
     tallies,
     packed,

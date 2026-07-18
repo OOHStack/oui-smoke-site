@@ -1,16 +1,20 @@
+import { findJobIdByPrepToken } from "@/lib/job-prep-token";
 import { completePrepItem, loadPrepQueue } from "@/lib/prep-queue";
-import { isValidPrepToken } from "@/lib/prep-token";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ token: string }> };
 
 export async function GET(_request: Request, context: RouteContext) {
   const { token } = await context.params;
-  if (!(await isValidPrepToken(token))) {
+  const jobId = await findJobIdByPrepToken(token);
+  if (jobId == null) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const snapshot = await loadPrepQueue();
+  const snapshot = await loadPrepQueue(jobId);
+  if (!snapshot) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   return NextResponse.json(snapshot, {
     headers: { "Cache-Control": "no-store" },
   });
@@ -18,7 +22,8 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function POST(request: Request, context: RouteContext) {
   const { token } = await context.params;
-  if (!(await isValidPrepToken(token))) {
+  const jobId = await findJobIdByPrepToken(token);
+  if (jobId == null) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -36,13 +41,19 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const result = await completePrepItem(body.id.trim());
+  const result = await completePrepItem(body.id.trim(), jobId);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  const snapshot = await loadPrepQueue();
-  return NextResponse.json({ ok: true, ...snapshot }, {
-    headers: { "Cache-Control": "no-store" },
-  });
+  const snapshot = await loadPrepQueue(jobId);
+  if (!snapshot) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  return NextResponse.json(
+    { ok: true, ...snapshot },
+    {
+      headers: { "Cache-Control": "no-store" },
+    },
+  );
 }

@@ -122,6 +122,8 @@ export const jobs = pgTable("jobs", {
   clientToken: text("client_token").unique(),
   /** Customer-facing event tablet (POS-style CFD) — not the host client portal */
   displayToken: text("display_token").unique(),
+  /** Kitchen prep board for this job (no ops login) */
+  prepToken: text("prep_token").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -326,6 +326,65 @@ a.admin-user.active {
   border-left-color: color-mix(in srgb, var(--accent) 40%, var(--line));
 }
 
+.admin-toolbar-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.admin-toolbar-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.admin-toolbar-menu__caret {
+  font-size: 0.7em;
+  opacity: 0.75;
+  line-height: 1;
+}
+
+.admin-toolbar-menu__panel {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  z-index: 40;
+  min-width: 11.5rem;
+  display: grid;
+  padding: 0.3rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.admin-toolbar-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-toolbar-menu__item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent, #c4a574) 12%, transparent);
+}
+
+.admin-toolbar-menu__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.admin-toolbar-menu__item--danger {
+  color: var(--danger, #e07070);
+}
+
 .page-head-status {
   display: inline-flex;
   align-items: center;

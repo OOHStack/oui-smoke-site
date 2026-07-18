@@ -90,6 +90,10 @@ function rebuildFromLists(
 
   return {
     ...prev,
+    jobId: prev.jobId,
+    jobTitle: prev.jobTitle,
+    clientName: prev.clientName,
+    location: prev.location,
     items,
     tallies,
     packed,
@@ -236,9 +240,12 @@ export default function PrepKitchenPage() {
       <div className="prep__shell">
         <header className="prep__head">
           <div>
-            <p className="prep__kicker">Oui Smoke</p>
-            <h1 className="prep__title">Prep board</h1>
+            <p className="prep__kicker">Oui Smoke · Prep</p>
+            <h1 className="prep__title">{data.jobTitle || "Prep board"}</h1>
             <p className="prep__muted">
+              {data.clientName}
+              {data.location ? ` · ${data.location}` : ""}
+              {" · "}
               Pack heads · tap Done · packed stays listed by flavour
             </p>
           </div>

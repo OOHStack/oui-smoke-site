@@ -9,11 +9,16 @@ import {
   createClientToken,
   clientPortalUrl,
   jobDisplayPortalUrl,
+  prepPortalUrl,
 } from "@/lib/guest";
 import {
   getOrCreateJobDisplayToken,
   rotateJobDisplayToken,
 } from "@/lib/job-display-token";
+import {
+  getOrCreateJobPrepToken,
+  rotateJobPrepToken,
+} from "@/lib/job-prep-token";
 import {
   notifyBookingConfirmed,
   notifyJobCompleted,
@@ -141,6 +146,7 @@ export async function GET(_request: Request, context: RouteContext) {
       displayPortalUrl: job.displayToken
         ? jobDisplayPortalUrl(job.displayToken)
         : null,
+      prepPortalUrl: job.prepToken ? prepPortalUrl(job.prepToken) : null,
       assignments: assignmentsEnriched,
       events,
       payments: paymentRows,
@@ -186,6 +192,9 @@ export async function PATCH(request: Request, context: RouteContext) {
           displayPortalUrl: existing.displayToken
             ? jobDisplayPortalUrl(existing.displayToken)
             : null,
+          prepPortalUrl: existing.prepToken
+            ? prepPortalUrl(existing.prepToken)
+            : null,
         });
       }
       const token = createClientToken();
@@ -199,6 +208,9 @@ export async function PATCH(request: Request, context: RouteContext) {
         clientPortalUrl: clientPortalUrl(token),
         displayPortalUrl: updated.displayToken
           ? jobDisplayPortalUrl(updated.displayToken)
+          : null,
+        prepPortalUrl: updated.prepToken
+          ? prepPortalUrl(updated.prepToken)
           : null,
       });
     }
@@ -216,6 +228,9 @@ export async function PATCH(request: Request, context: RouteContext) {
           : null,
         displayToken: link.token,
         displayPortalUrl: link.url,
+        prepPortalUrl: updated?.prepToken
+          ? prepPortalUrl(updated.prepToken)
+          : null,
         created: link.created,
       });
     }
@@ -239,6 +254,55 @@ export async function PATCH(request: Request, context: RouteContext) {
           : null,
         displayToken: link.token,
         displayPortalUrl: link.url,
+        prepPortalUrl: updated?.prepToken
+          ? prepPortalUrl(updated.prepToken)
+          : null,
+        rotated: true,
+      });
+    }
+
+    if (body.ensurePrepToken === true) {
+      const link = await getOrCreateJobPrepToken(id);
+      if (!link) {
+        return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      }
+      const [updated] = await db.select().from(jobs).where(eq(jobs.id, id));
+      return NextResponse.json({
+        ...updated,
+        clientPortalUrl: updated?.clientToken
+          ? clientPortalUrl(updated.clientToken)
+          : null,
+        displayPortalUrl: updated?.displayToken
+          ? jobDisplayPortalUrl(updated.displayToken)
+          : null,
+        prepToken: link.token,
+        prepPortalUrl: link.url,
+        created: link.created,
+      });
+    }
+
+    if (body.rotatePrepToken === true) {
+      if (session.role !== "admin") {
+        return NextResponse.json(
+          { error: "Only admins can rotate the prep board link" },
+          { status: 403 },
+        );
+      }
+      const link = await rotateJobPrepToken(id);
+      if (!link) {
+        return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      }
+      const [updated] = await db.select().from(jobs).where(eq(jobs.id, id));
+      return NextResponse.json({
+        ...updated,
+        clientPortalUrl: updated?.clientToken
+          ? clientPortalUrl(updated.clientToken)
+          : null,
+        displayPortalUrl: updated?.displayToken
+          ? jobDisplayPortalUrl(updated.displayToken)
+          : null,
+        prepToken: link.token,
+        prepPortalUrl: link.url,
         rotated: true,
       });
     }

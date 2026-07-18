@@ -23,6 +23,7 @@ import {
 } from "@/lib/ops/guest-pay";
 import { resolveTipSplit } from "@/lib/ops/tip-split";
 import TipSplitEditor from "@/components/admin/TipSplitEditor";
+import { AdminToolbarMenu } from "@/components/admin/AdminToolbarMenu";
 import {
   DEFAULT_PRICING,
   jobPricingOverrideCount,
@@ -153,6 +154,8 @@ type Job = {
   clientPortalUrl?: string | null;
   displayToken?: string | null;
   displayPortalUrl?: string | null;
+  prepToken?: string | null;
+  prepPortalUrl?: string | null;
   pricingJson?: Record<string, unknown> | null;
   pricingOverrides?: JobPricingOverride;
   hasCustomPricing?: boolean;
@@ -428,86 +431,150 @@ export default function JobDetailPage() {
     }
   }
 
-  async function openEventDisplay() {
+  async function ensurePortalLink(
+    kind: "display" | "prep",
+  ): Promise<string | null> {
+    const existing =
+      kind === "display" ? job?.displayPortalUrl : job?.prepPortalUrl;
+    if (existing) return existing;
+
+    const res = await fetch(`/api/jobs/${jobId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        kind === "display"
+          ? { ensureDisplayToken: true }
+          : { ensurePrepToken: true },
+      ),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const url =
+      kind === "display" ? data.displayPortalUrl : data.prepPortalUrl;
+    setJob((prev) =>
+      prev
+        ? {
+            ...prev,
+            ...(kind === "display"
+              ? {
+                  displayToken: data.displayToken,
+                  displayPortalUrl: data.displayPortalUrl,
+                }
+              : {
+                  prepToken: data.prepToken,
+                  prepPortalUrl: data.prepPortalUrl,
+                }),
+          }
+        : prev,
+    );
+    return typeof url === "string" ? url : null;
+  }
+
+  async function openPortalLink(kind: "display" | "prep") {
     setPortalBusy(true);
     setPortalMsg("");
+    const label = kind === "display" ? "Event display" : "Prep board";
     try {
-      let url = job?.displayPortalUrl ?? null;
+      const url = await ensurePortalLink(kind);
       if (!url) {
-        const res = await fetch(`/api/jobs/${jobId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ensureDisplayToken: true }),
-        });
-        if (!res.ok) {
-          setPortalMsg("Couldn’t create event display link");
-          return;
-        }
-        const data = await res.json();
-        url = data.displayPortalUrl;
-        setJob((prev) =>
-          prev
-            ? {
-                ...prev,
-                displayToken: data.displayToken,
-                displayPortalUrl: data.displayPortalUrl,
-              }
-            : prev,
-        );
-      }
-      if (!url) {
-        setPortalMsg("No event display link");
+        setPortalMsg(`Couldn’t create ${label.toLowerCase()} link`);
         return;
       }
       window.open(url, "_blank", "noopener,noreferrer");
       try {
         await navigator.clipboard.writeText(url);
-        setPortalMsg("Event display opened · link copied for the tablet");
+        setPortalMsg(`${label} opened · link copied for the tablet`);
       } catch {
-        setPortalMsg("Event display opened");
+        setPortalMsg(`${label} opened`);
       }
     } catch {
-      setPortalMsg("Couldn’t open event display");
+      setPortalMsg(`Couldn’t open ${label.toLowerCase()}`);
     } finally {
       setPortalBusy(false);
     }
   }
 
-  async function copyEventDisplay() {
+  async function copyPortalLink(kind: "display" | "prep") {
     setPortalBusy(true);
     setPortalMsg("");
+    const label = kind === "display" ? "Event display" : "Prep board";
     try {
-      let url = job?.displayPortalUrl ?? null;
+      const url = await ensurePortalLink(kind);
       if (!url) {
-        const res = await fetch(`/api/jobs/${jobId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ensureDisplayToken: true }),
-        });
-        if (!res.ok) {
-          setPortalMsg("Couldn’t create event display link");
-          return;
-        }
-        const data = await res.json();
-        url = data.displayPortalUrl;
-        setJob((prev) =>
-          prev
-            ? {
-                ...prev,
-                displayToken: data.displayToken,
-                displayPortalUrl: data.displayPortalUrl,
-              }
-            : prev,
-        );
-      }
-      if (!url) {
-        setPortalMsg("No event display link");
+        setPortalMsg(`Couldn’t create ${label.toLowerCase()} link`);
         return;
       }
       await navigator.clipboard.writeText(url);
-      setPortalMsg("Event display link copied");
+      setPortalMsg(`${label} link copied`);
     } catch {
       setPortalMsg("Copy failed");
+    } finally {
+      setPortalBusy(false);
+    }
+  }
+
+  async function rotatePortalLink(kind: "display" | "prep") {
+    if (!isAdmin) {
+      setPortalMsg("Only admins can rotate tablet links");
+      return;
+    }
+    const label = kind === "display" ? "event display" : "prep board";
+    const ok = await confirm({
+      title: `Rotate ${label} link?`,
+      message:
+        "The current tablet URL will stop working. You’ll need to open or copy the new link on the device.",
+      confirmLabel: "Rotate link",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    setPortalBusy(true);
+    setPortalMsg("");
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          kind === "display"
+            ? { rotateDisplayToken: true }
+            : { rotatePrepToken: true },
+        ),
+      });
+      if (!res.ok) {
+        setPortalMsg(`Couldn’t rotate ${label} link`);
+        return;
+      }
+      const data = await res.json();
+      setJob((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...(kind === "display"
+                ? {
+                    displayToken: data.displayToken,
+                    displayPortalUrl: data.displayPortalUrl,
+                  }
+                : {
+                    prepToken: data.prepToken,
+                    prepPortalUrl: data.prepPortalUrl,
+                  }),
+            }
+          : prev,
+      );
+      const url =
+        kind === "display" ? data.displayPortalUrl : data.prepPortalUrl;
+      if (typeof url === "string") {
+        try {
+          await navigator.clipboard.writeText(url);
+          setPortalMsg(`New ${label} link copied`);
+        } catch {
+          setPortalMsg(`${label} link rotated`);
+        }
+      } else {
+        setPortalMsg(`${label} link rotated`);
+      }
+    } catch {
+      setPortalMsg(`Couldn’t rotate ${label} link`);
     } finally {
       setPortalBusy(false);
     }
@@ -947,24 +1014,55 @@ export default function JobDetailPage() {
             >
               {portalBusy ? "…" : "Client portal"}
             </button>
-            <button
-              type="button"
-              className="btn btn-sm btn-primary"
+            <AdminToolbarMenu
+              label="Prep"
+              title="Kitchen prep board for this job"
               disabled={portalBusy}
-              onClick={() => void openEventDisplay()}
-              title="Open customer-facing event tablet (POS-style)"
-            >
-              Event display
-            </button>
-            <button
-              type="button"
-              className="btn btn-sm btn-ghost"
+              items={[
+                {
+                  label: "Open board",
+                  onClick: () => openPortalLink("prep"),
+                },
+                {
+                  label: "Copy link",
+                  onClick: () => copyPortalLink("prep"),
+                },
+                {
+                  label: "Rotate link",
+                  onClick: () => rotatePortalLink("prep"),
+                  disabled: !isAdmin,
+                  title: isAdmin
+                    ? "Invalidate the current prep URL"
+                    : "Admin only",
+                  danger: true,
+                },
+              ]}
+            />
+            <AdminToolbarMenu
+              label="Display"
+              primary
+              title="Customer-facing event tablet for this job"
               disabled={portalBusy}
-              onClick={() => void copyEventDisplay()}
-              title="Copy event display link only"
-            >
-              Copy display
-            </button>
+              items={[
+                {
+                  label: "Open tablet",
+                  onClick: () => openPortalLink("display"),
+                },
+                {
+                  label: "Copy link",
+                  onClick: () => copyPortalLink("display"),
+                },
+                {
+                  label: "Rotate link",
+                  onClick: () => rotatePortalLink("display"),
+                  disabled: !isAdmin,
+                  title: isAdmin
+                    ? "Invalidate the current event display URL"
+                    : "Admin only",
+                  danger: true,
+                },
+              ]}
+            />
           </div>
 
           {isAdmin ? (
