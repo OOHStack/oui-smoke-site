@@ -120,6 +120,8 @@ export const jobs = pgTable("jobs", {
   incidentCount: integer("incident_count").notNull().default(0),
   /** Read-only live portal for the venue/host */
   clientToken: text("client_token").unique(),
+  /** Customer-facing event tablet (POS-style CFD) — not the host client portal */
+  displayToken: text("display_token").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

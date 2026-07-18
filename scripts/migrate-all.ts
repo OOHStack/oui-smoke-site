@@ -160,6 +160,11 @@ async function main() {
     CREATE UNIQUE INDEX IF NOT EXISTS jobs_client_token_unique
     ON jobs (client_token)
   `;
+  await sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS display_token text`;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS jobs_display_token_unique
+    ON jobs (display_token)
+  `;
   await sql`ALTER TABLE job_photos ADD COLUMN IF NOT EXISTS approved_for_social boolean NOT NULL DEFAULT false`;
   await sql`ALTER TABLE job_photos ADD COLUMN IF NOT EXISTS featured boolean NOT NULL DEFAULT false`;
   await sql`ALTER TABLE job_photos ADD COLUMN IF NOT EXISTS reviewed_at timestamptz`;
@@ -467,7 +472,13 @@ async function main() {
       "approved_for_social",
       "featured",
     ],
-    jobs: ["client_token", "payment_model", "deposit_percent", "tip_split_json"],
+    jobs: [
+      "client_token",
+      "display_token",
+      "payment_model",
+      "deposit_percent",
+      "tip_split_json",
+    ],
     flavours: ["description"],
     hookah_refills: ["price_cents", "source", "flavour_label"],
     ops_users: [

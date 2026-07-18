@@ -44,3 +44,7 @@ export function prepPortalUrl(token: string) {
 export function displayPortalUrl(token: string) {
   return `${getSiteUrl()}/display/${token}`;
 }
+
+export function jobDisplayPortalUrl(token: string) {
+  return `${getSiteUrl()}/display/job/${token}`;
+}

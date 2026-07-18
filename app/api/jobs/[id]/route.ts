@@ -5,7 +5,15 @@ import {
   countOutAssignments,
   releaseJobHookahsToAvailable,
 } from "@/lib/fleet";
-import { createClientToken, clientPortalUrl } from "@/lib/guest";
+import {
+  createClientToken,
+  clientPortalUrl,
+  jobDisplayPortalUrl,
+} from "@/lib/guest";
+import {
+  getOrCreateJobDisplayToken,
+  rotateJobDisplayToken,
+} from "@/lib/job-display-token";
 import {
   notifyBookingConfirmed,
   notifyJobCompleted,
@@ -127,6 +135,9 @@ export async function GET(_request: Request, context: RouteContext) {
     {
       ...job,
       clientPortalUrl: job.clientToken ? clientPortalUrl(job.clientToken) : null,
+      displayPortalUrl: job.displayToken
+        ? jobDisplayPortalUrl(job.displayToken)
+        : null,
       assignments: assignmentsEnriched,
       events,
       payments: paymentRows,
@@ -169,6 +180,9 @@ export async function PATCH(request: Request, context: RouteContext) {
         return NextResponse.json({
           ...existing,
           clientPortalUrl: clientPortalUrl(existing.clientToken),
+          displayPortalUrl: existing.displayToken
+            ? jobDisplayPortalUrl(existing.displayToken)
+            : null,
         });
       }
       const token = createClientToken();
@@ -180,6 +194,49 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({
         ...updated,
         clientPortalUrl: clientPortalUrl(token),
+        displayPortalUrl: updated.displayToken
+          ? jobDisplayPortalUrl(updated.displayToken)
+          : null,
+      });
+    }
+
+    if (body.ensureDisplayToken === true) {
+      const link = await getOrCreateJobDisplayToken(id);
+      if (!link) {
+        return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      }
+      const [updated] = await db.select().from(jobs).where(eq(jobs.id, id));
+      return NextResponse.json({
+        ...updated,
+        clientPortalUrl: updated?.clientToken
+          ? clientPortalUrl(updated.clientToken)
+          : null,
+        displayToken: link.token,
+        displayPortalUrl: link.url,
+        created: link.created,
+      });
+    }
+
+    if (body.rotateDisplayToken === true) {
+      if (session.role !== "admin") {
+        return NextResponse.json(
+          { error: "Only admins can rotate the event display link" },
+          { status: 403 },
+        );
+      }
+      const link = await rotateJobDisplayToken(id);
+      if (!link) {
+        return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      }
+      const [updated] = await db.select().from(jobs).where(eq(jobs.id, id));
+      return NextResponse.json({
+        ...updated,
+        clientPortalUrl: updated?.clientToken
+          ? clientPortalUrl(updated.clientToken)
+          : null,
+        displayToken: link.token,
+        displayPortalUrl: link.url,
+        rotated: true,
       });
     }
 

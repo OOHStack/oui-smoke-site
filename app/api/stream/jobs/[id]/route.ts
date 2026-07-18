@@ -1,7 +1,7 @@
 import { requireApiSession } from "@/lib/auth/api";
 import { getDb } from "@/lib/db";
 import { jobEvents, jobHookahs, jobs, payments, serviceRequests } from "@/lib/db/schema";
-import { clientPortalUrl } from "@/lib/guest";
+import { clientPortalUrl, jobDisplayPortalUrl } from "@/lib/guest";
 import { summarizeJobMoney } from "@/lib/job-balance";
 import { onsiteUnitPaymentMap } from "@/lib/ops/onsite-pay";
 import { guestRefillPaymentMap } from "@/lib/refill-payment-link";
@@ -92,6 +92,9 @@ async function loadJobSnapshot(id: number) {
   return {
     ...job,
     clientPortalUrl: job.clientToken ? clientPortalUrl(job.clientToken) : null,
+    displayPortalUrl: job.displayToken
+      ? jobDisplayPortalUrl(job.displayToken)
+      : null,
     assignments: assignmentsWithCalls,
     events,
     payments: paymentRows,

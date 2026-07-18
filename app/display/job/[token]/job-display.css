@@ -1,0 +1,395 @@
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap");
+
+.jdisplay {
+  --bg: #0a0908;
+  --ink: #f7f4ef;
+  --ink-soft: rgba(247, 244, 239, 0.78);
+  --ink-mute: rgba(247, 244, 239, 0.48);
+  --accent: #e4574d;
+  --line: rgba(247, 244, 239, 0.12);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  min-height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Outfit", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.jdisplay__bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 80% 10%, rgba(228, 87, 77, 0.16), transparent 55%),
+    radial-gradient(ellipse 60% 45% at 0% 100%, rgba(247, 244, 239, 0.05), transparent 50%),
+    var(--bg);
+  z-index: 0;
+}
+
+.jdisplay__shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100dvh;
+  padding: clamp(1.1rem, 2.8vw, 2rem);
+  box-sizing: border-box;
+}
+
+.jdisplay__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.jdisplay__kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.jdisplay__event {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(1.8rem, 4.5vw, 2.6rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.jdisplay__meta {
+  margin: 0.35rem 0 0;
+  color: var(--ink-mute);
+  font-size: 0.9rem;
+}
+
+.jdisplay__logo {
+  width: clamp(64px, 9vw, 96px);
+  height: auto;
+  opacity: 0.9;
+}
+
+.jdisplay__stage {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.jdisplay__idle,
+.jdisplay__cfd {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition:
+    opacity 0.45s var(--ease),
+    transform 0.45s var(--ease);
+}
+
+.jdisplay__idle {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.jdisplay__idle.is-dimmed {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+
+.jdisplay__cfd {
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+}
+
+.jdisplay__cfd.is-on {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.jdisplay__headline {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(2.8rem, 8vw, 4.4rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+}
+
+.jdisplay__lede {
+  margin: 0.65rem 0 0;
+  max-width: 40ch;
+  color: var(--ink-mute);
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.jdisplay__panels {
+  margin-top: 1.35rem;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: clamp(1rem, 3vw, 2rem);
+  min-height: 0;
+}
+
+.jdisplay__section-label {
+  margin: 0 0 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.jdisplay__flavours {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.35rem 0.85rem;
+  max-height: min(42dvh, 340px);
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.jdisplay__flavour {
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.jdisplay__flavour strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.jdisplay__flavour span {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--ink-mute);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.jdisplay__rates {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.jdisplay__rate {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem 1rem;
+  align-items: baseline;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.jdisplay__rate-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.jdisplay__rate-detail {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-mute);
+  font-size: 0.85rem;
+}
+
+.jdisplay__rate-price {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.85rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.jdisplay__footnotes {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.1rem;
+  color: var(--ink-mute);
+  font-size: 0.82rem;
+}
+
+.jdisplay__cfd-grid {
+  display: grid;
+  grid-template-columns: 1.05fr auto;
+  gap: clamp(1.25rem, 4vw, 3rem);
+  align-items: center;
+}
+
+.jdisplay__cfd-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  animation: jdisplay-pulse 1.4s var(--ease) infinite;
+}
+
+.jdisplay__cfd-unit {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(5rem, 16vw, 9rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 0.9;
+}
+
+.jdisplay__cfd-flavour {
+  margin: 0.55rem 0 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.6rem, 3.8vw, 2.4rem);
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+.jdisplay__cfd-tier {
+  display: inline-block;
+  margin-top: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.jdisplay__cfd-hint {
+  margin: 1.25rem 0 0;
+  max-width: 28ch;
+  color: var(--ink-mute);
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.jdisplay__cfd-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.jdisplay__cfd-qr img {
+  width: min(300px, 38vw);
+  height: auto;
+  border-radius: 6px;
+  background: #fff;
+  padding: 0.75rem;
+  box-shadow:
+    0 0 0 1px rgba(247, 244, 239, 0.08),
+    0 24px 60px rgba(0, 0, 0, 0.5);
+  animation: jdisplay-rise 0.55s var(--ease) both;
+}
+
+.jdisplay__cfd-qr p {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.jdisplay__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-mute);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+
+.jdisplay__foot strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.jdisplay--loading,
+.jdisplay--error {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.jdisplay--error h1 {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 2.6rem;
+  font-weight: 400;
+}
+
+.jdisplay--error p,
+.jdisplay--loading p {
+  margin: 0.55rem 0 0;
+  color: var(--ink-mute);
+}
+
+@keyframes jdisplay-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes jdisplay-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (max-width: 860px) {
+  .jdisplay__panels,
+  .jdisplay__cfd-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .jdisplay__cfd-qr img {
+    width: min(240px, 70vw);
+  }
+
+  .jdisplay__flavours {
+    max-height: min(28dvh, 220px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jdisplay__idle,
+  .jdisplay__cfd,
+  .jdisplay__cfd-qr img,
+  .jdisplay__cfd-kicker {
+    animation: none;
+    transition: none;
+  }
+}

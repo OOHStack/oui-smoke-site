@@ -151,6 +151,8 @@ type Job = {
   outcomeNotes: string | null;
   clientToken?: string | null;
   clientPortalUrl?: string | null;
+  displayToken?: string | null;
+  displayPortalUrl?: string | null;
   pricingJson?: Record<string, unknown> | null;
   pricingOverrides?: JobPricingOverride;
   hasCustomPricing?: boolean;
@@ -419,6 +421,91 @@ export default function JobDetailPage() {
       }
       await navigator.clipboard.writeText(url);
       setPortalMsg("Client portal link copied");
+    } catch {
+      setPortalMsg("Copy failed");
+    } finally {
+      setPortalBusy(false);
+    }
+  }
+
+  async function openEventDisplay() {
+    setPortalBusy(true);
+    setPortalMsg("");
+    try {
+      let url = job?.displayPortalUrl ?? null;
+      if (!url) {
+        const res = await fetch(`/api/jobs/${jobId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ensureDisplayToken: true }),
+        });
+        if (!res.ok) {
+          setPortalMsg("Couldn’t create event display link");
+          return;
+        }
+        const data = await res.json();
+        url = data.displayPortalUrl;
+        setJob((prev) =>
+          prev
+            ? {
+                ...prev,
+                displayToken: data.displayToken,
+                displayPortalUrl: data.displayPortalUrl,
+              }
+            : prev,
+        );
+      }
+      if (!url) {
+        setPortalMsg("No event display link");
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+      try {
+        await navigator.clipboard.writeText(url);
+        setPortalMsg("Event display opened · link copied for the tablet");
+      } catch {
+        setPortalMsg("Event display opened");
+      }
+    } catch {
+      setPortalMsg("Couldn’t open event display");
+    } finally {
+      setPortalBusy(false);
+    }
+  }
+
+  async function copyEventDisplay() {
+    setPortalBusy(true);
+    setPortalMsg("");
+    try {
+      let url = job?.displayPortalUrl ?? null;
+      if (!url) {
+        const res = await fetch(`/api/jobs/${jobId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ensureDisplayToken: true }),
+        });
+        if (!res.ok) {
+          setPortalMsg("Couldn’t create event display link");
+          return;
+        }
+        const data = await res.json();
+        url = data.displayPortalUrl;
+        setJob((prev) =>
+          prev
+            ? {
+                ...prev,
+                displayToken: data.displayToken,
+                displayPortalUrl: data.displayPortalUrl,
+              }
+            : prev,
+        );
+      }
+      if (!url) {
+        setPortalMsg("No event display link");
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setPortalMsg("Event display link copied");
     } catch {
       setPortalMsg("Copy failed");
     } finally {
@@ -859,6 +946,24 @@ export default function JobDetailPage() {
               title="Copy client portal link"
             >
               {portalBusy ? "…" : "Client portal"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              disabled={portalBusy}
+              onClick={() => void openEventDisplay()}
+              title="Open customer-facing event tablet (POS-style)"
+            >
+              Event display
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              disabled={portalBusy}
+              onClick={() => void copyEventDisplay()}
+              title="Copy event display link only"
+            >
+              Copy display
             </button>
           </div>
 

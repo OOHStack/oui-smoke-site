@@ -69,8 +69,9 @@ export default function AdminDisplayPage() {
         <div>
           <h1 className="page-title">Event display</h1>
           <p className="page-sub">
-            Secondary tablet for the floor — brand, live flavours, packages, and
-            QR codes for booking. No admin login on the tablet.
+            Venue-wide promo tablet — brand, live flavours, packages, and book
+            QR codes. For a <strong>specific event</strong> with send-out
+            customer QR takeovers, open <em>Event display</em> on that job.
           </p>
         </div>
         <div className="page-head-actions">
