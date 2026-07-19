@@ -97,27 +97,58 @@ export default function WeddingHookahPage() {
         </div>
       </section>
 
-      <section className="section">
-        <div className="section__inner page-prose">
+      <section className="page-split" aria-labelledby="wedding-plan-title">
+        <div
+          className="page-split__media"
+          style={{ backgroundImage: "url('/images/model-5-web.jpg')" }}
+          aria-hidden="true"
+        />
+        <div className="page-split__veil" aria-hidden="true" />
+        <div className="page-split__inner">
           <p className="eyebrow">Planning</p>
-          <h2 className="section__title">What we’ll align on</h2>
-          <h3>Venue and space</h3>
-          <p>
-            Confirm indoor versus outdoor permission, proximity to food service,
-            wind exposure outdoors, and a clear footprint for units and guest
-            circulation.
+          <h2 className="section__title" id="wedding-plan-title">
+            What we’ll align on
+          </h2>
+          <p className="section__lede">
+            Venue rules, lounge placement, and timing — so the experience fits
+            the day instead of fighting it.
           </p>
-          <h3>Guest count and hookah planning</h3>
-          <p>
-            Hookah count depends on how concurrent you expect lounge use to be —
-            not only total headcount. Share expected lounge traffic when you
-            inquire.
-          </p>
-          <h3>Timeline</h3>
-          <p>
-            We plan around ceremony, dinner, and entertainment cues. See{" "}
-            <Link href="/how-it-works">how booking works</Link>.
-          </p>
+          <div className="page-hero__actions">
+            <Link className="btn btn--solid" href="/book">
+              Request a wedding quote
+            </Link>
+            <Link className="btn btn--ghost" href="/how-it-works">
+              How booking works
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="section experience">
+        <div className="section__inner">
+          <ul className="page-panels">
+            <li className="page-panel">
+              <h3>Venue &amp; space</h3>
+              <p>
+                Indoor versus outdoor permission, proximity to food service,
+                wind exposure, and a clear footprint for units and guests.
+              </p>
+            </li>
+            <li className="page-panel">
+              <h3>Guest flow</h3>
+              <p>
+                Hookah count depends on concurrent lounge use — not only total
+                headcount. Share expected traffic when you inquire.
+              </p>
+            </li>
+            <li className="page-panel">
+              <h3>Timeline</h3>
+              <p>
+                We plan around ceremony, dinner, and entertainment cues. See{" "}
+                <Link href="/how-it-works">how booking works</Link>.
+              </p>
+            </li>
+          </ul>
         </div>
       </section>
 

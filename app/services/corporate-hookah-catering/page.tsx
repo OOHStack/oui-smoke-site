@@ -90,19 +90,47 @@ export default function CorporateHookahPage() {
       </section>
 
       <section className="section">
-        <div className="section__inner page-prose">
+        <div className="section__inner">
           <p className="eyebrow">For planners</p>
           <h2 className="section__title">What you’ll get from us</h2>
-          <ul>
-            <li>Clear package variables — units, hours, staffing</li>
-            <li>Indoor/outdoor feasibility notes</li>
-            <li>Branding add-ons when creative is ready</li>
-            <li>A single booking pathway for deposits and confirmations</li>
-          </ul>
-          <p>
-            Partners can share the <Link href="/partner">partner one-pager</Link>{" "}
-            with clients.
+          <p className="section__lede">
+            Clear variables, branding options, and a single path to confirm —
+            built for agencies and in-house teams.
           </p>
+          <ul className="page-includes">
+            <li>
+              <span className="page-includes__num" aria-hidden="true">01</span>
+              <p className="page-includes__copy">
+                Clear package variables — units, hours, staffing
+              </p>
+            </li>
+            <li>
+              <span className="page-includes__num" aria-hidden="true">02</span>
+              <p className="page-includes__copy">
+                Indoor/outdoor feasibility notes
+              </p>
+            </li>
+            <li>
+              <span className="page-includes__num" aria-hidden="true">03</span>
+              <p className="page-includes__copy">
+                Branding add-ons when creative is ready
+              </p>
+            </li>
+            <li>
+              <span className="page-includes__num" aria-hidden="true">04</span>
+              <p className="page-includes__copy">
+                A single booking pathway for deposits and confirmations
+              </p>
+            </li>
+          </ul>
+          <div className="section__actions">
+            <Link className="btn btn--solid" href="/partner">
+              Partner one-pager
+            </Link>
+            <Link className="btn btn--ghost" href="/book">
+              Request a quote
+            </Link>
+          </div>
         </div>
       </section>
 

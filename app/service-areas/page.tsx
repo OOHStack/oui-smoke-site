@@ -91,21 +91,36 @@ export default function ServiceAreasPage() {
         </div>
       </section>
 
-      <section className="section">
-        <div className="section__inner page-prose">
+      <section className="page-split" aria-labelledby="areas-logistics-title">
+        <div
+          className="page-split__media"
+          style={{ backgroundImage: "url('/images/model-3-web.jpg')" }}
+          aria-hidden="true"
+        />
+        <div className="page-split__veil" aria-hidden="true" />
+        <div className="page-split__inner">
           <p className="eyebrow">Logistics</p>
-          <h2 className="section__title">What to consider by location</h2>
-          <ul>
-            <li>Venue permission for indoor or outdoor service</li>
-            <li>Load-in access and elevator or stair constraints</li>
-            <li>Outdoor weather contingency</li>
-            <li>Travel time for peak traffic corridors</li>
-          </ul>
-          <p>
-            Include your venue city on the <Link href="/book">booking form</Link>.
-            For service details, see{" "}
-            <Link href="/hookah-catering-toronto">hookah catering in Toronto</Link>.
+          <h2 className="section__title" id="areas-logistics-title">
+            What to consider by location
+          </h2>
+          <p className="section__lede">
+            Every venue is different — permissions, access, and weather shape
+            the plan as much as the city name.
           </p>
+          <ul className="page-chips">
+            <li>Venue permission</li>
+            <li>Load-in access</li>
+            <li>Weather plan</li>
+            <li>Travel time</li>
+          </ul>
+          <div className="page-hero__actions">
+            <Link className="btn btn--solid" href="/book">
+              Book for your city
+            </Link>
+            <Link className="btn btn--ghost" href="/hookah-catering-toronto">
+              Hookah catering
+            </Link>
+          </div>
         </div>
       </section>
     </MarketingPage>

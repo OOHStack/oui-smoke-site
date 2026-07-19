@@ -51,47 +51,76 @@ export default function AboutPage() {
       jsonLd={jsonLd}
       hero="about"
     >
-      <section className="section experience">
-        <div className="section__inner page-prose">
+      <section className="page-split" aria-labelledby="about-do-title">
+        <div
+          className="page-split__media"
+          style={{ backgroundImage: "url('/images/model-2-web.jpg')" }}
+          aria-hidden="true"
+        />
+        <div className="page-split__veil" aria-hidden="true" />
+        <div className="page-split__inner">
           <p className="eyebrow">What we do</p>
-          <h2 className="section__title">Managed experiences, on location</h2>
-          <p>
-            We bring a managed lounge experience to events: delivery, setup,
-            staffing, and cleanup. Packages can be personalized with timing,
-            unit counts, and optional add-ons such as LED bases or unit branding.
+          <h2 className="section__title" id="about-do-title">
+            Managed experiences, on location
+          </h2>
+          <p className="section__lede">
+            Delivery, setup, staffing, and cleanup — personalized with timing,
+            unit counts, and optional add-ons like LED bases or unit branding.
           </p>
-          <h3>Where we operate</h3>
-          <p>
-            Toronto and the GTA are our primary service area. Travel beyond the
-            GTA is available on request.{" "}
-            <Link href="/service-areas">See service areas</Link>.
-          </p>
-          <h3>How to reach us</h3>
-          <p>
-            Email <a href={`mailto:${SITE.email}`}>{SITE.email}</a> or use the{" "}
-            <Link href="/book">booking form</Link>.
-          </p>
-          <p className="page-note">
-            Public phone number and inquiry-hours language: owner approval
-            required before publication.
-          </p>
-          <h3>Adult-oriented service</h3>
-          <p>{SITE.ageNotice}</p>
+          <ul className="page-chips">
+            <li>Private</li>
+            <li>Wedding</li>
+            <li>Corporate</li>
+            <li>Toronto &amp; GTA</li>
+          </ul>
+        </div>
+      </section>
+
+      <section className="section experience">
+        <div className="section__inner">
+          <ul className="page-panels">
+            <li className="page-panel">
+              <h3>Where we operate</h3>
+              <p>
+                Toronto and the GTA first. Travel beyond on request.{" "}
+                <Link href="/service-areas">See service areas</Link>.
+              </p>
+            </li>
+            <li className="page-panel">
+              <h3>How to reach us</h3>
+              <p>
+                Email <a href={`mailto:${SITE.email}`}>{SITE.email}</a> or use
+                the <Link href="/book">booking form</Link>.
+              </p>
+            </li>
+            <li className="page-panel">
+              <h3>Adult-oriented</h3>
+              <p>{SITE.ageNotice}</p>
+            </li>
+          </ul>
         </div>
       </section>
 
       <section className="section">
-        <div className="section__inner page-prose">
+        <div className="section__inner">
           <p className="eyebrow">Pending approval</p>
           <h2 className="section__title">Details we won’t invent</h2>
-          <p className="page-note">
-            The following stay unpublished until confirmed:
+          <p className="section__lede">
+            These stay unpublished until confirmed — no fabricated claims for SEO.
           </p>
-          <ul>
-            {OWNER_TODOS.map((item) => (
-              <li key={item}>{item}</li>
+          <ul className="page-includes">
+            {OWNER_TODOS.slice(0, 6).map((item, i) => (
+              <li key={item}>
+                <span className="page-includes__num" aria-hidden="true">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <p className="page-includes__copy">{item}</p>
+              </li>
             ))}
           </ul>
+          <p className="page-note" style={{ marginTop: "1.25rem" }}>
+            Full checklist lives in the SEO owner docs for the team.
+          </p>
         </div>
       </section>
     </MarketingPage>

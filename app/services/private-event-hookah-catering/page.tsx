@@ -98,21 +98,36 @@ export default function PrivateEventHookahPage() {
         </div>
       </section>
 
-      <section className="section">
-        <div className="section__inner page-prose">
+      <section className="page-split" aria-labelledby="private-ready-title">
+        <div
+          className="page-split__media"
+          style={{ backgroundImage: "url('/images/model-4-web.jpg')" }}
+          aria-hidden="true"
+        />
+        <div className="page-split__veil" aria-hidden="true" />
+        <div className="page-split__inner">
           <p className="eyebrow">Before you inquire</p>
-          <h2 className="section__title">Have these ready</h2>
-          <ul>
-            <li>Date and start time</li>
-            <li>City or venue neighbourhood</li>
-            <li>Indoor or outdoor plan</li>
-            <li>Expected guest count</li>
-            <li>Preferred number of hookahs and hours</li>
-          </ul>
-          <p>
-            Start with <Link href="/packages">packages</Link> or go straight to{" "}
-            <Link href="/book">booking</Link>.
+          <h2 className="section__title" id="private-ready-title">
+            Have these ready
+          </h2>
+          <p className="section__lede">
+            A tight brief gets you a faster, cleaner package recommendation.
           </p>
+          <ul className="page-chips">
+            <li>Date &amp; time</li>
+            <li>City / venue</li>
+            <li>Indoor or outdoor</li>
+            <li>Guest count</li>
+            <li>Hookahs &amp; hours</li>
+          </ul>
+          <div className="page-hero__actions">
+            <Link className="btn btn--solid" href="/book">
+              Book an event
+            </Link>
+            <Link className="btn btn--ghost" href="/packages">
+              View packages
+            </Link>
+          </div>
         </div>
       </section>
 

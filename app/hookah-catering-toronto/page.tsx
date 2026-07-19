@@ -23,6 +23,38 @@ export const metadata = buildPageMetadata({
 
 const faqs = CORE_FAQS;
 
+const INCLUDES = [
+  "Delivery and setup of premium hookah units",
+  "On-site staffing for service flow and guest support",
+  "Package duration planning",
+  "Refill structure based on package tier",
+  "Optional add-ons — LED bases, enhancers, branding",
+  "Cleanup at the end of service",
+] as const;
+
+const STEPS = [
+  {
+    num: "01",
+    title: "Share the brief",
+    body: "Date, city or venue, guest count, and preferred hookah count.",
+  },
+  {
+    num: "02",
+    title: "Confirm the package",
+    body: "We check availability and lock the right structure for your event.",
+  },
+  {
+    num: "03",
+    title: "Align logistics",
+    body: "Indoor or outdoor plan, setup window, add-ons, and access.",
+  },
+  {
+    num: "04",
+    title: "We run the floor",
+    body: "Delivery, setup, managed service, and cleanup — so you can host.",
+  },
+] as const;
+
 export default function HookahCateringTorontoPage() {
   const jsonLd = graph(
     organizationNode(),
@@ -69,76 +101,133 @@ export default function HookahCateringTorontoPage() {
             weddings, rooftop and backyard gatherings, corporate hospitality, and
             brand activations.
           </p>
-          <ul className="page-cards">
-            <li className="page-card">
-              <h3>
-                <Link href="/services/wedding-hookah-catering">Weddings</Link>
-              </h3>
+          <div className="page-cards">
+            <Link className="page-card" href="/services/wedding-hookah-catering">
+              <h3>Weddings</h3>
               <p>Lounge zones for cocktail hour, late-night, or outdoor reception moments.</p>
-            </li>
-            <li className="page-card">
-              <h3>
-                <Link href="/services/corporate-hookah-catering">Corporate</Link>
-              </h3>
+              <span className="page-card__go">Explore →</span>
+            </Link>
+            <Link className="page-card" href="/services/corporate-hookah-catering">
+              <h3>Corporate</h3>
               <p>Hospitality experiences and brand activations with optional unit branding.</p>
-            </li>
-            <li className="page-card">
-              <h3>
-                <Link href="/services/private-event-hookah-catering">
-                  Private events
-                </Link>
-              </h3>
+              <span className="page-card__go">Explore →</span>
+            </Link>
+            <Link
+              className="page-card"
+              href="/services/private-event-hookah-catering"
+            >
+              <h3>Private events</h3>
               <p>Birthdays, engagements, bachelor/bachelorette, rooftop and backyard parties.</p>
-            </li>
-            <li className="page-card">
-              <h3>
-                <Link href="/services/hookah-rentals">Rentals vs catering</Link>
-              </h3>
+              <span className="page-card__go">Explore →</span>
+            </Link>
+            <Link className="page-card" href="/services/hookah-rentals">
+              <h3>Rentals vs catering</h3>
               <p>Understand staffed catering versus DIY rental before you decide.</p>
-            </li>
-          </ul>
+              <span className="page-card__go">Compare →</span>
+            </Link>
+          </div>
         </div>
       </section>
 
       <section className="section">
-        <div className="section__inner page-prose">
+        <div className="section__inner">
           <p className="eyebrow">The experience</p>
           <h2 className="section__title">What may be included</h2>
-          <ul>
-            <li>Delivery and setup of premium hookah units</li>
-            <li>On-site staffing for service flow and guest support</li>
-            <li>Package duration planning</li>
-            <li>Refill structure based on package tier</li>
-            <li>Optional add-ons — LED bases, water enhancers, unit branding</li>
-            <li>Cleanup at the end of service</li>
-          </ul>
-          <p className="page-note">
-            Exact inclusions depend on your package. Use the{" "}
-            <Link href="/book">booking form</Link> or homepage estimator for a
-            tailored quote.
+          <p className="section__lede">
+            A managed package built around your guest flow — not a pile of gear
+            left at the door.
           </p>
+          <ul className="page-includes">
+            {INCLUDES.map((item, i) => (
+              <li key={item}>
+                <span className="page-includes__num" aria-hidden="true">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <p className="page-includes__copy">{item}</p>
+              </li>
+            ))}
+          </ul>
+          <div className="section__actions">
+            <Link className="btn btn--solid" href="/book">
+              Book an event
+            </Link>
+            <Link className="btn btn--ghost" href="/#pricing">
+              View pricing
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="page-split" aria-labelledby="coverage-title">
+        <div
+          className="page-split__media"
+          style={{ backgroundImage: "url('/images/model-1-web.jpg')" }}
+          aria-hidden="true"
+        />
+        <div className="page-split__veil" aria-hidden="true" />
+        <div className="page-split__inner">
+          <p className="eyebrow">Coverage</p>
+          <h2 className="section__title" id="coverage-title">
+            Toronto and the GTA
+          </h2>
+          <p className="section__lede">
+            Mobile service to your venue or property across Toronto and the
+            Greater Toronto Area. Travel beyond the GTA on request.
+          </p>
+          <ul className="page-chips" aria-label="Regions we commonly serve">
+            <li>Toronto</li>
+            <li>York</li>
+            <li>Peel</li>
+            <li>Durham</li>
+            <li>Halton</li>
+          </ul>
+          <div className="page-hero__actions">
+            <Link className="btn btn--solid" href="/service-areas">
+              Service areas
+            </Link>
+            <Link className="btn btn--ghost" href="/book">
+              Check your date
+            </Link>
+          </div>
         </div>
       </section>
 
       <section className="section experience">
-        <div className="section__inner page-prose">
-          <p className="eyebrow">Coverage</p>
-          <h2 className="section__title">Toronto and the GTA</h2>
-          <p>
-            Primary coverage is Toronto and the Greater Toronto Area. Travel
-            outside the GTA is considered on request. See the{" "}
-            <Link href="/service-areas">service areas overview</Link>.
+        <div className="section__inner">
+          <p className="eyebrow">How booking works</p>
+          <h2 className="section__title">Four steps to the floor</h2>
+          <p className="section__lede">
+            From first inquiry to cleanup — built for hosts who want premium
+            service without DIY logistics.
           </p>
-          <h3>How booking works</h3>
-          <ol>
-            <li>Share your date, city/venue, guest count, and preferred hookah count.</li>
-            <li>We confirm availability and package fit.</li>
-            <li>Finalize logistics: indoor/outdoor plan, setup window, and staffing.</li>
-            <li>Event day: delivery, setup, managed service, and cleanup.</li>
-          </ol>
-          <p>
-            Full walkthrough: <Link href="/how-it-works">How it works</Link>.
-          </p>
+          <div className="page-rows">
+            {STEPS.map((step) => (
+              <Link
+                key={step.num}
+                className="page-row"
+                href="/how-it-works"
+              >
+                <span className="page-row__num" aria-hidden="true">
+                  {step.num}
+                </span>
+                <span className="page-row__copy">
+                  <strong>{step.title}</strong>
+                  <span>{step.body}</span>
+                </span>
+                <span className="page-row__go" aria-hidden="true">
+                  →
+                </span>
+              </Link>
+            ))}
+          </div>
+          <div className="section__actions">
+            <Link className="btn btn--solid" href="/how-it-works">
+              Full walkthrough
+            </Link>
+            <Link className="btn btn--ghost" href="/book">
+              Start booking
+            </Link>
+          </div>
         </div>
       </section>
 
