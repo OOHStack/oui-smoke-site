@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   title: "Event day · Oui Smoke",
   description:
     "What hosts and partners should expect at Oui Smoke on-site sales events.",
+  robots: { index: false, follow: false },
+  alternates: { canonical: "/partner/playbook" },
 };
 
 export default async function PartnerPlaybookPage() {

@@ -1,0 +1,25 @@
+# Keyword-to-Page Map
+
+Intent-first architecture. One primary intent per URL. Status reflects implementation in repo as of 2026-07-19.
+
+| Target URL | Search intent | Primary topic | Supporting topics | Audience | Recommended title | Recommended H1 | Recommended description | Internal links | Conversion | Schema | Status |
+|------------|---------------|---------------|-------------------|----------|-------------------|----------------|-------------------------|----------------|------------|--------|--------|
+| `/` | Brand + commercial | Premium hookah catering Toronto | Private/wedding/corporate; GTA | Hosts | Oui Smoke — Premium Hookah Catering in Toronto & the GTA | Premium hookah catering for Toronto events | Premium mobile hookah & shisha catering for private, wedding, and corporate events in Toronto and the GTA. | Service pages, how-it-works, FAQ, book | Estimate / Book | Org, LocalBusiness, WebSite, Service, FAQPage | published |
+| `/hookah-catering-toronto` | Core commercial | Hookah catering Toronto | Shisha catering; mobile service; GTA | Comparing hosts | Hookah Catering Toronto \| Premium Mobile Shisha · Oui Smoke | Hookah catering in Toronto and the GTA | Professionally managed mobile hookah catering for private, wedding, and corporate events in Toronto and the GTA. | Wedding/corporate/private, areas, book | Book | Service, WebPage, Breadcrumb, FAQ | published |
+| `/services/wedding-hookah-catering` | Event — wedding | Wedding hookah catering | Reception lounge; venue rules | Couples/planners | Wedding Hookah Catering Toronto \| Oui Smoke | Wedding hookah catering in Toronto | Staffed hookah experiences for weddings across Toronto and the GTA. | Core, guides, how-it-works, book | Wedding quote | Service, FAQ | published |
+| `/services/corporate-hookah-catering` | Event — corporate | Corporate hookah catering | Brand activations; branding | Planners/agencies | Corporate Hookah Catering Toronto \| Oui Smoke | Corporate hookah catering and brand activations | Premium mobile hookah for corporate events and activations in Toronto and the GTA. | Partner, core, book | Corporate quote | Service, FAQ | published |
+| `/services/private-event-hookah-catering` | Event — private | Private event catering | Birthday; bachelor; rooftop | Private hosts | Private Event Hookah Catering Toronto \| Oui Smoke | Private event hookah catering | Mobile hookah for birthdays, engagements, bachelor/bachelorette, rooftop and backyard events. | Packages, book | Book | Service, FAQ | published |
+| `/services/hookah-rentals` | Comparison | Catering vs rental | DIY; staffing | Decision-stage hosts | Hookah Rentals vs Staffed Catering Toronto \| Oui Smoke | Hookah rentals vs staffed catering | Understand staffed Oui Smoke catering versus DIY rental. | Core, book | Book | WebPage, FAQ | published |
+| `/service-areas` | Location hub | GTA coverage | Toronto regions; travel | Coverage checkers | Toronto & GTA Service Areas \| Oui Smoke | Toronto and GTA service areas | Mobile hookah catering across Toronto and the GTA; beyond GTA on request. | Core, book | Book | WebPage | published |
+| `/how-it-works` | Informational | How catering works | Setup; cleanup; logistics | First-timers | How Hookah Catering Works \| Oui Smoke Toronto | How Oui Smoke hookah catering works | From inquiry to cleanup for Toronto and GTA events. | Packages, FAQ, book | Book | WebPage, FAQ | published |
+| `/packages` | Commercial pricing | Packages & pricing | Add-ons; hours | Budgeting hosts | Hookah Catering Packages & Pricing \| Oui Smoke Toronto | Packages and pricing | Package structure, variables, and estimator pathway. | Homepage pricing, book | Estimate/Book | WebPage | published |
+| `/faq` | Q&A | Catering FAQ | Age; venue; lead time | Planners | Hookah Catering FAQ \| Oui Smoke Toronto | Frequently asked questions | Answers for booking Oui Smoke in Toronto and the GTA. | How-it-works, book | Book | FAQPage | published |
+| `/about` | Trust/entity | About Oui Smoke | Legal identity; area | Evaluators | About Oui Smoke \| Premium Hookah Catering Toronto | About Oui Smoke | Who Oui Smoke is and how to contact us. | Core, book | Contact/Book | About/WebPage | published |
+| `/guides` | Informational hub | Planning guides | Costs; weddings; venues | Researchers | Event Planning Guides \| Oui Smoke Toronto | Hookah event planning guides | Practical planning guides; drafts pending editorial approval. | FAQ, book | Book | Collection/WebPage | published |
+| `/book` | Conversion | Book event | Estimate; package | Ready hosts | Book an Event \| Oui Smoke | Book an event | Request a package for Toronto/GTA events. | Home, packages | Submit lead | WebPage | published |
+
+## Cannibalization rules
+
+- Do **not** create separate indexable pages for every synonym of “hookah/shisha catering Toronto”.
+- City pages must not repeat the core page with only the city name changed.
+- Guide articles target informational queries; link up to service pages rather than competing on commercial titles.

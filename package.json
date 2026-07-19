@@ -10,7 +10,9 @@
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:seed": "dotenv -e .env.local -- tsx scripts/seed.ts",
     "db:migrate": "dotenv -e .env.local -- tsx scripts/migrate-all.ts",
-    "serve:static": "npx --yes serve -l 5173 public"
+    "serve:static": "npx --yes serve -l 5173 public",
+    "seo:research": "node scripts/seo/competitor-research.mjs --import docs/seo/research/manual-urls.txt",
+    "seo:test-schema": "node scripts/seo/test-schema.mjs"
   },
   "main": "index.js",
   "directories": {

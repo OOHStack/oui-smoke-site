@@ -1,0 +1,9 @@
+# Manual competitor URL import for scripts/seo/competitor-research.mjs
+# One URL per line. Lines starting with # are ignored.
+# Only allowlisted hosts are fetched. Respect robots.txt.
+
+https://hayaticatering.ca/
+https://shishachauffeurs.com/
+https://fumeshisha.ca/
+https://cloudsvapeandshisha.com/catering-services/
+https://classiccafe.ca/catering

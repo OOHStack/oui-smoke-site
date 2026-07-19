@@ -1,0 +1,50 @@
+{
+  "userAgent": "OuiSmokeSeoResearch/1.0 (+https://ouismoke.co/; research@ouismoke.co)",
+  "log": [
+    {
+      "url": "https://hayaticatering.ca/",
+      "status": 200,
+      "ok": true,
+      "fromCache": false,
+      "skipped": null,
+      "error": null,
+      "at": "2026-07-19T04:45:02.748Z"
+    },
+    {
+      "url": "https://shishachauffeurs.com/",
+      "status": 200,
+      "ok": true,
+      "fromCache": false,
+      "skipped": null,
+      "error": null,
+      "at": "2026-07-19T04:45:05.395Z"
+    },
+    {
+      "url": "https://fumeshisha.ca/",
+      "status": 200,
+      "ok": true,
+      "fromCache": false,
+      "skipped": null,
+      "error": null,
+      "at": "2026-07-19T04:45:08.347Z"
+    },
+    {
+      "url": "https://cloudsvapeandshisha.com/catering-services/",
+      "status": 200,
+      "ok": true,
+      "fromCache": false,
+      "skipped": null,
+      "error": null,
+      "at": "2026-07-19T04:45:11.633Z"
+    },
+    {
+      "url": "https://classiccafe.ca/catering",
+      "status": 200,
+      "ok": true,
+      "fromCache": false,
+      "skipped": null,
+      "error": null,
+      "at": "2026-07-19T04:45:14.375Z"
+    }
+  ]
+}

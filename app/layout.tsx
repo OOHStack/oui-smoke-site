@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -6,36 +6,34 @@ const siteUrl = "https://ouismoke.co";
 const GA_MEASUREMENT_ID =
   process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-45J86Y7468";
 const description =
-  "Private & corporate premium hookah catering in Toronto and beyond the GTA. Personalized packages for birthdays, weddings, and corporate events.";
+  "Oui Smoke provides premium mobile hookah and shisha catering for private, wedding, and corporate events in Toronto and the Greater Toronto Area.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Oui Smoke — Premium Hookah Catering",
+    default: "Oui Smoke — Premium Hookah Catering in Toronto & the GTA",
     template: "%s · Oui Smoke",
   },
   description,
   applicationName: "Oui Smoke",
   keywords: [
-    "hookah catering",
-    "Toronto hookah",
+    "hookah catering Toronto",
+    "shisha catering Toronto",
     "GTA hookah catering",
-    "private event hookah",
+    "mobile hookah service",
+    "wedding hookah catering",
     "corporate hookah catering",
     "Oui Smoke",
   ],
   authors: [{ name: "Oui Smoke Catering Inc." }],
   creator: "Oui Smoke",
   publisher: "Oui Smoke Catering Inc.",
-  alternates: {
-    canonical: "/",
-  },
   openGraph: {
     type: "website",
     locale: "en_CA",
     url: siteUrl,
     siteName: "Oui Smoke",
-    title: "Oui Smoke — Premium Hookah Catering",
+    title: "Oui Smoke — Premium Hookah Catering in Toronto & the GTA",
     description,
     images: [
       {
@@ -48,9 +46,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Oui Smoke — Premium Hookah Catering",
+    title: "Oui Smoke — Premium Hookah Catering in Toronto & the GTA",
     description:
-      "Private & corporate premium hookah catering in Toronto and beyond the GTA.",
+      "Premium mobile hookah and shisha catering for private, wedding, and corporate events across Toronto and the GTA.",
     images: ["/og-image.jpg"],
   },
   icons: {
@@ -61,6 +59,18 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
   manifest: "/site.webmanifest",
+  verification: {
+    // OWNER TODO: paste Search Console / Bing verification tokens when issued
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+    other: process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
+      ? {
+          "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION,
+        }
+      : undefined,
+  },
+};
+
+export const viewport: Viewport = {
   themeColor: "#0a0a0a",
 };
 
@@ -71,6 +81,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en-CA">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>
         {children}
         <Analytics />

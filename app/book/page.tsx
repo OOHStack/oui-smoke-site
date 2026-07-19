@@ -3,6 +3,7 @@
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { trackGenerateLead } from "@/lib/analytics";
 import {
   DEFAULT_PRICING,
   estimateBooking,
@@ -170,7 +171,14 @@ function BookForm() {
         );
         return;
       }
-      setDone((data.engagement as Engagement) || engagement);
+      const nextEngagement =
+        (data.engagement as Engagement) || engagement;
+      trackGenerateLead({
+        engagement: nextEngagement,
+        eventType: String(payload.eventType || ""),
+        location: String(payload.location || ""),
+      });
+      setDone(nextEngagement);
     } catch {
       setError("Couldn’t reach Oui Smoke. Try again or email contact@ouismoke.co.");
     } finally {

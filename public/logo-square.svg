@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Oui Smoke">
+  <!-- Square brand lockup: mark + wordmark (for Google Business / social) -->
+  <rect width="1024" height="1024" fill="#0a0908"/>
+  <g
+    fill="none"
+    stroke="#f7f4ef"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    transform="translate(512 430)"
+  >
+    <circle cx="0" cy="0" r="248" stroke-width="34"/>
+    <circle cx="0" cy="0" r="164" stroke-width="30" opacity="0.92"/>
+    <circle cx="0" cy="0" r="80" stroke-width="26" opacity="0.75"/>
+  </g>
+  <text
+    x="512"
+    y="780"
+    fill="#f7f4ef"
+    font-family="Outfit, Helvetica Neue, Arial, sans-serif"
+    font-size="72"
+    font-weight="500"
+    letter-spacing="16"
+    text-anchor="middle"
+  >OUI SMOKE</text>
+</svg>

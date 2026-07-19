@@ -1,0 +1,19 @@
+intent_group,primary_topic,example_queries,target_url,priority,notes
+A_core_commercial,hookah catering Toronto,"hookah catering Toronto; shisha catering Toronto; mobile hookah service Toronto",/hookah-catering-toronto,P1,Primary money page
+A_core_commercial,hookah catering GTA,"hookah catering GTA; luxury hookah catering Toronto",/hookah-catering-toronto,P1,Secondary on same page
+A_core_commercial,private event hookah,"private event hookah service; premium shisha catering",/services/private-event-hookah-catering,P2,
+B_event,wedding,"wedding hookah catering Toronto; wedding shisha service GTA",/services/wedding-hookah-catering,P2,
+B_event,corporate,"corporate hookah catering Toronto; brand activation hookah",/services/corporate-hookah-catering,P2,
+B_event,birthday_bachelor,"birthday hookah catering; bachelor party hookah; bachelorette hookah",/services/private-event-hookah-catering,P2,Cluster on private events
+B_event,rooftop_backyard,"rooftop hookah catering; backyard party hookah",/services/private-event-hookah-catering,P3,Support section not separate thin pages
+C_location,service area hub,"hookah catering near me; GTA hookah catering",/service-areas,P2,Consolidated hub
+C_location,city pages deferred,"hookah catering Mississauga; Brampton; Vaughan; Markham",/service-areas,P3,Publish city pages only with unique content + owner OK
+D_informational,how it works,"how hookah catering works; what is included",/how-it-works,P2,
+D_informational,costs,"how much hookah catering costs Toronto",/packages,P2,Also draft guide
+D_informational,guest count,"how many hookahs for an event",/guides,P3,Draft guide
+D_informational,venue,"venue requirements for hookah catering",/guides,P3,Draft guide
+D_informational,booking lead time,"how far in advance to book hookah catering",/faq,P2,
+E_comparison,rental vs catering,"hookah catering vs rental; staffed vs DIY",/services/hookah-rentals,P2,
+E_comparison,lounge vs mobile,"mobile hookah vs hookah lounge",/hookah-catering-toronto,P3,Section on core page
+conversion,book,"book hookah catering Toronto",/book,P1,
+brand,homepage,"Oui Smoke; Oui Smoke Toronto",/,P1,

@@ -1,0 +1,330 @@
+/* Thin extensions on top of /site.css — keep marketing pages on-brand */
+@import "../public/site.css";
+
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.page .topbar {
+  background: rgba(10, 9, 8, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.page-hero__crumb {
+  margin: 0 0 1.25rem;
+}
+
+.page-hero__crumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.45rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(247, 244, 239, 0.55);
+}
+
+.page-hero__crumb li:not(:last-child)::after {
+  content: "/";
+  margin-left: 0.45rem;
+  opacity: 0.45;
+}
+
+.page-hero__crumb a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 200ms var(--ease);
+}
+
+.page-hero__crumb a:hover,
+.page-hero__crumb a:focus-visible {
+  color: var(--ink);
+}
+
+.page-hero__crumb [aria-current="page"] {
+  color: rgba(247, 244, 239, 0.78);
+}
+
+/* Full-bleed page hero — mirrors contact / feature energy */
+.page-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  min-height: min(72vh, 36rem);
+  display: grid;
+  align-items: end;
+  color: var(--ink);
+  background: #0a0908;
+}
+
+.page-hero__media,
+.page-hero__veil {
+  position: absolute;
+  inset: 0;
+}
+
+.page-hero__media {
+  z-index: 0;
+  background-size: cover;
+  background-position: center 30%;
+  transform: translateZ(0);
+}
+
+.page-hero__veil {
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(10, 9, 8, 0.35) 0%, rgba(10, 9, 8, 0.72) 45%, rgba(10, 9, 8, 0.92) 100%),
+    linear-gradient(90deg, rgba(10, 9, 8, 0.55), transparent 55%);
+}
+
+.page-hero__inner {
+  position: relative;
+  z-index: 2;
+  width: min(100% - (var(--pad) * 2), var(--max));
+  margin: 0 auto;
+  padding: clamp(5.5rem, 12vh, 7rem) 0 clamp(3rem, 7vh, 4.5rem);
+}
+
+.page-hero .eyebrow {
+  color: rgba(247, 244, 239, 0.62);
+}
+
+.page-hero__title {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(2.8rem, 8vw, 5.2rem);
+  line-height: 0.94;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  max-width: 16ch;
+  font-weight: 400;
+}
+
+.page-hero__lede {
+  margin: 1.1rem 0 0;
+  max-width: 40ch;
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
+  color: var(--ink-soft);
+}
+
+.page-hero__answer {
+  margin: 1.35rem 0 0;
+  max-width: 46ch;
+  padding: 0.9rem 0 0.9rem 1rem;
+  border-left: 2px solid var(--accent);
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+}
+
+.page-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-top: 1.75rem;
+}
+
+.page-body .section__title {
+  max-width: 18ch;
+}
+
+.page-prose {
+  max-width: 46rem;
+}
+
+.page-prose > * + * {
+  margin-top: 1rem;
+}
+
+.page-prose h2 {
+  margin: clamp(2.5rem, 5vh, 3.5rem) 0 0.75rem;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  line-height: 0.98;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.page-prose h2:first-child {
+  margin-top: 0;
+}
+
+.page-prose h3 {
+  margin: 1.75rem 0 0.45rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.page-prose p,
+.page-prose li {
+  color: var(--ink-soft);
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.page-prose ul,
+.page-prose ol {
+  padding-left: 1.15rem;
+}
+
+.page-prose li + li {
+  margin-top: 0.45rem;
+}
+
+.page-prose a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.page-prose .fineprint,
+.page-note {
+  font-size: 0.88rem;
+  color: var(--ink-mute);
+}
+
+.page-todo {
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px dashed rgba(228, 87, 77, 0.4);
+  color: var(--ink-mute);
+  font-size: 0.88rem;
+}
+
+.page-cards {
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 800px) {
+  .page-cards {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+}
+
+.page-card {
+  padding: 1.35rem 1.4rem;
+  border-top: 1px solid rgba(228, 87, 77, 0.45);
+  background:
+    linear-gradient(165deg, rgba(228, 87, 77, 0.08), transparent 42%),
+    rgba(20, 18, 16, 0.55);
+}
+
+.page-card h3 {
+  margin: 0 0 0.5rem;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.55rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.page-card h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page-card h3 a:hover,
+.page-card h3 a:focus-visible {
+  color: var(--accent);
+}
+
+.page-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.page-table-wrap {
+  margin-top: 1.5rem;
+  overflow-x: auto;
+}
+
+.page-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.page-table th,
+.page-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.85rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.page-table th {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.page-table td {
+  color: var(--ink-soft);
+}
+
+.page-guide-list {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+}
+
+.page-guide-list li {
+  border-top: 1px solid var(--line);
+  padding: 1.15rem 0;
+}
+
+.page-guide-list li:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.page-guide-list strong {
+  display: block;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.35rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.page-guide-list p {
+  margin: 0.35rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 859px) {
+  .page-hero__inner {
+    text-align: center;
+  }
+
+  .page-hero__title,
+  .page-hero__lede,
+  .page-hero__answer {
+    margin-inline: auto;
+  }
+
+  .page-hero__actions {
+    justify-content: center;
+  }
+
+  .page-hero__crumb ol {
+    justify-content: center;
+  }
+}
