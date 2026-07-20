@@ -11,8 +11,7 @@
     "db:seed": "dotenv -e .env.local -- tsx scripts/seed.ts",
     "db:migrate": "dotenv -e .env.local -- tsx scripts/migrate-all.ts",
     "serve:static": "npx --yes serve -l 5173 public",
-    "seo:research": "node scripts/seo/competitor-research.mjs --import docs/seo/research/manual-urls.txt",
-    "seo:test-schema": "node scripts/seo/test-schema.mjs"
+    "seo:research": "node scripts/seo/competitor-research.mjs --import docs/seo/research/manual-urls.txt"
   },
   "main": "index.js",
   "directories": {

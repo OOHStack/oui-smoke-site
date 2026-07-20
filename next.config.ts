@@ -28,6 +28,17 @@ const nextConfig: NextConfig = {
         destination: "/promo",
         permanent: true,
       },
+      // Retired SEO marketing pages → homepage
+      { source: "/hookah-catering-toronto", destination: "/", permanent: true },
+      { source: "/how-it-works", destination: "/", permanent: true },
+      { source: "/service-areas", destination: "/", permanent: true },
+      { source: "/packages", destination: "/", permanent: true },
+      { source: "/faq", destination: "/", permanent: true },
+      { source: "/about", destination: "/", permanent: true },
+      { source: "/guides", destination: "/", permanent: true },
+      { source: "/guides/:path*", destination: "/", permanent: true },
+      { source: "/services", destination: "/", permanent: true },
+      { source: "/services/:path*", destination: "/", permanent: true },
     ];
   },
   async rewrites() {
