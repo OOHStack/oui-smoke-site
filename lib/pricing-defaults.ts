@@ -12,7 +12,7 @@ export const GUEST_REBOOK_PROMO = {
 
 export const INCLUDED_HOURS = 4;
 export const MIN_PACKAGE_HOOKAHS = 4;
-export const MIN_PACKAGE_DOLLARS = 450;
+export const MIN_PACKAGE_DOLLARS = 500;
 export const EXTRA_HOUR_RATE = 150;
 export const HST_RATE = 0.13;
 

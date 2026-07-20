@@ -369,7 +369,7 @@ async function main() {
         "guestRebookLabel": "$25 off your next booking",
         "includedHours": 4,
         "minPackageHookahs": 4,
-        "minPackageDollars": 450,
+        "minPackageDollars": 500,
         "midTierRate": 95,
         "highTierRate": 85,
         "extraHourRate": 150,

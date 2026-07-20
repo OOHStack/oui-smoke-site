@@ -33,7 +33,7 @@
 
   let HST = 0.13;
   const BRANDING_MIN = 4;
-  const MIN_PACKAGE = 450;
+  const MIN_PACKAGE = 500;
   const EXTRA_HOUR = 150;
   const LED_RATE = 15;
   const WATER_RATE = 8;
@@ -62,8 +62,8 @@
     if (count <= 4) {
       return {
         id: "starter",
-        label: "4-hookah package · $450 · up to 4 hours · 1 refill included",
-        rate: 112.5,
+        label: "4-hookah package · $500 · up to 4 hours · 1 refill included",
+        rate: 125,
         flat: MIN_PACKAGE,
         unlimited: false,
         nextAt: 5,

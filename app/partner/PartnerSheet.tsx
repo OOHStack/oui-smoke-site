@@ -279,7 +279,7 @@ export default function PartnerSheet() {
             </h2>
             <p>
               {isPackage
-                ? "From $450 · up to 4 hours included"
+                ? "From $500 · up to 4 hours included"
                 : "Per unit · guests choose on site"}
             </p>
           </div>
@@ -287,7 +287,7 @@ export default function PartnerSheet() {
             <div className="partner-rates__tiers">
               <div className="partner-rates__tier">
                 <span className="partner-rates__range">4</span>
-                <strong className="partner-rates__price">$450</strong>
+                <strong className="partner-rates__price">$500</strong>
                 <span className="partner-rates__meta">
                   Package floor · 1 refill
                 </span>
