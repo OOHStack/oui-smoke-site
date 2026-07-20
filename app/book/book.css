@@ -184,6 +184,20 @@ body {
   letter-spacing: 0.08em;
 }
 
+.book__promo-field {
+  margin-top: 0.35rem;
+}
+
+.book__promo-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: rgba(247, 244, 239, 0.55);
+}
+
+.book__promo-hint--ok {
+  color: color-mix(in srgb, #e4574d 85%, #f7f4ef);
+}
+
 .book__row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

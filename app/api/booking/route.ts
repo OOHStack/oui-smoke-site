@@ -5,6 +5,7 @@ import { notifyBookingInquiry } from "@/lib/email/workflow";
 import { getPaymentSettings } from "@/lib/payment-settings";
 import { normalizePaymentModel } from "@/lib/payment-model";
 import { estimateBooking, getPricing } from "@/lib/pricing";
+import { resolvePromoCode } from "@/lib/promo-codes";
 import { jobEvents, jobs } from "@/lib/db/schema";
 import { NextResponse } from "next/server";
 
@@ -83,11 +84,8 @@ export async function POST(request: Request) {
   );
 
   const pricing = await getPricing();
-  const promoDollars =
-    promoCode &&
-    promoCode === pricing.guestRebookCode.toUpperCase()
-      ? pricing.guestRebookDiscountDollars
-      : 0;
+  const promo = resolvePromoCode(promoCode, pricing);
+  const promoDollars = promo?.discountDollars ?? 0;
 
   const estimate =
     paymentModel === "client_deposit"
@@ -101,10 +99,10 @@ export async function POST(request: Request) {
     `Engagement: ${engagementLabel}`,
     hookahNote,
     notes,
-    promoCode && promoDollars
-      ? `Promo: ${promoCode} · $${promoDollars} guest rebook discount`
+    promo
+      ? `Promo: ${promo.code} · ${promo.label}`
       : promoCode
-        ? `Promo: ${promoCode}`
+        ? `Promo: ${promoCode} (unrecognized)`
         : "",
     estimate
       ? `Website estimate: $${estimate.total.toFixed(2)} CAD (incl. HST)`
@@ -141,7 +139,7 @@ export async function POST(request: Request) {
       jobId: job.id,
       type: "created",
       message: `Draft job from website (${engagementLabel}) · ${clientEmail || clientPhone}${
-        promoCode === "OUI25" ? " · Promo OUI25" : ""
+        promo ? ` · Promo ${promo.code}` : ""
       }`,
       createdBy: "website",
     });
@@ -150,7 +148,7 @@ export async function POST(request: Request) {
     await notifyBookingInquiry({
       ...job,
       paymentModel,
-      promoCode: promoCode === "OUI25" ? "OUI25" : undefined,
+      promoCode: promo?.code,
     });
 
     // Package bookings already have a website estimate — send deposit link now

@@ -10,6 +10,7 @@ import {
   formatCad,
   type PricingConfig,
 } from "@/lib/pricing";
+import { resolvePromoCode } from "@/lib/promo-codes";
 import "./book.css";
 
 type Engagement = "package" | "on_site";
@@ -30,7 +31,7 @@ const FALLBACK_COPY: PaymentCopy = {
 
 function BookForm() {
   const searchParams = useSearchParams();
-  const promoCode = (searchParams.get("code") || "").trim().toUpperCase();
+  const initialPromoCode = (searchParams.get("code") || "").trim().toUpperCase();
 
   const initialType = (searchParams.get("type") || "").trim().toLowerCase();
   const initialHours = (() => {
@@ -55,21 +56,14 @@ function BookForm() {
   );
   const [hours, setHours] = useState(initialHours);
   const [hookahs, setHookahs] = useState(initialHookahs);
+  const [promoCode, setPromoCode] = useState(initialPromoCode);
   const [payCopy, setPayCopy] = useState<PaymentCopy>(FALLBACK_COPY);
   const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
 
-  const promo = useMemo(() => {
-    if (
-      promoCode &&
-      promoCode === pricing.guestRebookCode.toUpperCase()
-    ) {
-      return {
-        discountDollars: pricing.guestRebookDiscountDollars,
-        label: pricing.guestRebookLabel,
-      };
-    }
-    return null;
-  }, [promoCode, pricing]);
+  const promo = useMemo(
+    () => resolvePromoCode(promoCode, pricing),
+    [promoCode, pricing],
+  );
 
   useEffect(() => {
     if (engagement !== "package") return;
@@ -254,12 +248,12 @@ function BookForm() {
         <div className="book__promo">
           <strong>{promo.label}</strong>
           <span>
-            Code <em>{promoCode}</em> will be noted for package bookings.
+            Code <em>{promo.code}</em> applied to full-service package bookings.
           </span>
         </div>
       ) : null}
 
-      <input type="hidden" name="promoCode" value={promo ? promoCode : ""} />
+      <input type="hidden" name="promoCode" value={promo ? promo.code : ""} />
 
       <fieldset className="book__engagement">
         <legend>How should we work your event?</legend>
@@ -378,6 +372,31 @@ function BookForm() {
         }
       />
 
+      {engagement === "package" ? (
+        <div className="book__field book__promo-field">
+          <label htmlFor="promoCodeInput">Promo code</label>
+          <input
+            id="promoCodeInput"
+            type="text"
+            inputMode="text"
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            placeholder="Enter code"
+            value={promoCode}
+            onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+          />
+          {promoCode && !promo ? (
+            <p className="book__promo-hint">That code isn’t recognized.</p>
+          ) : null}
+          {promo ? (
+            <p className="book__promo-hint book__promo-hint--ok">
+              {promo.label} unlocked.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {engagement === "package" && estimate ? (
         <aside className="book__estimate" aria-live="polite">
           <div className="book__estimate-head">
@@ -407,9 +426,9 @@ function BookForm() {
                 <span>Included</span>
               </li>
             )}
-            {estimate.discount > 0 ? (
+            {estimate.discount > 0 && promo ? (
               <li className="book__estimate-discount">
-                <span>Promo {promoCode}</span>
+                <span>Promo {promo.code}</span>
                 <span>−{formatCad(estimate.discount)}</span>
               </li>
             ) : null}
