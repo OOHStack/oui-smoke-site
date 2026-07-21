@@ -10,7 +10,7 @@ import {
   formatCad,
   type PricingConfig,
 } from "@/lib/pricing";
-import { resolvePromoCode } from "@/lib/promo-codes";
+import { resolvePromoCode, type PartnerPromo } from "@/lib/promo-codes";
 import "./book.css";
 
 type Engagement = "package" | "on_site";
@@ -59,10 +59,11 @@ function BookForm() {
   const [promoCode, setPromoCode] = useState(initialPromoCode);
   const [payCopy, setPayCopy] = useState<PaymentCopy>(FALLBACK_COPY);
   const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
+  const [partnerPromos, setPartnerPromos] = useState<PartnerPromo[]>([]);
 
   const promo = useMemo(
-    () => resolvePromoCode(promoCode, pricing),
-    [promoCode, pricing],
+    () => resolvePromoCode(promoCode, pricing, partnerPromos),
+    [promoCode, pricing, partnerPromos],
   );
 
   useEffect(() => {
@@ -109,6 +110,9 @@ function BookForm() {
               ...rest
             } = p;
             setPricing({ ...DEFAULT_PRICING, ...rest });
+          }
+          if (!cancelled && Array.isArray(data.partnerPromos)) {
+            setPartnerPromos(data.partnerPromos as PartnerPromo[]);
           }
         }
       } catch {

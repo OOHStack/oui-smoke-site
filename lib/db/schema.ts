@@ -85,6 +85,17 @@ export const flavours = pgTable("flavours", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/** Partner / campaign promo codes (admin CRUD). Guest rebook stays in site_settings. */
+export const promoCodes = pgTable("promo_codes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  label: text("label").notNull().default(""),
+  discountDollars: integer("discount_dollars").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const jobs = pgTable("jobs", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -413,6 +424,7 @@ export const jobPhotosRelations = relations(jobPhotos, ({ one }) => ({
 export type Job = typeof jobs.$inferSelect;
 export type Hookah = typeof hookahs.$inferSelect;
 export type Flavour = typeof flavours.$inferSelect;
+export type PromoCode = typeof promoCodes.$inferSelect;
 export type JobHookah = typeof jobHookahs.$inferSelect;
 export type JobEvent = typeof jobEvents.$inferSelect;
 export type ServiceRequest = typeof serviceRequests.$inferSelect;

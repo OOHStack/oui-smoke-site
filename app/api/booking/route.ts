@@ -5,7 +5,7 @@ import { notifyBookingInquiry } from "@/lib/email/workflow";
 import { getPaymentSettings } from "@/lib/payment-settings";
 import { normalizePaymentModel } from "@/lib/payment-model";
 import { estimateBooking, getPricing } from "@/lib/pricing";
-import { resolvePromoCode } from "@/lib/promo-codes";
+import { resolvePromoCodeLive } from "@/lib/promo-codes";
 import { jobEvents, jobs } from "@/lib/db/schema";
 import { NextResponse } from "next/server";
 
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   );
 
   const pricing = await getPricing();
-  const promo = resolvePromoCode(promoCode, pricing);
+  const promo = await resolvePromoCodeLive(promoCode, pricing);
   const promoDollars = promo?.discountDollars ?? 0;
 
   const estimate =

@@ -444,6 +444,30 @@ async function main() {
   `;
   console.log("✓ site_media");
 
+  // --- partner / campaign promo codes ---
+  await sql`
+    CREATE TABLE IF NOT EXISTS promo_codes (
+      id serial PRIMARY KEY,
+      code text NOT NULL UNIQUE,
+      label text NOT NULL DEFAULT '',
+      discount_dollars integer NOT NULL DEFAULT 0,
+      active boolean NOT NULL DEFAULT true,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    INSERT INTO promo_codes (code, label, discount_dollars, active)
+    VALUES (
+      'MRLEWIN',
+      '$50 off · Mr. Lewin referral',
+      50,
+      true
+    )
+    ON CONFLICT (code) DO NOTHING
+  `;
+  console.log("✓ promo_codes");
+
   // --- verify ---
   console.log("\nVerifying schema…");
   const requiredTables = [
@@ -456,6 +480,7 @@ async function main() {
     "payment_settings",
     "site_settings",
     "site_media",
+    "promo_codes",
   ];
   const requiredColumns: Record<string, string[]> = {
     job_hookahs: [
