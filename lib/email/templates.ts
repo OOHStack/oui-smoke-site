@@ -6,6 +6,7 @@ import {
 } from "@/lib/pricing";
 
 import { CONTACT_EMAIL } from "@/lib/brand-contact";
+import { paymentModelLabel } from "@/lib/payment-model";
 
 function escapeHtml(value: string) {
   return value
@@ -117,7 +118,7 @@ ${pre}
           <td align="center" style="padding:28px 12px 0;font-family:${brand.sans};font-size:12px;line-height:1.7;color:${brand.inkMute};font-weight:300;">
             <a href="${site}" style="color:${brand.inkSoft};text-decoration:none;letter-spacing:0.12em;text-transform:uppercase;font-size:11px;">ouismoke.co</a>
             <span style="color:${brand.line};padding:0 8px;">·</span>
-            GTA full-service hookah
+            GTA hookah catering
             <br>
             <a href="mailto:${CONTACT_EMAIL}" style="color:${brand.inkMute};text-decoration:none;">${CONTACT_EMAIL}</a>
             <span style="color:${brand.line};padding:0 8px;">·</span>
@@ -181,7 +182,7 @@ export function bookingInquiryClientEmail(input: {
   const rates = input.pricing ?? DEFAULT_PRICING;
   const nextStep =
     model === "pay_at_event"
-      ? `No deposit is required — guests pay on-site (${onsiteRatesLine(rates)}). We’ll confirm timing and setup with you shortly.`
+      ? `No hosted deposit — guests pay on the floor (${onsiteRatesLine(rates)}). We’ll confirm timing and setup with you shortly.`
       : model === "complimentary"
         ? "This booking is complimentary. We’ll confirm timing and setup with you shortly."
         : `A ~${pct}% deposit locks your date. The remaining balance is due ${timing} — we’ll email a final payment link then.`;
@@ -224,12 +225,7 @@ export function bookingInquiryOpsEmail(input: {
   const when = input.startsAt
     ? format(input.startsAt, "EEE MMM d, h:mm a")
     : "TBD";
-  const model =
-    input.paymentModel === "pay_at_event"
-      ? "Pay at event"
-      : input.paymentModel === "complimentary"
-        ? "Complimentary"
-        : "Client deposit";
+  const model = paymentModelLabel(input.paymentModel);
   const html = layout({
     title: "New website inquiry",
     eyebrow: "Ops alert",
@@ -424,7 +420,7 @@ export function bookingConfirmedClientEmail(input: {
   const refill = rates.refillPriceCents / 100;
   const body =
     model === "pay_at_event"
-      ? `Your Oui Smoke booking is confirmed. Guests pay $${rates.onsiteUnitRate} (+$${refill} refills) or $${rates.onsiteUnlimitedRate} unlimited on site, plus HST — no client deposit was required.`
+      ? `Your Oui Smoke booking is confirmed. Guests pay $${rates.onsiteUnitRate} (+$${refill} refills) or $${rates.onsiteUnlimitedRate} unlimited on the floor, plus HST — no hosted deposit was required.`
       : model === "complimentary"
         ? "Your Oui Smoke booking is confirmed. This one is on us — we’re looking forward to hosting."
         : "Your Oui Smoke booking is confirmed. We’re looking forward to hosting.";

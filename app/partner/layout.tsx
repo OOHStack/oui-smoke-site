@@ -4,14 +4,14 @@ import "./partner.css";
 export const metadata: Metadata = {
   title: "Partner one-pager",
   description:
-    "Oui Smoke private event hookah catering for planners, hosts, and vendors across Toronto and the GTA. Pricing, packages, and booking.",
+    "Oui Smoke hosted and guest-pay hookah catering for planners, hosts, and vendors across Toronto and the GTA. Pricing, packages, and booking.",
   alternates: {
     canonical: "/partner",
   },
   openGraph: {
     title: "Oui Smoke · Partner one-pager",
     description:
-      "Full-service private event hookah catering — Toronto & GTA. Share-ready rates and booking links for industry partners.",
+      "Hosted and guest-pay hookah catering — Toronto & GTA. Share-ready rates and booking links for industry partners.",
     url: "/partner",
     images: [
       {
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Oui Smoke · Partner one-pager",
     description:
-      "Full-service private event hookah catering — Toronto & GTA.",
+      "Hosted and guest-pay hookah catering — Toronto & GTA.",
     images: ["/og-image.jpg"],
   },
 };

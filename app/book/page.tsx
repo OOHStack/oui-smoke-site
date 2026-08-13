@@ -189,7 +189,7 @@ function BookForm() {
       <section className="book__panel">
         <h1>Request received</h1>
         <p className="book__lede">
-          Thanks — your full-service package inquiry is in our queue
+          Thanks — your hosted catering inquiry is in our queue
           {promo ? ` with your ${promo.label.toLowerCase()}` : ""}.
         </p>
         <ol className="book__steps">
@@ -219,12 +219,12 @@ function BookForm() {
       <section className="book__panel">
         <h1>Request received</h1>
         <p className="book__lede">
-          Thanks — we’ll review hosting on-site sales at your event.
+          Thanks — we’ll review guest-pay catering at your event.
         </p>
         <ol className="book__steps">
           <li>We’ll confirm we can attend your date and venue.</li>
           <li>
-            No package deposit — guests pay ${pricing.onsiteUnitRate} (+$
+            No hosted deposit — guests pay ${pricing.onsiteUnitRate} (+$
             {refillDollars} refills) or ${pricing.onsiteUnlimitedRate}{" "}
             unlimited per unit, plus HST.
           </li>
@@ -252,7 +252,7 @@ function BookForm() {
         <div className="book__promo">
           <strong>{promo.label}</strong>
           <span>
-            Code <em>{promo.code}</em> applied to full-service package bookings.
+            Code <em>{promo.code}</em> applied to hosted bookings.
           </span>
         </div>
       ) : null}
@@ -260,7 +260,7 @@ function BookForm() {
       <input type="hidden" name="promoCode" value={promo ? promo.code : ""} />
 
       <fieldset className="book__engagement">
-        <legend>How should we work your event?</legend>
+        <legend>How do you want to cover the night?</legend>
         <label
           className={`book__choice${engagement === "package" ? " is-selected" : ""}`}
         >
@@ -271,10 +271,10 @@ function BookForm() {
             onChange={() => setEngagement("package")}
           />
           <span className="book__choice-body">
-            <strong>Full-service package</strong>
+            <strong>Hosted</strong>
             <span>
-              We deliver, set up, and host for a fixed package price. A deposit
-              locks your date.
+              You cover the night — guests smoke included. A deposit locks your
+              date.
             </span>
           </span>
         </label>
@@ -288,11 +288,11 @@ function BookForm() {
             onChange={() => setEngagement("on_site")}
           />
           <span className="book__choice-body">
-            <strong>On-site sales</strong>
+            <strong>Guest-pay</strong>
             <span>
-              We attend your event and sell to guests at ${pricing.onsiteUnitRate}{" "}
+              We cater; guests pay ${pricing.onsiteUnitRate}{" "}
               (+${refillDollars} refills) or ${pricing.onsiteUnlimitedRate}{" "}
-              unlimited, plus HST. No package deposit from you.
+              unlimited, plus HST. You don’t pay a hosted package.
             </span>
           </span>
         </label>
@@ -404,7 +404,7 @@ function BookForm() {
       {engagement === "package" && estimate ? (
         <aside className="book__estimate" aria-live="polite">
           <div className="book__estimate-head">
-            <span>Estimated package</span>
+            <span>Hosted estimate</span>
             <strong>{formatCad(estimate.total)}</strong>
           </div>
           <ul className="book__estimate-lines">
@@ -452,8 +452,8 @@ function BookForm() {
       {engagement === "on_site" ? (
         <aside className="book__estimate" aria-live="polite">
           <div className="book__estimate-head">
-            <span>On-site model</span>
-            <strong>Guest pay</strong>
+            <span>Guest-pay</span>
+            <strong>Guests cover it</strong>
           </div>
           <ul className="book__estimate-lines">
             <li>
@@ -469,7 +469,7 @@ function BookForm() {
             </li>
           </ul>
           <p className="book__estimate-note" style={{ margin: "0.65rem 0 0" }}>
-            No host package deposit. Guests choose a rate on the floor; HST (
+            No hosted deposit. Guests choose a rate on the floor; HST (
             {Math.round(pricing.hstRate * 100)}%) is added at charge. We’ll
             confirm we can staff your date.
           </p>
@@ -478,7 +478,7 @@ function BookForm() {
 
       {!engagement ? (
         <p className="book__estimate-hint">
-          Choose package or on-site sales to continue.
+          Choose hosted or guest-pay to continue.
         </p>
       ) : null}
 

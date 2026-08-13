@@ -119,6 +119,14 @@
               },
               {
                 "@type": "Question",
+                "name": "Can guests pay instead of a hosted package?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. Hosted catering means you cover a package and guests smoke included. Guest-pay catering means we staff the event and guests pay on the floor — you don’t pay a hosted package."
+                }
+              },
+              {
+                "@type": "Question",
                 "name": "Is there an age requirement?",
                 "acceptedAnswer": {
                   "@type": "Answer",
@@ -487,8 +495,8 @@
       <section class="section pricing" id="pricing" data-pricing-switch>
         <div class="section__inner">
           <p class="eyebrow">Within the GTA</p>
-          <h2 class="section__title" data-pricing-title>Package pricing</h2>
-          <div class="pricing-toggle" role="tablist" aria-label="How we price events">
+          <h2 class="section__title" data-pricing-title>Hosted catering</h2>
+          <div class="pricing-toggle" role="tablist" aria-label="How you want to cover the night">
             <button
               class="pricing-toggle__btn is-active"
               type="button"
@@ -499,7 +507,7 @@
               aria-selected="true"
               tabindex="0"
             >
-              Packages
+              Hosted
             </button>
             <button
               class="pricing-toggle__btn"
@@ -511,7 +519,7 @@
               aria-selected="false"
               tabindex="-1"
             >
-              On-site sales
+              Guest-pay
             </button>
           </div>
           <div
@@ -520,10 +528,10 @@
             role="tabpanel"
             data-pricing-panel="package"
             aria-labelledby="pricing-tab-package"
-            data-title="Package pricing"
+            data-title="Hosted catering"
           >
             <p class="section__lede">
-              Clear per-hookah rates for private event packages (minimum 4 units · <strong>$500</strong> package floor). Up to 4 hours included — extra hours $150 each. Travel outside the GTA on request.
+              You cover the night — guests smoke included. Clear per-hookah rates (minimum 4 units · <strong>$500</strong> floor). Up to 4 hours included — extra hours $150 each. Travel outside the GTA on request.
             </p>
             <div class="rate-table" role="table" aria-label="GTA package pricing">
               <div class="rate-row rate-row--head" role="row">
@@ -571,13 +579,13 @@
             role="tabpanel"
             data-pricing-panel="on_site"
             aria-labelledby="pricing-tab-onsite"
-            data-title="On-site sales"
+            data-title="Guest-pay catering"
             hidden
           >
             <p class="section__lede">
-              We attend with units and staff. Guests pay on the floor — no package deposit from you. Travel outside the GTA on request.
+              We cater. Guests pay on the floor — you don’t. Travel outside the GTA on request.
             </p>
-            <div class="rate-table" role="table" aria-label="On-site guest rates">
+            <div class="rate-table" role="table" aria-label="Guest-pay rates">
               <div class="rate-row rate-row--head" role="row">
                 <span role="columnheader">Guest rate</span>
                 <span role="columnheader">Per unit</span>
@@ -606,7 +614,7 @@
                 <span class="process-steps__num" aria-hidden="true">01</span>
                 <div class="process-steps__copy">
                   <strong>We attend</strong>
-                  <span>Units, flavours, and staff come to your venue. You don’t pay a package deposit.</span>
+                  <span>Units, flavours, and staff come to your venue. You don’t pay a hosted package.</span>
                 </div>
               </li>
               <li>
@@ -627,7 +635,7 @@
 
             <p class="fineprint">Guest rates are plus HST. We’ll confirm we can staff your date and venue. Extra staffing hours quoted if needed.</p>
             <div class="section__actions">
-              <a class="btn btn--solid" href="/book?type=on_site">Request on-site sales</a>
+              <a class="btn btn--solid" href="/book?type=on_site">Request guest-pay</a>
             </div>
           </div>
         </div>
@@ -668,7 +676,7 @@
           <p class="eyebrow">How booking works</p>
           <h2 class="section__title">From inquiry to a managed night</h2>
           <p class="section__lede">
-            Share your date and details, confirm package fit, then we handle delivery,
+            Share your date and details, confirm hosted or guest-pay, then we handle delivery,
             setup, staffing, and cleanup.
           </p>
           <ol class="process-steps">
@@ -682,8 +690,8 @@
             <li>
               <span class="process-steps__num" aria-hidden="true">02</span>
               <div class="process-steps__copy">
-                <strong>Confirm the package</strong>
-                <span>We check availability and lock the right structure for your event.</span>
+                <strong>Confirm the fit</strong>
+                <span>We check availability and lock hosted or guest-pay for your event.</span>
               </div>
             </li>
             <li>
@@ -763,6 +771,13 @@
               </p>
             </details>
             <details>
+              <summary>Can guests pay instead of a hosted package?</summary>
+              <p>
+                Yes. <strong>Hosted</strong> means you cover a package and guests smoke included.
+                <strong>Guest-pay</strong> means we staff the event and guests pay on the floor — you don’t.
+              </p>
+            </details>
+            <details>
               <summary>Is there an age requirement?</summary>
               <p>
                 Oui Smoke is an adult-oriented service. Guests must meet applicable legal age
@@ -784,7 +799,7 @@
           <p class="eyebrow">Let’s build your event</p>
           <h2 class="section__title">Ready when you are</h2>
           <p class="section__lede">
-            Tell us the date, guest count, and vibe — we’ll craft a package around it.
+            Tell us the date, guest count, and vibe — hosted or guest-pay, we’ll shape the night around it.
           </p>
           <div class="contact__links">
             <button class="btn btn--solid" type="button" data-open-calculator>

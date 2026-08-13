@@ -110,15 +110,15 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
   return (
     <section className="partner-estimate" aria-label="Event estimate">
       <div className="partner-estimate__head">
-        <h2>{isPackage ? "Estimate your event" : "Plan on-site sales"}</h2>
+        <h2>{isPackage ? "Estimate your event" : "Plan guest-pay"}</h2>
         <p>
           {isPackage
             ? `From ${formatCad(pricing.minPackageDollars)} · min ${pricing.minPackageHookahs} hookahs · up to ${pricing.includedHours} hrs included · $${pricing.extraHourRate}/extra hour · HST in total.`
-            : "We staff your event and sell to guests. No host package deposit — set units and hours for the request."}
+            : "We staff your event. Guests pay on the floor — no hosted deposit. Set units and hours for the request."}
         </p>
       </div>
 
-      <div className="partner-mode" role="tablist" aria-label="Booking type">
+      <div className="partner-mode" role="tablist" aria-label="How you want to cover the night">
         <button
           type="button"
           role="tab"
@@ -126,7 +126,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
           className={`partner-mode__btn${isPackage ? " is-active" : ""}`}
           onClick={() => onModeChange("package")}
         >
-          Package
+          Hosted
         </button>
         <button
           type="button"
@@ -135,7 +135,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
           className={`partner-mode__btn${!isPackage ? " is-active" : ""}`}
           onClick={() => onModeChange("on_site")}
         >
-          On-site sales
+          Guest-pay
         </button>
       </div>
 
@@ -361,7 +361,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
         >
           <div className="partner-estimate__total">
             <span>Host cost</span>
-            <strong>Guest pay</strong>
+            <strong>Guest-pay</strong>
           </div>
           <ul className="partner-estimate__lines">
             <li>
@@ -384,7 +384,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
               <span>${pricing.onsiteUnlimitedRate} + HST / unit</span>
             </li>
             <li className="partner-estimate__lines--muted">
-              <span>Package deposit</span>
+              <span>Hosted deposit</span>
               <span>None</span>
             </li>
           </ul>
@@ -401,7 +401,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
 
       <div className="partner-estimate__cta">
         <a className="partner-estimate__book" href={bookHref}>
-          {isPackage ? "Book this estimate" : "Request on-site sales"}
+          {isPackage ? "Book this estimate" : "Request guest-pay"}
         </a>
         <a className="partner-estimate__mail" href="mailto:contact@ouismoke.co">
           Or email the brief

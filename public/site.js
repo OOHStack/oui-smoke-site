@@ -50,9 +50,9 @@
 
   const params = new URLSearchParams(window.location.search);
   const hash = window.location.hash.replace(/^#/, "");
-  if (params.get("type") === "on_site" || hash === "on-site") {
+  if (params.get("type") === "on_site" || hash === "on-site" || hash === "guest-pay") {
     setMode("on_site");
-    if (hash === "on-site") {
+    if (hash === "on-site" || hash === "guest-pay") {
       root.scrollIntoView();
     }
   }

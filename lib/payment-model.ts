@@ -7,18 +7,18 @@ export const PAYMENT_MODELS: Array<{
 }> = [
   {
     value: "client_deposit",
-    label: "Client deposit",
-    hint: "Private / corporate bookings — Square deposit to confirm",
+    label: "Hosted",
+    hint: "Host covers the night — Square deposit to confirm",
   },
   {
     value: "pay_at_event",
-    label: "Pay at event",
-    hint: "Guests pay on the floor (refills/terminal) — no client deposit",
+    label: "Guest-pay",
+    hint: "Guests pay on the floor — no hosted deposit",
   },
   {
     value: "complimentary",
     label: "Complimentary",
-    hint: "House / partner / marketing — no client package charge",
+    hint: "House / partner / marketing — no host charge",
   },
 ];
 
@@ -35,5 +35,5 @@ export function requiresClientDeposit(model: PaymentModel | string | null | unde
 
 export function paymentModelLabel(model: PaymentModel | string | null | undefined) {
   const value = normalizePaymentModel(model);
-  return PAYMENT_MODELS.find((m) => m.value === value)?.label ?? "Client deposit";
+  return PAYMENT_MODELS.find((m) => m.value === value)?.label ?? "Hosted";
 }

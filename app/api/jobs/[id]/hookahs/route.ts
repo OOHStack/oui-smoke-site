@@ -344,7 +344,7 @@ export async function POST(request: Request, context: RouteContext) {
             } else {
               return NextResponse.json(
                 {
-                  error: "Choose Standard or Unlimited guest pay before sending out",
+                  error: "Choose Standard or Unlimited guest-pay before sending out",
                   code: "NEED_GUEST_TIER",
                 },
                 { status: 409 },
@@ -526,7 +526,7 @@ export async function POST(request: Request, context: RouteContext) {
           } else {
             return NextResponse.json(
               {
-                error: "Choose Standard or Unlimited guest pay before sending out",
+                error: "Choose Standard or Unlimited guest-pay before sending out",
                 code: "NEED_GUEST_TIER",
               },
               { status: 409 },
@@ -1225,7 +1225,7 @@ export async function POST(request: Request, context: RouteContext) {
           jobId,
           jobHookahId: assignmentId,
           type: "note",
-          message: `Guest pay set · ${guestPayTierLabel(tier)}`,
+          message: `Guest-pay set · ${guestPayTierLabel(tier)}`,
           createdBy: session.name,
         });
 
@@ -1339,7 +1339,7 @@ export async function POST(request: Request, context: RouteContext) {
         }
         if (!isGuestPayTier(assignment.guestPayTier)) {
           return NextResponse.json(
-            { error: "Set guest pay tier first", code: "NEED_GUEST_TIER" },
+            { error: "Set guest-pay tier first", code: "NEED_GUEST_TIER" },
             { status: 409 },
           );
         }

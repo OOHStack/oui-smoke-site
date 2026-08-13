@@ -22,13 +22,13 @@ export function getOpsNightOfPlaybook(
   const hstPct = Math.round(pricing.hstRate * 100);
   return {
     title: "Event-day playbook",
-    subtitle: "Floor lead process for guest pay, refills, and QR failures.",
+    subtitle: "Floor lead process for guest-pay, refills, and QR failures.",
     sections: [
       {
         id: "guest-pay",
-        title: `Guest pay — who collects $${pricing.onsiteUnitRate} vs $${pricing.onsiteUnlimitedRate} (+ ${hstPct}% HST)`,
+        title: `Guest-pay — who collects $${pricing.onsiteUnitRate} vs $${pricing.onsiteUnlimitedRate} (+ ${hstPct}% HST)`,
         intro:
-          "Package / client-deposit jobs skip this menu — the client already paid. Use this only for Pay at event.",
+          "Hosted jobs skip this menu — the client already paid. Use this only for guest-pay.",
         bullets: [
           `Owner: the person with the Square terminal (floor lead). Runners do not negotiate rates.`,
           `When: at send-out (Ready → On the floor). Tap Send as Standard or Send as Unlimited before the unit leaves.`,

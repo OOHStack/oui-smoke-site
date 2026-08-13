@@ -22,7 +22,7 @@ const REASON_MESSAGES: Record<string, string> = {
   terminal_not_configured:
     "Square Terminal isn’t configured. Set SQUARE_TERMINAL_DEVICE_ID (paired device).",
   not_client_deposit:
-    "This job doesn’t use client deposits. Switch payment model to “Client deposit”.",
+    "This job isn’t hosted. Switch the payment model to “Hosted” to collect a deposit.",
   deposit_link_open:
     "A deposit payment is already open. Finish or cancel it in the ledger first.",
   deposit_already_paid: "Deposit already paid. Collect the balance instead.",

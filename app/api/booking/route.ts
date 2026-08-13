@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   }
   if (engagement !== "package" && engagement !== "on_site") {
     return NextResponse.json(
-      { error: "Please choose package or on-site sales" },
+      { error: "Please choose hosted or guest-pay" },
       { status: 400 },
     );
   }
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
   }
 
   const engagementLabel =
-    paymentModel === "pay_at_event" ? "On-site sales" : "Full-service package";
+    paymentModel === "pay_at_event" ? "Guest-pay" : "Hosted";
 
   const titleParts = [engagementLabel, eventType || "Event", clientName].filter(
     Boolean,

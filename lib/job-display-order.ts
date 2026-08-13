@@ -61,7 +61,7 @@ export async function placeFloorDisplayOrder(
   if (paymentModel !== "pay_at_event") {
     return {
       ok: false,
-      error: "Self-order is only available for on-site sales events",
+      error: "Self-order is only available for guest-pay events",
       status: 400,
     };
   }

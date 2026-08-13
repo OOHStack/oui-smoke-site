@@ -37,13 +37,13 @@ export default function PartnerToolbar({ mode = "package" }: Props) {
 
   const shareTitle =
     mode === "on_site"
-      ? "Oui Smoke · On-site sales"
-      : "Oui Smoke · Partner one-pager";
+      ? "Oui Smoke · Guest-pay catering"
+      : "Oui Smoke · Hosted catering";
 
   const shareText =
     mode === "on_site"
-      ? "On-site hookah sales for events — guests pay on the floor, no host package deposit."
-      : "Private event hookah catering for planners, hosts & vendors — Toronto & GTA rates.";
+      ? "Guest-pay hookah catering — guests pay on the floor, no hosted deposit."
+      : "Hosted hookah catering for planners, hosts & vendors — Toronto & GTA rates.";
 
   useEffect(() => {
     setNativeShare(

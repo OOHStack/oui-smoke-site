@@ -216,8 +216,8 @@ export default function AdminPaymentsPage() {
         paidCount === 0
           ? "None settled yet"
           : paidCount === 1
-            ? "Package fully paid"
-            : "Packages fully paid",
+            ? "Hosted job fully paid"
+            : "Hosted jobs fully paid",
       filterId: "paid_in_full",
       tone: paidCount > 0 ? "done" : "todo",
     },
@@ -228,7 +228,7 @@ export default function AdminPaymentsPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Payments</h1>
-          <p className="page-sub">Track package deposits and balances</p>
+          <p className="page-sub">Track hosted deposits and balances</p>
         </div>
       </div>
 
@@ -236,14 +236,14 @@ export default function AdminPaymentsPage() {
       {msg ? <p className="collect-toast">{msg}</p> : null}
 
       <section className="panel collect-hero">
-        <p className="collect-hero__kicker">Package payments</p>
+        <p className="collect-hero__kicker">Hosted payments</p>
         <h2 className="collect-hero__title">
           {counts
             ? counts.attention > 0
               ? `${counts.attention} job${counts.attention === 1 ? "" : "s"} need collecting`
               : packageCount > 0
-                ? "All packages settled"
-                : "No package jobs yet"
+                ? "All hosted jobs settled"
+                : "No hosted jobs yet"
             : "Payments"}
         </h2>
         <p className="collect-hero__body">

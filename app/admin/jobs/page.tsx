@@ -48,8 +48,8 @@ function jobPricingLabel(job: JobRow): { amount: string; model: string } {
   }
   if (model === "pay_at_event") {
     return {
-      amount: due > 0 ? formatCadCents(due) : "Guest pay",
-      model: due > 0 ? "Guest pay · estimate" : "On-site sales",
+      amount: due > 0 ? formatCadCents(due) : "Guest-pay",
+      model: due > 0 ? "Guest-pay · estimate" : "Guest-pay",
     };
   }
   if (due > 0) {
@@ -58,7 +58,7 @@ function jobPricingLabel(job: JobRow): { amount: string; model: string } {
       model: job.actualCents != null ? "Final" : "Quoted",
     };
   }
-  return { amount: "No quote", model: "Client deposit" };
+  return { amount: "No quote", model: "Hosted" };
 }
 
 const STATUSES = ["all", "draft", "confirmed", "active", "completed", "cancelled"];

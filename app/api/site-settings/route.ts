@@ -32,7 +32,7 @@ export async function PATCH(request: Request) {
 
   if (next.onsiteUnitRate <= 0 || next.onsiteUnlimitedRate <= 0) {
     return NextResponse.json(
-      { error: "On-site rates must be greater than 0" },
+      { error: "Guest-pay rates must be greater than 0" },
       { status: 400 },
     );
   }

@@ -1339,7 +1339,7 @@ export default function JobDetailPage() {
                       ? formatCadCents(job.paymentSummary.dueCents)
                       : job.quotedCents != null && job.quotedCents > 0
                         ? formatCadCents(job.quotedCents)
-                        : "Guest pay"}
+                        : "Guest-pay"}
                   </button>
                 ) : job.paymentSummary && job.paymentSummary.dueCents > 0 ? (
                   formatCadCents(job.paymentSummary.dueCents)
@@ -1999,7 +1999,7 @@ export default function JobDetailPage() {
               </p>
               <ul className="page-sub" style={{ margin: "0 0 1rem", paddingLeft: "1.1rem" }}>
                 <li>Restages all hookahs and releases fleet units</li>
-                <li>Clears flavours, guest pay tiers, and guest QR tokens</li>
+                <li>Clears flavours, guest-pay tiers, and guest QR tokens</li>
                 <li>Deletes guest ledger / payment rows for this job</li>
                 <li>Deletes guest calls, refills, photos, and activity log</li>
                 <li>Clears tip split, feedback, and job outcome</li>
@@ -2633,7 +2633,7 @@ function HookahModal({
       return false;
     }
     if (needsGuestTier && !a.guestPayTier) {
-      setFormError("Choose Standard or Unlimited guest pay before sending out");
+      setFormError("Choose Standard or Unlimited guest-pay before sending out");
       return false;
     }
     return true;
@@ -2789,7 +2789,7 @@ function HookahModal({
 
         {paymentModel === "pay_at_event" ? (
           <section className="hookah-modal__section">
-            <h3 className="hookah-modal__section-title">Guest pay tier</h3>
+            <h3 className="hookah-modal__section-title">Guest-pay tier</h3>
             <p className="hookah-modal__hint">
               Required before send-out. Catalog rates exclude HST — Square adds{" "}
               {Math.round(pricing.hstRate * 100)}% at charge. Standard refills $

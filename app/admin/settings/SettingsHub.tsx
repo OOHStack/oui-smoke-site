@@ -720,7 +720,7 @@ export default function SettingsHub() {
           {pricingDraft ? (
             <form className="form" onSubmit={saveRates}>
               <h3 className="panel-title" style={{ fontSize: "0.95rem" }}>
-                On-site sales
+                Guest-pay
               </h3>
               <div className="form-row form-row-2">
                 <div className="field">
@@ -1178,7 +1178,7 @@ export default function SettingsHub() {
                 />
                 <span>
                   <strong>Auto-email deposit on website booking</strong>
-                  <em>When a package inquiry includes an estimate</em>
+                  <em>When a hosted inquiry includes an estimate</em>
                 </span>
               </label>
 

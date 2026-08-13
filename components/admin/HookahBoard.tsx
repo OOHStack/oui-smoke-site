@@ -428,7 +428,7 @@ export default function HookahBoard({
         } else if (result.code === "NEED_GUEST_TIER") {
           onOpen(
             assignmentId,
-            "Choose Standard ($80) or Unlimited ($100) guest pay, then send out.",
+            "Choose Standard ($80) or Unlimited ($100) guest-pay, then send out.",
           );
         } else if (result.code === "NEED_RETURN") {
           onOpen(

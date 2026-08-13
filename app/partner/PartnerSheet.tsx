@@ -193,13 +193,13 @@ export default function PartnerSheet() {
             <p className="partner-hero__eyebrow">For planners · hosts · vendors</p>
             <h1 className="partner-hero__title">
               {isPackage
-                ? "Private event hookah catering"
-                : "On-site hookah sales"}
+                ? "Hosted catering"
+                : "Guest-pay catering"}
             </h1>
             <p className="partner-hero__lede">
               {isPackage
-                ? "Full-service delivery, setup, staff, and teardown for private celebrations across Toronto and the GTA."
-                : `We bring units and staff — guests pay $${pricing.onsiteUnitRate} (+$${refillPriceDollars} refills) or $${pricing.onsiteUnlimitedRate} unlimited, plus HST. No host package deposit.`}
+                ? "You cover the night — guests smoke included. Delivery, setup, staff, and teardown across Toronto and the GTA."
+                : `We cater. Guests pay $${pricing.onsiteUnitRate} (+$${refillPriceDollars} refills) or $${pricing.onsiteUnlimitedRate} unlimited, plus HST. You don’t pay a hosted package.`}
             </p>
             <a className="partner-hero__jump no-print" href="#estimate">
               {isPackage ? "Build an estimate" : "Plan staffing"}
@@ -231,7 +231,7 @@ export default function PartnerSheet() {
             </figure>
 
             <section className="partner-aside__include">
-              <h2>{isPackage ? "What’s included" : "How on-site works"}</h2>
+              <h2>{isPackage ? "What’s included" : "How guest-pay works"}</h2>
               {isPackage ? (
                 <ul>
                   <li>Premium units + flavours</li>
@@ -251,7 +251,7 @@ export default function PartnerSheet() {
                   <li>
                     Or ${pricing.onsiteUnlimitedRate} / unit with unlimited refills
                   </li>
-                  <li>No host package deposit</li>
+                  <li>No hosted deposit</li>
                   <li>Floor ops handled by our team</li>
                 </ul>
               )}
@@ -274,8 +274,8 @@ export default function PartnerSheet() {
           <div className="partner-rates__head">
             <h2>
               {isPackage
-                ? "GTA package rates"
-                : "Guest rates on the floor"}
+                ? "GTA hosted rates"
+                : "Guest-pay rates"}
             </h2>
             <p>
               {isPackage
@@ -334,7 +334,7 @@ export default function PartnerSheet() {
               </>
             ) : (
               <>
-                Host pays nothing up front — guests settle on site at $
+                No hosted deposit — guests settle on site at $
                 {pricing.onsiteUnitRate} or ${pricing.onsiteUnlimitedRate} + HST.
                 Extra staffing hours quoted if needed.
               </>

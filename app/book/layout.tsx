@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Book an event",
   description:
-    "Request a Oui Smoke hookah catering package for your private or corporate event in Toronto and the GTA. Tell us the date, guest count, and vibe.",
+    "Request hosted or guest-pay hookah catering for your private or corporate event in Toronto and the GTA. Tell us the date, guest count, and vibe.",
   alternates: {
     canonical: "/book",
   },

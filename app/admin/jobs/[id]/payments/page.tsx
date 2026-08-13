@@ -514,7 +514,7 @@ export default function JobPaymentsPage() {
           <p className="collect-hero__kicker">Payment model</p>
           <h2 className="collect-hero__title">{paymentModelLabel(model)}</h2>
           <p className="collect-hero__body">
-            This job doesn’t use Square package deposits. Guests pay on the floor,
+            This job doesn’t use Square hosted deposits. Guests pay on the floor,
             or the booking is complimentary.
           </p>
           <button

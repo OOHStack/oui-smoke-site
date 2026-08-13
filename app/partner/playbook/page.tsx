@@ -7,7 +7,7 @@ import PlaybookDocument from "@/components/PlaybookDocument";
 export const metadata: Metadata = {
   title: "Event day · Oui Smoke",
   description:
-    "What hosts and partners should expect at Oui Smoke on-site sales events.",
+    "What hosts and partners should expect at Oui Smoke guest-pay events.",
   robots: { index: false, follow: false },
   alternates: { canonical: "/partner/playbook" },
 };

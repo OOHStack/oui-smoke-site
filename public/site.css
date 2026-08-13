@@ -1359,6 +1359,10 @@ code {
   outline: none;
 }
 
+.pricing .section__title {
+  max-width: 18ch;
+}
+
 .pricing-panel[hidden] {
   display: none;
 }

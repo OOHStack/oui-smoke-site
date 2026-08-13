@@ -209,7 +209,7 @@ export default function JobDisplayPage() {
           <div className="jdisplay__top-copy">
             <p className="jdisplay__kicker">
               {board.mode === "onsite"
-                ? "On-site sales"
+                ? "Guest rates"
                 : board.mode === "comp"
                   ? "Complimentary"
                   : "Private event"}
