@@ -8,7 +8,7 @@ export const PAYMENT_MODELS: Array<{
   {
     value: "client_deposit",
     label: "Hosted",
-    hint: "Host covers the night — Square deposit to confirm",
+    hint: "Host covers the event — Square deposit to confirm",
   },
   {
     value: "pay_at_event",

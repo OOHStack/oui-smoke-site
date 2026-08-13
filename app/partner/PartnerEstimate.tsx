@@ -118,7 +118,7 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
         </p>
       </div>
 
-      <div className="partner-mode" role="tablist" aria-label="How you want to cover the night">
+      <div className="partner-mode" role="tablist" aria-label="How you want to cover the event">
         <button
           type="button"
           role="tab"

@@ -198,7 +198,7 @@ export default function PartnerSheet() {
             </h1>
             <p className="partner-hero__lede">
               {isPackage
-                ? "You cover the night — guests smoke included. Delivery, setup, staff, and teardown across Toronto and the GTA."
+                ? "You cover the event — guests smoke included. Delivery, setup, staff, and teardown across Toronto and the GTA."
                 : `We cater. Guests pay $${pricing.onsiteUnitRate} (+$${refillPriceDollars} refills) or $${pricing.onsiteUnlimitedRate} unlimited, plus HST. You don’t pay a hosted package.`}
             </p>
             <a className="partner-hero__jump no-print" href="#estimate">

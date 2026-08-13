@@ -260,7 +260,7 @@ function BookForm() {
       <input type="hidden" name="promoCode" value={promo ? promo.code : ""} />
 
       <fieldset className="book__engagement">
-        <legend>How do you want to cover the night?</legend>
+        <legend>How do you want to cover the event?</legend>
         <label
           className={`book__choice${engagement === "package" ? " is-selected" : ""}`}
         >
@@ -273,7 +273,7 @@ function BookForm() {
           <span className="book__choice-body">
             <strong>Hosted</strong>
             <span>
-              You cover the night — guests smoke included. A deposit locks your
+              You cover the event — guests smoke included. A deposit locks your
               date.
             </span>
           </span>
