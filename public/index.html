@@ -484,51 +484,151 @@
         </div>
       </section>
 
-      <section class="section pricing" id="pricing">
+      <section class="section pricing" id="pricing" data-pricing-switch>
         <div class="section__inner">
           <p class="eyebrow">Within the GTA</p>
-          <h2 class="section__title">Package pricing</h2>
-          <p class="section__lede">
-            Clear per-hookah rates for private event packages (minimum 4 units · <strong>$500</strong> package floor). Up to 4 hours included — extra hours $150 each. Travel outside the GTA on request.
-          </p>
+          <h2 class="section__title" data-pricing-title>Package pricing</h2>
+          <div class="pricing-toggle" role="tablist" aria-label="How we price events">
+            <button
+              class="pricing-toggle__btn is-active"
+              type="button"
+              role="tab"
+              id="pricing-tab-package"
+              data-pricing-tab="package"
+              aria-controls="pricing-panel-package"
+              aria-selected="true"
+              tabindex="0"
+            >
+              Packages
+            </button>
+            <button
+              class="pricing-toggle__btn"
+              type="button"
+              role="tab"
+              id="pricing-tab-onsite"
+              data-pricing-tab="on_site"
+              aria-controls="pricing-panel-onsite"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              On-site sales
+            </button>
+          </div>
+          <div
+            class="pricing-panel"
+            id="pricing-panel-package"
+            role="tabpanel"
+            data-pricing-panel="package"
+            aria-labelledby="pricing-tab-package"
+            data-title="Package pricing"
+          >
+            <p class="section__lede">
+              Clear per-hookah rates for private event packages (minimum 4 units · <strong>$500</strong> package floor). Up to 4 hours included — extra hours $150 each. Travel outside the GTA on request.
+            </p>
+            <div class="rate-table" role="table" aria-label="GTA package pricing">
+              <div class="rate-row rate-row--head" role="row">
+                <span role="columnheader">Package</span>
+                <span role="columnheader">Per hookah</span>
+                <span role="columnheader">Refills</span>
+              </div>
+              <div class="rate-row" role="row">
+                <div role="cell">
+                  <strong>4 hookahs</strong>
+                  <span>Package minimum · 1 refill included</span>
+                </div>
+                <div role="cell" class="rate-row__price">$500</div>
+                <div role="cell">$30 each after</div>
+              </div>
+              <div class="rate-row" role="row">
+                <div role="cell">
+                  <strong>5 – 8 hookahs</strong>
+                  <span>Unlimited refills</span>
+                </div>
+                <div role="cell" class="rate-row__price">$95</div>
+                <div role="cell">Unlimited</div>
+              </div>
+              <div class="rate-row" role="row">
+                <div role="cell">
+                  <strong>9+ hookahs</strong>
+                  <span>Unlimited refills</span>
+                </div>
+                <div role="cell" class="rate-row__price">$85</div>
+                <div role="cell">Unlimited</div>
+              </div>
+            </div>
 
-          <div class="rate-table" role="table" aria-label="GTA hookah pricing">
-            <div class="rate-row rate-row--head" role="row">
-              <span role="columnheader">Package</span>
-              <span role="columnheader">Per hookah</span>
-              <span role="columnheader">Refills</span>
-            </div>
-            <div class="rate-row" role="row">
-              <div role="cell">
-                <strong>4 hookahs</strong>
-                <span>Package minimum · 1 refill included</span>
-              </div>
-              <div role="cell" class="rate-row__price">$500</div>
-              <div role="cell">$30 each after</div>
-            </div>
-            <div class="rate-row" role="row">
-              <div role="cell">
-                <strong>5 – 8 hookahs</strong>
-                <span>Unlimited refills</span>
-              </div>
-              <div role="cell" class="rate-row__price">$95</div>
-              <div role="cell">Unlimited</div>
-            </div>
-            <div class="rate-row" role="row">
-              <div role="cell">
-                <strong>9+ hookahs</strong>
-                <span>Unlimited refills</span>
-              </div>
-              <div role="cell" class="rate-row__price">$85</div>
-              <div role="cell">Unlimited</div>
+            <p class="fineprint">All packages start at $500 within the GTA (whichever is higher: package floor or per-hookah total). Up to 4 hours included. Additional hours are $150 each. Modifications quoted on request.</p>
+            <div class="section__actions">
+              <button class="btn btn--solid" type="button" data-open-calculator>
+                Calculate my cost
+              </button>
             </div>
           </div>
 
-          <p class="fineprint">All packages start at $500 within the GTA (whichever is higher: package floor or per-hookah total). Up to 4 hours included. Additional hours are $150 each. Modifications quoted on request.</p>
-          <div class="section__actions">
-            <button class="btn btn--solid" type="button" data-open-calculator>
-              Calculate my cost
-            </button>
+          <div
+            class="pricing-panel"
+            id="pricing-panel-onsite"
+            role="tabpanel"
+            data-pricing-panel="on_site"
+            aria-labelledby="pricing-tab-onsite"
+            data-title="On-site sales"
+            hidden
+          >
+            <p class="section__lede">
+              We attend with units and staff. Guests pay on the floor — no package deposit from you. Travel outside the GTA on request.
+            </p>
+            <div class="rate-table" role="table" aria-label="On-site guest rates">
+              <div class="rate-row rate-row--head" role="row">
+                <span role="columnheader">Guest rate</span>
+                <span role="columnheader">Per unit</span>
+                <span role="columnheader">Refills</span>
+              </div>
+              <div class="rate-row" role="row">
+                <div role="cell">
+                  <strong>Standard</strong>
+                  <span>Guests pay on the floor + HST</span>
+                </div>
+                <div role="cell" class="rate-row__price">$80</div>
+                <div role="cell">$30 each + HST</div>
+              </div>
+              <div class="rate-row" role="row">
+                <div role="cell">
+                  <strong>Unlimited</strong>
+                  <span>Flavour refills included + HST</span>
+                </div>
+                <div role="cell" class="rate-row__price">$100</div>
+                <div role="cell">Unlimited</div>
+              </div>
+            </div>
+
+            <ol class="process-steps onsite-how">
+              <li>
+                <span class="process-steps__num" aria-hidden="true">01</span>
+                <div class="process-steps__copy">
+                  <strong>We attend</strong>
+                  <span>Units, flavours, and staff come to your venue. You don’t pay a package deposit.</span>
+                </div>
+              </li>
+              <li>
+                <span class="process-steps__num" aria-hidden="true">02</span>
+                <div class="process-steps__copy">
+                  <strong>Guests choose</strong>
+                  <span>Standard with paid refills, or Unlimited for the event — they pick on the floor.</span>
+                </div>
+              </li>
+              <li>
+                <span class="process-steps__num" aria-hidden="true">03</span>
+                <div class="process-steps__copy">
+                  <strong>We collect &amp; run service</strong>
+                  <span>Staff take card or cash (including HST), then handle setup, checks, and teardown.</span>
+                </div>
+              </li>
+            </ol>
+
+            <p class="fineprint">Guest rates are plus HST. We’ll confirm we can staff your date and venue. Extra staffing hours quoted if needed.</p>
+            <div class="section__actions">
+              <a class="btn btn--solid" href="/book?type=on_site">Request on-site sales</a>
+            </div>
           </div>
         </div>
       </section>

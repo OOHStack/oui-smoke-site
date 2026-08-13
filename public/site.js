@@ -1,4 +1,64 @@
 (() => {
+  const root = document.querySelector("[data-pricing-switch]");
+  if (!root) return;
+
+  const title = root.querySelector("[data-pricing-title]");
+  const tablist = root.querySelector('[role="tablist"]');
+  const tabs = Array.from(root.querySelectorAll("[data-pricing-tab]"));
+  const panels = Array.from(root.querySelectorAll("[data-pricing-panel]"));
+
+  function setMode(mode) {
+    const next = panels.find((panel) => panel.getAttribute("data-pricing-panel") === mode);
+    if (!next) return;
+
+    tabs.forEach((tab) => {
+      const on = tab.getAttribute("data-pricing-tab") === mode;
+      tab.classList.toggle("is-active", on);
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+      tab.tabIndex = on ? 0 : -1;
+    });
+
+    panels.forEach((panel) => {
+      panel.hidden = panel.getAttribute("data-pricing-panel") !== mode;
+    });
+
+    if (title) {
+      title.textContent = next.getAttribute("data-title") || title.textContent;
+    }
+
+    if (typeof ScrollTrigger !== "undefined") {
+      ScrollTrigger.refresh();
+    }
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      setMode(tab.getAttribute("data-pricing-tab"));
+    });
+  });
+
+  tablist?.addEventListener("keydown", (event) => {
+    const index = tabs.indexOf(document.activeElement);
+    if (index < 0) return;
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    event.preventDefault();
+    const offset = event.key === "ArrowRight" ? 1 : tabs.length - 1;
+    const next = tabs[(index + offset) % tabs.length];
+    next.focus();
+    setMode(next.getAttribute("data-pricing-tab"));
+  });
+
+  const params = new URLSearchParams(window.location.search);
+  const hash = window.location.hash.replace(/^#/, "");
+  if (params.get("type") === "on_site" || hash === "on-site") {
+    setMode("on_site");
+    if (hash === "on-site") {
+      root.scrollIntoView();
+    }
+  }
+})();
+
+(() => {
   if (typeof gsap === "undefined") return;
 
   gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
@@ -21,6 +81,7 @@
         ".eyebrow",
         ".section__title",
         ".section__lede",
+        ".pricing-toggle",
         ".pillars li",
         ".rate-row",
         ".addon-list li",
@@ -214,7 +275,12 @@
 
     // —— One-shot section reveals (no reverse = no scroll flicker) ——
     document.querySelectorAll(".section").forEach((section) => {
-      reveal(section.querySelectorAll(".eyebrow, .section__title, .section__lede"), {
+      const intro = Array.from(
+        section.querySelectorAll(
+          ".eyebrow, .section__title, .pricing-toggle, .section__lede",
+        ),
+      ).filter((el) => !el.closest("[hidden]"));
+      reveal(intro, {
         trigger: section,
         start: "top 80%",
         y: 24,
@@ -228,8 +294,20 @@
       y: 18,
       stagger: 0.06,
     });
-    reveal(".rate-row", { trigger: ".rate-table", y: 18, stagger: 0.07 });
-    reveal(".fineprint", { trigger: ".fineprint", y: 12 });
+    reveal(".pricing-panel:not([hidden]) .rate-row", {
+      trigger: ".pricing-panel:not([hidden]) .rate-table",
+      y: 18,
+      stagger: 0.07,
+    });
+    reveal(".pricing-panel:not([hidden]) .fineprint", {
+      trigger: ".pricing-panel:not([hidden]) .fineprint",
+      y: 12,
+    });
+    reveal(".pricing-panel:not([hidden]) .onsite-how li", {
+      trigger: ".pricing-panel:not([hidden]) .onsite-how",
+      y: 16,
+      stagger: 0.06,
+    });
     reveal(".addon-list li", { trigger: ".addon-list", y: 18, stagger: 0.06 });
     reveal(".playlist__embed", { trigger: ".playlist__embed", y: 20 });
     // Contact / footer: opacity only — y transforms near page end inflate mobile scroll height

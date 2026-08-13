@@ -1321,6 +1321,53 @@ code {
   border-block: 1px solid var(--line);
 }
 
+.pricing-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+  width: min(100%, 22.5rem);
+  margin: 1.15rem 0 0;
+  padding: 0.28rem;
+  background: rgba(10, 9, 8, 0.35);
+  border: 1px solid var(--line);
+}
+
+.pricing-toggle__btn {
+  min-height: 2.55rem;
+  padding: 0.45rem 0.7rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink-mute);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 200ms var(--ease), color 200ms var(--ease);
+}
+
+.pricing-toggle__btn.is-active {
+  background: var(--ink);
+  color: #111;
+}
+
+.pricing-toggle__btn:not(.is-active):hover,
+.pricing-toggle__btn:not(.is-active):focus-visible {
+  color: var(--ink);
+  background: rgba(247, 244, 239, 0.06);
+  outline: none;
+}
+
+.pricing-panel[hidden] {
+  display: none;
+}
+
+.onsite-how {
+  margin-top: 0;
+  border-top: 0;
+}
+
 .rate-table {
   margin-top: clamp(2rem, 5vh, 3.25rem);
   display: grid;
