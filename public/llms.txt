@@ -6,7 +6,8 @@
 - Website: https://ouismoke.co/
 - Contact: contact@ouismoke.co
 - Booking: https://ouismoke.co/book
-- Partner one-pager: https://ouismoke.co/partner
+- Partner hosted one-pager: https://ouismoke.co/partner
+- Partner guest-pay one-pager: https://ouismoke.co/partner/guest-pay
 - Privacy: https://ouismoke.co/privacy
 - Terms: https://ouismoke.co/terms
 - Accessibility: https://ouismoke.co/accessibility
@@ -16,4 +17,4 @@ Notes:
 - Adult-oriented service; Ontario legal age requirements apply (19+).
 - Do not invent reviews, ratings, certifications, or health claims.
 
-Last updated: 2026-07-20
+Last updated: 2026-08-14

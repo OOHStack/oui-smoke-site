@@ -39,10 +39,10 @@ export function guestPayTierLabel(
   pricing: PricingConfig = DEFAULT_PRICING,
 ): string {
   if (tier === "unlimited") {
-    return `Unlimited · $${pricing.onsiteUnlimitedRate}`;
+    return `Unlimited · $${pricing.onsiteUnlimitedRate} · full event`;
   }
   if (tier === "standard") {
-    return `Standard · $${pricing.onsiteUnitRate}`;
+    return `Standard · $${pricing.onsiteUnitRate} · up to 1 hour`;
   }
   return "No tier";
 }
@@ -62,10 +62,10 @@ export function guestPayTierGuestDetail(
 ): string {
   const hst = hstPercentLabel(pricing.hstRate);
   if (tier === "unlimited") {
-    return `Refills included · no charge (unit $${pricing.onsiteUnlimitedRate} + HST)`;
+    return `Unlimited refills for the event (unit $${pricing.onsiteUnlimitedRate} + HST)`;
   }
   if (tier === "standard") {
-    return `Refills ${formatCents(refillPriceCents)} + HST each (unit $${pricing.onsiteUnitRate} + HST)`;
+    return `Up to 1 hour · refills ${formatCents(refillPriceCents)} + HST each (unit $${pricing.onsiteUnitRate} + HST)`;
   }
   if (refillPriceCents > 0) {
     return `Refills ${formatCents(refillPriceCents)} + ${hst}% HST each`;

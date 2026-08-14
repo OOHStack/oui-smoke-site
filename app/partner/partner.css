@@ -243,6 +243,11 @@ body {
   text-transform: uppercase;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
   transition: background 0.2s ease, color 0.2s ease;
 }
 

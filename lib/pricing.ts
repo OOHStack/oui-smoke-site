@@ -59,6 +59,14 @@ export function clearPricingCache() {
   cache = null;
 }
 
+function isLegacyGuestPayCatalog(value: PricingConfig) {
+  return (
+    value.onsiteUnitRate === 80 &&
+    value.onsiteUnlimitedRate === 100 &&
+    value.refillPriceCents === 3000
+  );
+}
+
 export async function getPricing(): Promise<PricingConfig> {
   if (cache && Date.now() - cache.at < CACHE_MS) {
     return cache.value;
@@ -78,6 +86,25 @@ export async function getPricing(): Promise<PricingConfig> {
           defaultCheckIntervalMinutes: row.defaultCheckIntervalMinutes,
         })
       : { ...DEFAULT_PRICING };
+    if (isLegacyGuestPayCatalog(value)) {
+      cache = { at: Date.now(), value };
+      try {
+        return await updatePricing({
+          onsiteUnitRate: DEFAULT_PRICING.onsiteUnitRate,
+          onsiteUnlimitedRate: DEFAULT_PRICING.onsiteUnlimitedRate,
+          refillPriceCents: DEFAULT_PRICING.refillPriceCents,
+        });
+      } catch {
+        const next = {
+          ...value,
+          onsiteUnitRate: DEFAULT_PRICING.onsiteUnitRate,
+          onsiteUnlimitedRate: DEFAULT_PRICING.onsiteUnlimitedRate,
+          refillPriceCents: DEFAULT_PRICING.refillPriceCents,
+        };
+        cache = { at: Date.now(), value: next };
+        return next;
+      }
+    }
     cache = { at: Date.now(), value };
     return value;
   } catch {

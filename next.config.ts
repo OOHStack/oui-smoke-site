@@ -39,6 +39,18 @@ const nextConfig: NextConfig = {
       { source: "/guides/:path*", destination: "/", permanent: true },
       { source: "/services", destination: "/", permanent: true },
       { source: "/services/:path*", destination: "/", permanent: true },
+      {
+        source: "/partner",
+        has: [{ type: "query", key: "mode", value: "on_site" }],
+        destination: "/partner/guest-pay",
+        permanent: true,
+      },
+      {
+        source: "/partner",
+        has: [{ type: "query", key: "type", value: "on_site" }],
+        destination: "/partner/guest-pay",
+        permanent: true,
+      },
     ];
   },
   async rewrites() {

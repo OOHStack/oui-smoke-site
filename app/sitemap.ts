@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 const SITE_URL = "https://ouismoke.co";
-const LAST_MODIFIED = new Date("2026-07-20T12:00:00.000Z");
+const LAST_MODIFIED = new Date("2026-08-14T12:00:00.000Z");
 
 const PAGES: {
   path: string;
@@ -11,6 +11,7 @@ const PAGES: {
   { path: "/", priority: 1, changeFrequency: "weekly" },
   { path: "/book", priority: 0.9, changeFrequency: "weekly" },
   { path: "/partner", priority: 0.7, changeFrequency: "monthly" },
+  { path: "/partner/guest-pay", priority: 0.7, changeFrequency: "monthly" },
   { path: "/promo", priority: 0.4, changeFrequency: "monthly" },
   { path: "/privacy", priority: 0.3, changeFrequency: "yearly" },
   { path: "/terms", priority: 0.3, changeFrequency: "yearly" },

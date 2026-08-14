@@ -93,14 +93,14 @@ function buildOnsitePackages(pricing: PricingConfig): DisplayPackage[] {
       eyebrow: "On the floor",
       title: "Standard",
       price: `$${pricing.onsiteUnitRate}`,
-      detail: `Per hookah · refills $${refill}`,
+      detail: `Up to 1 hour · refills $${refill} + HST`,
     },
     {
       id: "unlimited",
       eyebrow: "On the floor",
       title: "Unlimited",
       price: `$${pricing.onsiteUnlimitedRate}`,
-      detail: "Per hookah · refills included",
+      detail: "Full event · unlimited refills + HST",
     },
   ];
 }

@@ -1,8 +1,8 @@
 /** Hardcoded fallbacks — used when DB has no site_settings row yet. */
 
-export const REFILL_PRICE_CENTS = 3000;
-export const ONSITE_UNIT_RATE = 80;
-export const ONSITE_UNLIMITED_RATE = 100;
+export const REFILL_PRICE_CENTS = 3500;
+export const ONSITE_UNIT_RATE = 150;
+export const ONSITE_UNLIMITED_RATE = 200;
 
 export const GUEST_REBOOK_PROMO = {
   code: "OUI25",

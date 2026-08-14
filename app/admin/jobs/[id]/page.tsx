@@ -1630,7 +1630,7 @@ export default function JobDetailPage() {
               <div className="form" style={{ gap: "0.75rem" }}>
                 <div className="form-row form-row-2">
                   <div className="field">
-                    <label htmlFor="job-rate-standard">Standard ($)</label>
+                    <label htmlFor="job-rate-standard">Standard ($) — up to 1 hour</label>
                     <input
                       id="job-rate-standard"
                       type="number"
@@ -1649,7 +1649,7 @@ export default function JobDetailPage() {
                     </p>
                   </div>
                   <div className="field">
-                    <label htmlFor="job-rate-unlimited">Unlimited ($)</label>
+                    <label htmlFor="job-rate-unlimited">Unlimited ($) — full event</label>
                     <input
                       id="job-rate-unlimited"
                       type="number"
@@ -2792,8 +2792,9 @@ function HookahModal({
             <h3 className="hookah-modal__section-title">Guest-pay tier</h3>
             <p className="hookah-modal__hint">
               Required before send-out. Catalog rates exclude HST — Square adds{" "}
-              {Math.round(pricing.hstRate * 100)}% at charge. Standard refills $
-              {pricing.refillPriceCents / 100} + HST; Unlimited refills included.
+              {Math.round(pricing.hstRate * 100)}% at charge. Standard is up to 1
+              hour, refills ${pricing.refillPriceCents / 100} + HST. Unlimited is
+              the full event, refills included.
             </p>
             <div className="guest-tier-picker__row">
               <button
@@ -2809,7 +2810,7 @@ function HookahModal({
                   })
                 }
               >
-                Standard · ${pricing.onsiteUnitRate} + HST
+                Standard · ${pricing.onsiteUnitRate} + HST · up to 1 hour
               </button>
               <button
                 type="button"
@@ -2824,7 +2825,7 @@ function HookahModal({
                   })
                 }
               >
-                Unlimited · ${pricing.onsiteUnlimitedRate} + HST
+                Unlimited · ${pricing.onsiteUnlimitedRate} + HST · full event
               </button>
             </div>
           </section>
@@ -3120,7 +3121,7 @@ function HookahModal({
                         );
                       }}
                     >
-                      Send as Standard · ${pricing.onsiteUnitRate} + HST
+                      Send as Standard · ${pricing.onsiteUnitRate} + HST · up to 1 hour
                     </button>
                     <button
                       type="button"
@@ -3140,7 +3141,7 @@ function HookahModal({
                         );
                       }}
                     >
-                      Send as Unlimited · ${pricing.onsiteUnlimitedRate} + HST
+                      Send as Unlimited · ${pricing.onsiteUnlimitedRate} + HST · full event
                     </button>
                   </>
                 ) : (

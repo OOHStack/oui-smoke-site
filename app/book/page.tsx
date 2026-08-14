@@ -224,9 +224,9 @@ function BookForm() {
         <ol className="book__steps">
           <li>We’ll confirm we can attend your date and venue.</li>
           <li>
-            No hosted deposit — guests pay ${pricing.onsiteUnitRate} (+$
-            {refillDollars} refills) or ${pricing.onsiteUnlimitedRate}{" "}
-            unlimited per unit, plus HST.
+            No hosted deposit — guests pay ${pricing.onsiteUnitRate} (up to 1
+            hour, ${refillDollars} refills) or ${pricing.onsiteUnlimitedRate}{" "}
+            unlimited for the event, plus HST.
           </li>
           <li>We’ll send timing and floor details once confirmed.</li>
         </ol>
@@ -290,9 +290,10 @@ function BookForm() {
           <span className="book__choice-body">
             <strong>Guest-pay</strong>
             <span>
-              We cater; guests pay ${pricing.onsiteUnitRate}{" "}
-              (+${refillDollars} refills) or ${pricing.onsiteUnlimitedRate}{" "}
-              unlimited, plus HST. You don’t pay a hosted package.
+              We cater; guests pay ${pricing.onsiteUnitRate} (up to 1 hour, $
+              {refillDollars} refills) or ${pricing.onsiteUnlimitedRate}{" "}
+              unlimited for the event, plus HST. You don’t pay a hosted
+              package.
             </span>
           </span>
         </label>
@@ -459,13 +460,16 @@ function BookForm() {
             <li>
               <span>Standard unit</span>
               <span>
-                ${pricing.onsiteUnitRate} + HST · ${refillDollars} + HST
-                refills
+                ${pricing.onsiteUnitRate} + HST · up to 1 hour · $
+                {refillDollars} + HST refills
               </span>
             </li>
             <li>
               <span>Unlimited unit</span>
-              <span>${pricing.onsiteUnlimitedRate} + HST / event</span>
+              <span>
+                ${pricing.onsiteUnlimitedRate} + HST · full event ·
+                unlimited refills
+              </span>
             </li>
           </ul>
           <p className="book__estimate-note" style={{ margin: "0.65rem 0 0" }}>

@@ -18,7 +18,7 @@ function escapeHtml(value: string) {
 
 function onsiteRatesLine(pricing: PricingConfig = DEFAULT_PRICING) {
   const refill = pricing.refillPriceCents / 100;
-  return `$${pricing.onsiteUnitRate} + $${refill} refills (+ HST), or $${pricing.onsiteUnlimitedRate} unlimited (+ HST)`;
+  return `$${pricing.onsiteUnitRate} up to 1 hour + $${refill} refills (+ HST), or $${pricing.onsiteUnlimitedRate} unlimited for the event (+ HST)`;
 }
 
 function moneyCad(cents: number) {
@@ -420,7 +420,7 @@ export function bookingConfirmedClientEmail(input: {
   const refill = rates.refillPriceCents / 100;
   const body =
     model === "pay_at_event"
-      ? `Your Oui Smoke booking is confirmed. Guests pay $${rates.onsiteUnitRate} (+$${refill} refills) or $${rates.onsiteUnlimitedRate} unlimited on the floor, plus HST — no hosted deposit was required.`
+      ? `Your Oui Smoke booking is confirmed. Guests pay $${rates.onsiteUnitRate} (up to 1 hour, $${refill} refills) or $${rates.onsiteUnlimitedRate} unlimited for the event on the floor, plus HST — no hosted deposit was required.`
       : model === "complimentary"
         ? "Your Oui Smoke booking is confirmed. This one is on us — we’re looking forward to hosting."
         : "Your Oui Smoke booking is confirmed. We’re looking forward to hosting.";

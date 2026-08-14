@@ -32,8 +32,8 @@ export function getOpsNightOfPlaybook(
         bullets: [
           `Owner: the person with the Square terminal (floor lead). Runners do not negotiate rates.`,
           `When: at send-out (Ready → On the floor). Tap Send as Standard or Send as Unlimited before the unit leaves.`,
-          `Standard · $${pricing.onsiteUnitRate} + HST — paid refills at $${refillDollars} + HST each.`,
-          `Unlimited · $${pricing.onsiteUnlimitedRate} + HST — no per-refill charge for that unit for the event.`,
+          `Standard · $${pricing.onsiteUnitRate} + HST — up to 1 hour, paid refills at $${refillDollars} + HST each.`,
+          `Unlimited · $${pricing.onsiteUnlimitedRate} + HST — unlimited refills for the full event.`,
           `Collect with Terminal (auto-captures when the device completes) or Mark paid for cash. Both paths add ${hstPct}% HST.`,
           `Guest calls: tap I’m on it so the guest sees your name and follow-up alerts go to your device.`,
           `Unpaid units show a chip on the board / ledger — clear them before close-out. End-of-event Actual ($) is suggested from the ledger.`,

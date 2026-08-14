@@ -361,9 +361,9 @@ async function main() {
     VALUES (
       1,
       '{
-        "refillPriceCents": 3000,
-        "onsiteUnitRate": 80,
-        "onsiteUnlimitedRate": 100,
+        "refillPriceCents": 3500,
+        "onsiteUnitRate": 150,
+        "onsiteUnlimitedRate": 200,
         "guestRebookCode": "OUI25",
         "guestRebookDiscountDollars": 25,
         "guestRebookLabel": "$25 off your next booking",
@@ -383,6 +383,16 @@ async function main() {
       45
     )
     ON CONFLICT (id) DO NOTHING
+  `;
+  await sql`
+    UPDATE site_settings
+    SET
+      pricing_json = pricing_json || '{"onsiteUnitRate": 150, "onsiteUnlimitedRate": 200, "refillPriceCents": 3500}'::jsonb,
+      updated_at = now()
+    WHERE id = 1
+      AND (pricing_json->>'onsiteUnitRate')::numeric = 80
+      AND (pricing_json->>'onsiteUnlimitedRate')::numeric = 100
+      AND (pricing_json->>'refillPriceCents')::numeric = 3000
   `;
   await sql`ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS prep_token text`;
   await sql`

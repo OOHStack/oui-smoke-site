@@ -5,33 +5,12 @@ import PartnerEstimate, { type PartnerMode } from "./PartnerEstimate";
 import PartnerToolbar from "./PartnerToolbar";
 import { DEFAULT_PRICING, type PricingConfig } from "@/lib/pricing";
 
-function readInitialMode(): PartnerMode {
-  if (typeof window === "undefined") return "package";
-  const params = new URLSearchParams(window.location.search);
-  const value = (params.get("mode") || params.get("type") || "").toLowerCase();
-  return value === "on_site" ? "on_site" : "package";
-}
+type Props = {
+  mode: PartnerMode;
+};
 
-function syncModeToUrl(mode: PartnerMode) {
-  if (typeof window === "undefined") return;
-  const url = new URL(window.location.href);
-  if (mode === "on_site") {
-    url.searchParams.set("mode", "on_site");
-  } else {
-    url.searchParams.delete("mode");
-  }
-  url.searchParams.delete("type");
-  const next = `${url.pathname}${url.search}${url.hash}`;
-  window.history.replaceState({}, "", next);
-}
-
-export default function PartnerSheet() {
-  const [mode, setMode] = useState<PartnerMode>("package");
+export default function PartnerSheet({ mode }: Props) {
   const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
-
-  useEffect(() => {
-    setMode(readInitialMode());
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,12 +41,6 @@ export default function PartnerSheet() {
   }, []);
 
   const refillPriceDollars = pricing.refillPriceCents / 100;
-
-  function onModeChange(next: PartnerMode) {
-    setMode(next);
-    syncModeToUrl(next);
-  }
-
   const isPackage = mode === "package";
 
   return (
@@ -199,10 +172,10 @@ export default function PartnerSheet() {
             <p className="partner-hero__lede">
               {isPackage
                 ? "You cover the event — guests smoke included. Delivery, setup, staff, and teardown across Toronto and the GTA."
-                : `We cater. Guests pay $${pricing.onsiteUnitRate} (+$${refillPriceDollars} refills) or $${pricing.onsiteUnlimitedRate} unlimited, plus HST. You don’t pay a hosted package.`}
+                : "We bring our hookahs to your event and your guests pay for our services. Our service comes fully managed with staff, setup and cleanup."}
             </p>
-            <a className="partner-hero__jump no-print" href="#estimate">
-              {isPackage ? "Build an estimate" : "Plan staffing"}
+            <a className="partner-hero__jump no-print" href={isPackage ? "#estimate" : "#rates"}>
+              {isPackage ? "Build an estimate" : "See guest rates"}
             </a>
           </div>
           <div className="partner-hero__media" aria-hidden="true">
@@ -217,7 +190,7 @@ export default function PartnerSheet() {
         </header>
 
         <div className="partner-sheet__main" id="estimate">
-          <PartnerEstimate mode={mode} onModeChange={onModeChange} />
+          <PartnerEstimate mode={mode} />
 
           <aside className="partner-aside">
             <figure className="partner-aside__media">
@@ -243,16 +216,17 @@ export default function PartnerSheet() {
                 </ul>
               ) : (
                 <ul>
-                  <li>We attend with units + staff</li>
+                  <li>Fully managed: staff, setup, and cleanup</li>
+                  <li>Guests pay through Oui Smoke</li>
                   <li>
-                    Guests pay ${pricing.onsiteUnitRate} / unit · $
+                    Standard ${pricing.onsiteUnitRate} up to 1 hour · $
                     {refillPriceDollars} refills (+ HST)
                   </li>
                   <li>
-                    Or ${pricing.onsiteUnlimitedRate} / unit with unlimited refills
+                    Unlimited ${pricing.onsiteUnlimitedRate} full event ·
+                    unlimited refills (+ HST)
                   </li>
-                  <li>No hosted deposit</li>
-                  <li>Floor ops handled by our team</li>
+                  <li>No deposit or venue fees</li>
                 </ul>
               )}
             </section>
@@ -270,7 +244,7 @@ export default function PartnerSheet() {
           </aside>
         </div>
 
-        <section className="partner-rates" aria-label="GTA rate tiers">
+        <section className="partner-rates" id="rates" aria-label="GTA rate tiers">
           <div className="partner-rates__head">
             <h2>
               {isPackage
@@ -280,7 +254,7 @@ export default function PartnerSheet() {
             <p>
               {isPackage
                 ? "From $500 · up to 4 hours included"
-                : "Per unit · guests choose on site"}
+                : "All plus HST · guests choose on site"}
             </p>
           </div>
           {isPackage ? (
@@ -311,7 +285,7 @@ export default function PartnerSheet() {
                   ${pricing.onsiteUnitRate}
                 </strong>
                 <span className="partner-rates__meta">
-                  Per unit + HST · ${refillPriceDollars} + HST refills
+                  Up to 1 hour + HST · ${refillPriceDollars} + HST refills
                 </span>
               </div>
               <div className="partner-rates__tier">
@@ -320,7 +294,7 @@ export default function PartnerSheet() {
                   ${pricing.onsiteUnlimitedRate}
                 </strong>
                 <span className="partner-rates__meta">
-                  Per unit + HST · unlimited refills
+                  Full event + HST · unlimited refills
                 </span>
               </div>
             </div>
@@ -334,9 +308,7 @@ export default function PartnerSheet() {
               </>
             ) : (
               <>
-                No hosted deposit — guests settle on site at $
-                {pricing.onsiteUnitRate} or ${pricing.onsiteUnlimitedRate} + HST.
-                Extra staffing hours quoted if needed.
+                All rates plus HST. No deposit or fees to the venue.
               </>
             )}
           </p>
@@ -389,12 +361,6 @@ export default function PartnerSheet() {
           </div>
           <p className="partner-sheet__note">
             Private events · Toronto &amp; beyond the GTA · Travel quoted on request
-            {mode === "on_site" ? (
-              <>
-                {" · "}
-                <a href="/partner/playbook">Event-day playbook</a>
-              </>
-            ) : null}
           </p>
         </footer>
       </article>

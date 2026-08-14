@@ -724,7 +724,7 @@ export default function SettingsHub() {
               </h3>
               <div className="form-row form-row-2">
                 <div className="field">
-                  <label htmlFor="onsite-unit">Per-unit rate ($)</label>
+                  <label htmlFor="onsite-unit">Standard rate ($) — up to 1 hour</label>
                   <input
                     id="onsite-unit"
                     type="number"
@@ -740,7 +740,7 @@ export default function SettingsHub() {
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="onsite-unlimited">Unlimited rate ($)</label>
+                  <label htmlFor="onsite-unlimited">Unlimited rate ($) — full event</label>
                   <input
                     id="onsite-unlimited"
                     type="number"

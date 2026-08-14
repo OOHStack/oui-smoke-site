@@ -40,6 +40,10 @@ import { CSS } from "@dnd-kit/utilities";
 import Countdown from "@/components/admin/Countdown";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { refillPayChip, unitPayChip } from "@/lib/ops/guest-pay";
+import {
+  ONSITE_UNIT_RATE,
+  ONSITE_UNLIMITED_RATE,
+} from "@/lib/pricing-defaults";
 
 export type BoardFlavour = { id: number; name: string; active: boolean };
 export type BoardHookah = {
@@ -428,7 +432,7 @@ export default function HookahBoard({
         } else if (result.code === "NEED_GUEST_TIER") {
           onOpen(
             assignmentId,
-            "Choose Standard ($80) or Unlimited ($100) guest-pay, then send out.",
+            `Choose Standard ($${ONSITE_UNIT_RATE}, up to 1 hour) or Unlimited ($${ONSITE_UNLIMITED_RATE}, full event) guest-pay, then send out.`,
           );
         } else if (result.code === "NEED_RETURN") {
           onOpen(

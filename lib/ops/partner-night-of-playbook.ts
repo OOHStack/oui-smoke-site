@@ -22,8 +22,8 @@ export function getPartnerNightOfPlaybook(
         id: "pricing",
         title: "Guest pricing",
         bullets: [
-          `Standard · $${pricing.onsiteUnitRate} + HST per unit — refills $${refillDollars} + HST each.`,
-          `Unlimited · $${pricing.onsiteUnlimitedRate} + HST per unit — unlimited flavour refills for the event.`,
+          `Standard · $${pricing.onsiteUnitRate} + HST — up to 1 hour, refills $${refillDollars} + HST each.`,
+          `Unlimited · $${pricing.onsiteUnlimitedRate} + HST — unlimited flavour refills for the full event.`,
           `Oui staff collect payment on the floor (Square terminal or cash), including ${hstPct}% HST. Hosts do not need a hosted deposit for guest-pay.`,
         ],
       },

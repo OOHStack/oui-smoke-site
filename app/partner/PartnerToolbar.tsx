@@ -31,7 +31,7 @@ export default function PartnerToolbar({ mode = "package" }: Props) {
 
   const shareUrl = useMemo(
     () =>
-      mode === "on_site" ? `${BASE_SHARE_URL}?mode=on_site` : BASE_SHARE_URL,
+      mode === "on_site" ? `${BASE_SHARE_URL}/guest-pay` : BASE_SHARE_URL,
     [mode],
   );
 
@@ -42,7 +42,7 @@ export default function PartnerToolbar({ mode = "package" }: Props) {
 
   const shareText =
     mode === "on_site"
-      ? "Guest-pay hookah catering — guests pay on the floor, no hosted deposit."
+      ? "We bring our hookahs to your event. Guests pay on the floor through Oui Smoke — fully managed, no venue deposit."
       : "Hosted hookah catering for planners, hosts & vendors — Toronto & GTA rates.";
 
   useEffect(() => {

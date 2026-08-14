@@ -18,7 +18,7 @@ export default async function PartnerPlaybookPage() {
   return (
     <div className="partner-playbook-page">
       <p className="partner-playbook-page__back no-print">
-        <Link href="/partner?mode=on_site">← Partner rates</Link>
+        <Link href="/partner/guest-pay">← Partner rates</Link>
       </p>
       <PlaybookDocument
         title={doc.title}

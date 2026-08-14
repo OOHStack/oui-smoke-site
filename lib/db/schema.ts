@@ -162,7 +162,7 @@ export const jobHookahs = pgTable("job_hookahs", {
   returnOutcome: returnOutcomeEnum("return_outcome"),
   issueFlag: boolean("issue_flag").notNull().default(false),
   guestToken: text("guest_token").unique(),
-  /** Pay-at-event menu: standard ($80 + refills) or unlimited ($100). */
+  /** Pay-at-event menu: standard ($150 up to 1 hour + refills) or unlimited ($200 full event). */
   guestPayTier: guestPayTierEnum("guest_pay_tier"),
   guestRating: integer("guest_rating"),
   guestComment: text("guest_comment").default(""),

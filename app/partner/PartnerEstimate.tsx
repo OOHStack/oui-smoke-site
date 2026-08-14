@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   DEFAULT_PRICING,
   estimateBooking,
@@ -21,10 +22,9 @@ function clamp(n: number, min: number, max: number) {
 
 type Props = {
   mode: PartnerMode;
-  onModeChange: (mode: PartnerMode) => void;
 };
 
-export default function PartnerEstimate({ mode, onModeChange }: Props) {
+export default function PartnerEstimate({ mode }: Props) {
   const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
   const [hookahs, setHookahs] = useState(DEFAULT_PRICING.minPackageHookahs);
   const [hours, setHours] = useState(DEFAULT_PRICING.includedHours);
@@ -103,121 +103,109 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
     return Math.round((estimate.total + addOns.subtotal + addOns.hst) * 100) / 100;
   }, [estimate, addOns]);
 
-  const bookHref = `/book?type=${mode}&hookahs=${hookahs}&hours=${hours}`;
+  const bookHref = isPackage
+    ? `/book?type=${mode}&hookahs=${hookahs}&hours=${hours}`
+    : "/book?type=on_site";
   const sizeLabel = brandingSize === pricing.brandingLarge ? "large" : "medium";
   const hstPercent = Math.round(pricing.hstRate * 100);
 
   return (
     <section className="partner-estimate" aria-label="Event estimate">
       <div className="partner-estimate__head">
-        <h2>{isPackage ? "Estimate your event" : "Plan guest-pay"}</h2>
+        <h2>{isPackage ? "Estimate your event" : "Guest-pay catering"}</h2>
         <p>
           {isPackage
             ? `From ${formatCad(pricing.minPackageDollars)} · min ${pricing.minPackageHookahs} hookahs · up to ${pricing.includedHours} hrs included · $${pricing.extraHourRate}/extra hour · HST in total.`
-            : "We staff your event. Guests pay on the floor — no hosted deposit. Set units and hours for the request."}
+            : "Guests pay on the floor through Oui Smoke, and service is managed through our Oui Smoke customer web app. No deposit or fees to the venue required."}
         </p>
       </div>
 
-      <div className="partner-mode" role="tablist" aria-label="How you want to cover the event">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={isPackage}
+      <nav className="partner-mode" aria-label="How you want to cover the event">
+        <Link
+          href="/partner"
           className={`partner-mode__btn${isPackage ? " is-active" : ""}`}
-          onClick={() => onModeChange("package")}
+          aria-current={isPackage ? "page" : undefined}
         >
           Hosted
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={!isPackage}
+        </Link>
+        <Link
+          href="/partner/guest-pay"
           className={`partner-mode__btn${!isPackage ? " is-active" : ""}`}
-          onClick={() => onModeChange("on_site")}
+          aria-current={!isPackage ? "page" : undefined}
         >
           Guest-pay
-        </button>
-      </div>
+        </Link>
+      </nav>
 
-      <div className="partner-estimate__controls">
-        <div className="partner-stepper">
-          <span className="partner-stepper__label" id="partner-hookahs-label">
-            {isPackage ? (
-              <>
-                Hookahs <em>(min {pricing.minPackageHookahs})</em>
-              </>
-            ) : (
-              "Hookahs to bring"
-            )}
-          </span>
-          <div
-            className="partner-stepper__row"
-            role="group"
-            aria-labelledby="partner-hookahs-label"
-          >
-            <button
-              type="button"
-              className="partner-stepper__btn"
-              aria-label="Fewer hookahs"
-              disabled={hookahs <= minHookahs}
-              onClick={() => setHookahs((n) => clamp(n - 1, minHookahs, MAX_HOOKAHS))}
+      {isPackage ? (
+        <div className="partner-estimate__controls">
+          <div className="partner-stepper">
+            <span className="partner-stepper__label" id="partner-hookahs-label">
+              Hookahs <em>(min {pricing.minPackageHookahs})</em>
+            </span>
+            <div
+              className="partner-stepper__row"
+              role="group"
+              aria-labelledby="partner-hookahs-label"
             >
-              −
-            </button>
-            <output className="partner-stepper__value" aria-live="polite">
-              {hookahs}
-            </output>
-            <button
-              type="button"
-              className="partner-stepper__btn"
-              aria-label="More hookahs"
-              disabled={hookahs >= MAX_HOOKAHS}
-              onClick={() => setHookahs((n) => clamp(n + 1, minHookahs, MAX_HOOKAHS))}
+              <button
+                type="button"
+                className="partner-stepper__btn"
+                aria-label="Fewer hookahs"
+                disabled={hookahs <= minHookahs}
+                onClick={() => setHookahs((n) => clamp(n - 1, minHookahs, MAX_HOOKAHS))}
+              >
+                −
+              </button>
+              <output className="partner-stepper__value" aria-live="polite">
+                {hookahs}
+              </output>
+              <button
+                type="button"
+                className="partner-stepper__btn"
+                aria-label="More hookahs"
+                disabled={hookahs >= MAX_HOOKAHS}
+                onClick={() => setHookahs((n) => clamp(n + 1, minHookahs, MAX_HOOKAHS))}
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div className="partner-stepper">
+            <span className="partner-stepper__label" id="partner-hours-label">
+              Hours <em>(up to {pricing.includedHours} incl.)</em>
+            </span>
+            <div
+              className="partner-stepper__row"
+              role="group"
+              aria-labelledby="partner-hours-label"
             >
-              +
-            </button>
+              <button
+                type="button"
+                className="partner-stepper__btn"
+                aria-label="Fewer hours"
+                disabled={hours <= minHours}
+                onClick={() => setHours((n) => clamp(n - 1, minHours, MAX_HOURS))}
+              >
+                −
+              </button>
+              <output className="partner-stepper__value" aria-live="polite">
+                {hours}
+              </output>
+              <button
+                type="button"
+                className="partner-stepper__btn"
+                aria-label="More hours"
+                disabled={hours >= MAX_HOURS}
+                onClick={() => setHours((n) => clamp(n + 1, minHours, MAX_HOURS))}
+              >
+                +
+              </button>
+            </div>
           </div>
         </div>
-
-        <div className="partner-stepper">
-          <span className="partner-stepper__label" id="partner-hours-label">
-            {isPackage ? (
-              <>
-                Hours <em>(up to {pricing.includedHours} incl.)</em>
-              </>
-            ) : (
-              "Hours on site"
-            )}
-          </span>
-          <div
-            className="partner-stepper__row"
-            role="group"
-            aria-labelledby="partner-hours-label"
-          >
-            <button
-              type="button"
-              className="partner-stepper__btn"
-              aria-label="Fewer hours"
-              disabled={hours <= minHours}
-              onClick={() => setHours((n) => clamp(n - 1, minHours, MAX_HOURS))}
-            >
-              −
-            </button>
-            <output className="partner-stepper__value" aria-live="polite">
-              {hours}
-            </output>
-            <button
-              type="button"
-              className="partner-stepper__btn"
-              aria-label="More hours"
-              disabled={hours >= MAX_HOURS}
-              onClick={() => setHours((n) => clamp(n + 1, minHours, MAX_HOURS))}
-            >
-              +
-            </button>
-          </div>
-        </div>
-      </div>
+      ) : null}
 
       {isPackage ? (
         <div className="partner-estimate__addons" role="group" aria-label="Add-ons">
@@ -366,22 +354,25 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
           <ul className="partner-estimate__lines">
             <li>
               <span>Units on the floor</span>
-              <span>{hookahs}</span>
+              <span>Unlimited</span>
             </li>
             <li>
               <span>Hours on site</span>
-              <span>{hours}</span>
+              <span>Unlimited</span>
             </li>
             <li>
               <span>Guest · standard</span>
               <span>
-                ${pricing.onsiteUnitRate} + HST · ${refillPriceDollars} + HST
-                refills
+                ${pricing.onsiteUnitRate} + HST · up to 1 hour · $
+                {refillPriceDollars} + HST refills
               </span>
             </li>
             <li>
               <span>Guest · unlimited</span>
-              <span>${pricing.onsiteUnlimitedRate} + HST / unit</span>
+              <span>
+                ${pricing.onsiteUnlimitedRate} + HST · full event ·
+                unlimited refills
+              </span>
             </li>
             <li className="partner-estimate__lines--muted">
               <span>Hosted deposit</span>
@@ -389,9 +380,9 @@ export default function PartnerEstimate({ mode, onModeChange }: Props) {
             </li>
           </ul>
           <p className="partner-estimate__intro">
-            Guests choose ${pricing.onsiteUnitRate} with paid refills, or $
-            {pricing.onsiteUnlimitedRate} with unlimited refills for the event —
-            plus HST.
+            Guests choose ${pricing.onsiteUnitRate} for up to 1 hour with paid
+            refills, or ${pricing.onsiteUnlimitedRate} unlimited for the full
+            event — plus HST.
           </p>
           <p className="partner-estimate__note">
             We’ll confirm we can staff your date and venue before locking in.
