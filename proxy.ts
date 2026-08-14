@@ -15,6 +15,20 @@ const MARKETING_EXACT = new Set([
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (pathname === "/partner") {
+    const mode = (
+      request.nextUrl.searchParams.get("mode") ||
+      request.nextUrl.searchParams.get("type") ||
+      ""
+    ).toLowerCase();
+    if (mode === "on_site") {
+      return NextResponse.redirect(
+        new URL("/partner/guest-pay", request.url),
+        308,
+      );
+    }
+  }
+
   // Gate admin UI (login excluded). APIs keep requireApiSession().
   if (pathname.startsWith("/admin")) {
     if (pathname === "/admin/login" || pathname.startsWith("/admin/login/")) {
