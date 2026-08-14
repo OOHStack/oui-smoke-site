@@ -1142,7 +1142,7 @@ code {
 .experience-tech__bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 1rem 1.35rem;
   width: 100%;
@@ -1151,7 +1151,7 @@ code {
 
 .experience-tech__bar > .btn {
   flex-shrink: 0;
-  align-self: center;
+  align-self: flex-end;
 }
 
 .experience-tech__intro {
