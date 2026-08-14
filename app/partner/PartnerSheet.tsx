@@ -166,7 +166,7 @@ export default function PartnerSheet({ mode }: Props) {
             <p className="partner-hero__eyebrow">For planners · hosts · vendors</p>
             <h1 className="partner-hero__title">
               {isPackage
-                ? "Hosted catering"
+                ? "Fully hosted catering"
                 : "Guest-pay catering"}
             </h1>
             <p className="partner-hero__lede">

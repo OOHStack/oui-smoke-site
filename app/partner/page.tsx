@@ -3,16 +3,16 @@ import PartnerEntrance from "./PartnerEntrance";
 import PartnerSheet from "./PartnerSheet";
 
 export const metadata: Metadata = {
-  title: "Hosted catering · Partners",
+  title: "Fully hosted catering · Partners",
   description:
-    "Oui Smoke hosted hookah catering for planners, hosts, and vendors across Toronto and the GTA. You cover the event — guests smoke included.",
+    "Oui Smoke fully hosted hookah catering for planners, hosts, and vendors across Toronto and the GTA. You cover the event — guests smoke included.",
   alternates: {
     canonical: "/partner",
   },
   openGraph: {
-    title: "Oui Smoke · Hosted catering",
+    title: "Oui Smoke · Fully hosted catering",
     description:
-      "Hosted hookah catering — Toronto & GTA. Share-ready rates and booking links for industry partners.",
+      "Fully hosted hookah catering — Toronto & GTA. Share-ready rates and booking links for industry partners.",
     url: "/partner",
     images: [
       {
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Oui Smoke · Hosted catering",
-    description: "Hosted hookah catering — Toronto & GTA.",
+    title: "Oui Smoke · Fully hosted catering",
+    description: "Fully hosted hookah catering — Toronto & GTA.",
     images: ["/og-image.jpg"],
   },
 };

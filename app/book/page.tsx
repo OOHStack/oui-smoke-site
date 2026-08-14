@@ -189,7 +189,7 @@ function BookForm() {
       <section className="book__panel">
         <h1>Request received</h1>
         <p className="book__lede">
-          Thanks — your hosted catering inquiry is in our queue
+          Thanks — your fully hosted catering inquiry is in our queue
           {promo ? ` with your ${promo.label.toLowerCase()}` : ""}.
         </p>
         <ol className="book__steps">
