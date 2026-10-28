@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import PartnerEstimate, { type PartnerMode } from "./PartnerEstimate";
 import PartnerToolbar from "./PartnerToolbar";
-import { DEFAULT_PRICING, type PricingConfig } from "@/lib/pricing";
+import { DEFAULT_PRICING, formatCad, packageBaseForHookahs, type PricingConfig } from "@/lib/pricing";
 
 type Props = {
   mode: PartnerMode;
@@ -253,29 +253,19 @@ export default function PartnerSheet({ mode }: Props) {
             </h2>
             <p>
               {isPackage
-                ? "From $500 · up to 4 hours included"
+                ? `From ${formatCad(pricing.minPackageDollars)} · up to ${pricing.includedHours} hours included`
                 : "All plus HST · guests choose on site"}
             </p>
           </div>
           {isPackage ? (
             <div className="partner-rates__tiers">
-              <div className="partner-rates__tier">
-                <span className="partner-rates__range">4</span>
-                <strong className="partner-rates__price">$500</strong>
-                <span className="partner-rates__meta">
-                  Package floor · 1 refill
-                </span>
-              </div>
-              <div className="partner-rates__tier">
-                <span className="partner-rates__range">5–8</span>
-                <strong className="partner-rates__price">$95</strong>
-                <span className="partner-rates__meta">Unlimited refills</span>
-              </div>
-              <div className="partner-rates__tier">
-                <span className="partner-rates__range">9+</span>
-                <strong className="partner-rates__price">$85</strong>
-                <span className="partner-rates__meta">Unlimited refills</span>
-              </div>
+              {[4, 6, 8].map((count) => (
+                <div className="partner-rates__tier" key={count}>
+                  <span className="partner-rates__range">{count} hookahs</span>
+                  <strong className="partner-rates__price">{formatCad(packageBaseForHookahs(count, pricing))}</strong>
+                  <span className="partner-rates__meta">{count === 4 ? "1 refill included" : "Unlimited refills"}</span>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="partner-rates__tiers partner-rates__tiers--onsite">
@@ -302,9 +292,9 @@ export default function PartnerSheet({ mode }: Props) {
           <p className="partner-rates__extra">
             {isPackage ? (
               <>
-                Extra hour <strong>$150</strong>
+                Extra hour <strong>{formatCad(pricing.extraHourRate)}</strong>
                 <span aria-hidden="true"> · </span>
-                Bill the higher of package floor or per-hookah total
+                Regardless of hookah count · plus HST. 10+ hookahs: custom base quote.
               </>
             ) : (
               <>
