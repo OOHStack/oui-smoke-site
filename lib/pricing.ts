@@ -216,7 +216,6 @@ export function estimateBooking(
     return null;
   }
 
-  if (units > pricing.minPackageHookahs && serviceHours > pricing.includedHours) return null;
   const tier = tierRateForHookahs(units, pricing);
   const base = packageBaseForHookahs(units, pricing);
   const extraHours = Math.max(0, serviceHours - pricing.includedHours);

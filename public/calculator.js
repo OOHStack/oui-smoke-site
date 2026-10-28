@@ -137,7 +137,6 @@
       lines.push({
         label: `${state.extraHours} extra hour${state.extraHours === 1 ? "" : "s"} × $${EXTRA_HOUR}`,
         amount: state.extraHours * EXTRA_HOUR,
-        ...(state.hookahs > 4 ? { note: "Quoted individually" } : {}),
       });
     }
 
@@ -252,10 +251,9 @@
       })
       .join("");
 
-    const customTime = state.hookahs > 4 && state.extraHours > 0;
-    els.subtotal.textContent = customTime ? "Request a quote" : moneyExact(result.subtotal);
-    els.hst.textContent = customTime ? "Quoted individually" : moneyExact(result.hst);
-    els.total.textContent = customTime ? "Request a quote" : moneyExact(result.total);
+    els.subtotal.textContent = moneyExact(result.subtotal);
+    els.hst.textContent = moneyExact(result.hst);
+    els.total.textContent = moneyExact(result.total);
 
     const nudge = nextTierInfo(state.hookahs);
     const summary = [
@@ -266,9 +264,9 @@
         (line) => `- ${line.label}: ${line.note || moneyExact(line.amount)}`
       ),
       "",
-      `Subtotal: ${customTime ? "Request a quote for extended service" : moneyExact(result.subtotal)}`,
-      `Est. HST (${Math.round(HST * 100)}%): ${customTime ? "Quoted individually" : moneyExact(result.hst)}`,
-      `Estimated total: ${customTime ? "Request a quote" : moneyExact(result.total)}`,
+      `Subtotal: ${moneyExact(result.subtotal)}`,
+      `Est. HST (${Math.round(HST * 100)}%): ${moneyExact(result.hst)}`,
+      `Estimated total: ${moneyExact(result.total)}`,
       nudge
         ? `\nNote: Adding ${nudge.needed} more hookah(s) unlocks ${money(nudge.next.rate)}/hookah.`
         : "",
