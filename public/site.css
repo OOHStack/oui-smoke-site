@@ -2626,3 +2626,74 @@ body.modal-open {
 .locale a:focus-visible {
   color: var(--ink);
 }
+
+/* Keep package quantities aligned with the price, with room for its qualifier. */
+.summer__stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.8fr);
+  align-items: end;
+  gap: 1rem;
+  text-align: left;
+}
+
+.summer__stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+  width: 100%;
+}
+
+.summer__stat-num,
+.summer__stat-price {
+  font-size: clamp(2.75rem, 4.5vw, 4rem);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.summer__stat-prefix {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-family: "Outfit", sans-serif;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.summer__stat-label {
+  margin-top: 0.6rem;
+  font-size: 0.66rem;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+}
+
+.summer__stat-divider {
+  display: none;
+}
+
+@media (max-width: 859px) {
+  .summer__stats {
+    max-width: 32rem;
+    text-align: center;
+    gap: 1rem 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .summer__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 23rem;
+  }
+
+  .summer__stat:last-child {
+    grid-column: 1 / -1;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(20, 15, 14, 0.2);
+  }
+
+  .summer__stat-num,
+  .summer__stat-price {
+    font-size: 3rem;
+  }
+}
