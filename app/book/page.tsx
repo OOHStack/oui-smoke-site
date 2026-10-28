@@ -402,6 +402,10 @@ function BookForm() {
         </div>
       ) : null}
 
+      {engagement === "package" && !estimate ? (
+        <p role="status">Custom event pricing — send your event details for a tailored quote. Hosted bookings start at $1,000 + HST.</p>
+      ) : null}
+
       {engagement === "package" && estimate ? (
         <aside className="book__estimate" aria-live="polite">
           <div className="book__estimate-head">
@@ -412,7 +416,7 @@ function BookForm() {
             <li>
               <span>
                 {estimate.tier.flat != null
-                  ? "4-hookah package"
+                  ? `${estimate.units}-hookah package`
                   : `${estimate.units} hookahs × ${formatCad(estimate.tier.rate)}`}
               </span>
               <span>{formatCad(estimate.base)}</span>

@@ -26,6 +26,8 @@ export type PricingConfig = {
   includedHours: number;
   minPackageHookahs: number;
   minPackageDollars: number;
+  hostedAdditionalHookahRate: number;
+  customQuoteFromHookahs: number;
   midTierRate: number;
   highTierRate: number;
   extraHourRate: number;
@@ -48,6 +50,8 @@ export const DEFAULT_PRICING: PricingConfig = {
   includedHours: INCLUDED_HOURS,
   minPackageHookahs: MIN_PACKAGE_HOOKAHS,
   minPackageDollars: MIN_PACKAGE_DOLLARS,
+  hostedAdditionalHookahRate: 200,
+  customQuoteFromHookahs: 10,
   midTierRate: 95,
   highTierRate: 85,
   extraHourRate: EXTRA_HOUR_RATE,
@@ -74,8 +78,16 @@ export function normalizePricing(
   raw: Partial<PricingConfig> | Record<string, unknown> | null | undefined,
 ): PricingConfig {
   const d = DEFAULT_PRICING;
-  const src = (raw ?? {}) as Record<string, unknown>;
+  const src = { ...(raw ?? {}) } as Record<string, unknown>;
+  // Upgrade the previous hosted catalog while preserving unrelated settings.
+  const legacyHosted = Number(src.minPackageDollars) === 500;
+  if (legacyHosted) {
+    src.minPackageDollars = d.minPackageDollars;
+    if (Number(src.extraHourRate) === 150) src.extraHourRate = d.extraHourRate;
+  }
   return {
+    hostedAdditionalHookahRate: Math.max(0, num(src.hostedAdditionalHookahRate, d.hostedAdditionalHookahRate)),
+    customQuoteFromHookahs: Math.max(5, Math.round(num(src.customQuoteFromHookahs, d.customQuoteFromHookahs))),
     refillPriceCents: Math.max(
       0,
       Math.round(num(src.refillPriceCents, d.refillPriceCents)),

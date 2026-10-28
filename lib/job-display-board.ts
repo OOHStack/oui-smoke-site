@@ -117,16 +117,16 @@ function buildPrivatePackages(pricing: PricingConfig): DisplayPackage[] {
     {
       id: "mid",
       eyebrow: "Private events",
-      title: "5–8 hookahs",
-      price: `$${pricing.midTierRate}`,
-      detail: "Per hookah · unlimited refills",
+      title: "6 hookahs",
+      price: `From $${floor + (6 - min) * pricing.hostedAdditionalHookahRate}`,
+      detail: "Up to 4 hours · unlimited refills",
     },
     {
       id: "high",
       eyebrow: "Private events",
-      title: "9+ hookahs",
-      price: `$${pricing.highTierRate}`,
-      detail: "Per hookah · unlimited refills",
+      title: "8 hookahs",
+      price: `From $${floor + (8 - min) * pricing.hostedAdditionalHookahRate}`,
+      detail: "Up to 4 hours · unlimited refills",
     },
   ];
 }

@@ -270,6 +270,10 @@ export default function PartnerEstimate({ mode }: Props) {
         </div>
       ) : null}
 
+      {isPackage && !estimate ? (
+        <p role="status">Custom event pricing — send your event details for a tailored quote. Hosted bookings start at $1,000 + HST.</p>
+      ) : null}
+
       {isPackage && estimate && total != null ? (
         <div className="partner-estimate__result" aria-live="polite">
           <div className="partner-estimate__total">
@@ -282,7 +286,7 @@ export default function PartnerEstimate({ mode }: Props) {
             <li>
               <span>
                 {estimate.tier.flat != null
-                  ? `4-hookah package`
+                  ? `${estimate.units}-hookah package`
                   : `${estimate.units} × ${formatCad(estimate.tier.rate)}`}
                 <small> · {estimate.tier.label.split("·")[0]?.trim()}</small>
               </span>
@@ -392,7 +396,7 @@ export default function PartnerEstimate({ mode }: Props) {
 
       <div className="partner-estimate__cta">
         <a className="partner-estimate__book" href={bookHref}>
-          {isPackage ? "Book this estimate" : "Request guest-pay"}
+          {isPackage ? (estimate ? "Book this estimate" : "Request a custom quote") : "Request guest-pay"}
         </a>
         <a className="partner-estimate__mail" href="mailto:contact@ouismoke.co">
           Or email the brief

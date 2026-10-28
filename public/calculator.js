@@ -33,8 +33,8 @@
 
   let HST = 0.13;
   const BRANDING_MIN = 4;
-  const MIN_PACKAGE = 500;
-  const EXTRA_HOUR = 150;
+  const MIN_PACKAGE = 1000;
+  const EXTRA_HOUR = 200;
   const LED_RATE = 15;
   const WATER_RATE = 8;
   let lastFocused = null;
@@ -58,39 +58,15 @@
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-  const tierFor = (count) => {
-    if (count <= 4) {
-      return {
-        id: "starter",
-        label: "4-hookah package · $500 · up to 4 hours · 1 refill included",
-        rate: 125,
-        flat: MIN_PACKAGE,
-        unlimited: false,
-        nextAt: 5,
-      };
-    }
-    if (count <= 8) {
-      return {
-        id: "plus",
-        label: "5 – 8 hookahs · $95 each · up to 4 hours · unlimited refills",
-        rate: 95,
-        flat: null,
-        unlimited: true,
-        nextAt: 9,
-      };
-    }
-    return {
-      id: "max",
-      label: "9+ hookahs · $85 each · up to 4 hours · unlimited refills",
-      rate: 85,
-      flat: null,
-      unlimited: true,
-      nextAt: null,
-    };
-  };
-
-  const packageBase = (hookahs, tier) =>
-    Math.max(MIN_PACKAGE, tier.flat ?? hookahs * tier.rate);
+  const tierFor = (count) => ({
+    id: count <= 4 ? "starter" : "plus",
+    label: `${count}-hookah package · from ${money(MIN_PACKAGE + (count - 4) * 200)} · up to 4 hours${count <= 4 ? " · 1 refill included" : " · unlimited refills"}`,
+    rate: (MIN_PACKAGE + (count - 4) * 200) / count,
+    flat: MIN_PACKAGE + (count - 4) * 200,
+    unlimited: count > 4,
+    nextAt: count < 6 ? 6 : count < 8 ? 8 : null,
+  });
+  const packageBase = (hookahs, tier) => tier.flat;
 
   const nextTierInfo = (hookahs) => {
     const current = tierFor(hookahs);
@@ -115,7 +91,7 @@
   };
 
   const readState = () => {
-    const hookahs = clamp(Number(els.hookahs.value) || 4, 4, 40);
+    const hookahs = clamp(Number(els.hookahs.value) || 4, 4, 9);
     const extraHours = clamp(Number(els.hours.value) || 0, 0, 12);
     let ledQty = clamp(Number(els.led.value) || 0, 0, hookahs);
     let waterQty = clamp(Number(els.water.value) || 0, 0, hookahs);
@@ -152,7 +128,7 @@
     lines.push({
       label:
         tier.flat != null
-          ? `4-hookah package · up to 4 hours included`
+          ? `${state.hookahs}-hookah package · up to 4 hours included`
           : `${state.hookahs} hookahs × ${money(tier.rate)} · up to 4 hours included`,
       amount: base,
     });
@@ -161,6 +137,7 @@
       lines.push({
         label: `${state.extraHours} extra hour${state.extraHours === 1 ? "" : "s"} × $${EXTRA_HOUR}`,
         amount: state.extraHours * EXTRA_HOUR,
+        ...(state.hookahs > 4 ? { note: "Quoted individually" } : {}),
       });
     }
 
@@ -275,9 +252,10 @@
       })
       .join("");
 
-    els.subtotal.textContent = moneyExact(result.subtotal);
-    els.hst.textContent = moneyExact(result.hst);
-    els.total.textContent = moneyExact(result.total);
+    const customTime = state.hookahs > 4 && state.extraHours > 0;
+    els.subtotal.textContent = customTime ? "Request a quote" : moneyExact(result.subtotal);
+    els.hst.textContent = customTime ? "Quoted individually" : moneyExact(result.hst);
+    els.total.textContent = customTime ? "Request a quote" : moneyExact(result.total);
 
     const nudge = nextTierInfo(state.hookahs);
     const summary = [
@@ -288,9 +266,9 @@
         (line) => `- ${line.label}: ${line.note || moneyExact(line.amount)}`
       ),
       "",
-      `Subtotal: ${moneyExact(result.subtotal)}`,
-      `Est. HST (${Math.round(HST * 100)}%): ${moneyExact(result.hst)}`,
-      `Estimated total: ${moneyExact(result.total)}`,
+      `Subtotal: ${customTime ? "Request a quote for extended service" : moneyExact(result.subtotal)}`,
+      `Est. HST (${Math.round(HST * 100)}%): ${customTime ? "Quoted individually" : moneyExact(result.hst)}`,
+      `Estimated total: ${customTime ? "Request a quote" : moneyExact(result.total)}`,
       nudge
         ? `\nNote: Adding ${nudge.needed} more hookah(s) unlocks ${money(nudge.next.rate)}/hookah.`
         : "",

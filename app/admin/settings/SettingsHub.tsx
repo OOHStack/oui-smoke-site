@@ -837,32 +837,32 @@ export default function SettingsHub() {
 
               <div className="form-row form-row-3">
                 <div className="field">
-                  <label htmlFor="mid-tier">5–8 hookahs ($/ea)</label>
+                  <label htmlFor="mid-tier">Additional hosted hookah ($)</label>
                   <input
                     id="mid-tier"
                     type="number"
                     min={0}
                     step={1}
-                    value={pricingDraft.midTierRate}
+                    value={pricingDraft.hostedAdditionalHookahRate}
                     onChange={(e) =>
                       updatePricing(
-                        "midTierRate",
+                        "hostedAdditionalHookahRate",
                         Math.max(0, Number(e.target.value) || 0),
                       )
                     }
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="high-tier">9+ hookahs ($/ea)</label>
+                  <label htmlFor="high-tier">Custom quote from (hookahs)</label>
                   <input
                     id="high-tier"
                     type="number"
                     min={0}
                     step={1}
-                    value={pricingDraft.highTierRate}
+                    value={pricingDraft.customQuoteFromHookahs}
                     onChange={(e) =>
                       updatePricing(
-                        "highTierRate",
+                        "customQuoteFromHookahs",
                         Math.max(0, Number(e.target.value) || 0),
                       )
                     }

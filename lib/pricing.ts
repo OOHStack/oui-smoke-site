@@ -174,24 +174,14 @@ export function tierRateForHookahs(
   count: number,
   pricing: PricingConfig = DEFAULT_PRICING,
 ) {
-  if (count <= pricing.minPackageHookahs) {
-    return {
-      rate: pricing.minPackageDollars / pricing.minPackageHookahs,
-      label: `${pricing.minPackageHookahs}-hookah package · $${pricing.minPackageDollars}`,
-      flat: pricing.minPackageDollars as number | null,
-    };
-  }
-  if (count <= 8) {
-    return {
-      rate: pricing.midTierRate,
-      label: `5–8 hookahs · $${pricing.midTierRate} each`,
-      flat: null,
-    };
-  }
+  const flat = pricing.minPackageDollars +
+    Math.max(0, count - pricing.minPackageHookahs) * pricing.hostedAdditionalHookahRate;
   return {
-    rate: pricing.highTierRate,
-    label: `9+ hookahs · $${pricing.highTierRate} each`,
-    flat: null,
+    rate: flat / Math.max(1, count),
+    label: count >= pricing.customQuoteFromHookahs
+      ? "Custom event · request a quote"
+      : `${count}-hookah package · from $${flat}`,
+    flat: flat as number | null,
   };
 }
 
@@ -217,16 +207,17 @@ export function estimateBooking(
     1,
     Math.min(12, Math.floor(hours) || pricing.includedHours),
   );
-  if (units < pricing.minPackageHookahs) {
+  if (units < pricing.minPackageHookahs || units >= pricing.customQuoteFromHookahs) {
     return null;
   }
 
+  if (units > pricing.minPackageHookahs && serviceHours > pricing.includedHours) return null;
   const tier = tierRateForHookahs(units, pricing);
   const base = packageBaseForHookahs(units, pricing);
   const extraHours = Math.max(0, serviceHours - pricing.includedHours);
   const extras = extraHours * pricing.extraHourRate;
   const subtotalBeforePromo = base + extras;
-  const discount = Math.min(promoDollars, subtotalBeforePromo);
+  const discount = Math.max(0, Math.min(promoDollars, subtotalBeforePromo - pricing.minPackageDollars));
   const subtotal = Math.max(0, subtotalBeforePromo - discount);
   const hst = Math.round(subtotal * pricing.hstRate * 100) / 100;
   const total = Math.round((subtotal + hst) * 100) / 100;
