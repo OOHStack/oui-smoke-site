@@ -2721,7 +2721,7 @@ function HookahModal({
         setFormError("Couldn’t create guest link");
         return;
       }
-      const qrRes = await fetch(`/api/qr?token=${encodeURIComponent(token)}`);
+      const qrRes = await fetch(`/api/qr?hookahId=${a.hookah.id}`);
       if (!qrRes.ok) {
         setFormError("Couldn’t generate QR");
         return;
@@ -3503,7 +3503,7 @@ function HookahModal({
                       return;
                     }
                     const qrRes = await fetch(
-                      `/api/qr?token=${encodeURIComponent(token)}`,
+                      `/api/qr?hookahId=${a.hookah.id}`,
                     );
                     if (!qrRes.ok) {
                       setFormError("Couldn’t generate QR");
@@ -3519,7 +3519,7 @@ function HookahModal({
                   }
                 }}
               >
-                Regenerate guest link
+                Reset guest session
               </button>
             ) : null}
             <p className="hookah-modal__footer-hint">
@@ -3545,7 +3545,7 @@ function HookahModal({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={qrDataUrl} alt="Guest service QR code" className="guest-qr__code" />
             <p className="guest-qr__hint">
-              Guest keeps the page open for coals, refills, and help.
+              Matches this unit’s permanent printed sticker. Guest service opens once the unit is sent out.
             </p>
             <p className="guest-qr__url">{qrUrl}</p>
             <button type="button" className="btn btn-primary" onClick={() => setQrOpen(false)}>

@@ -9,7 +9,8 @@ import {
   FALLBACK_DISPLAY_WORKFLOW,
   getDisplayWorkflowSettings,
 } from "@/lib/display-workflow";
-import { guestServeUrl } from "@/lib/guest";
+import { getSiteUrl } from "@/lib/guest";
+import { unitServeUrl } from "@/lib/unit-sticker";
 import { findJobIdByDisplayToken } from "@/lib/job-display-token";
 import {
   normalizePaymentModel,
@@ -90,9 +91,9 @@ async function qrFor(url: string, size = 512): Promise<string> {
   if (hit) return hit;
   const dataUrl = await QRCode.toDataURL(url, {
     errorCorrectionLevel: "M",
-    margin: 1,
+    margin: 4,
     width: size,
-    color: { dark: "#0a0908", light: "#ffffff" },
+    color: { dark: "#000000", light: "#ffffff" },
   });
   if (qrCache.size > 80) {
     const first = qrCache.keys().next().value;
@@ -213,6 +214,7 @@ export async function loadJobDisplayBoard(
       status: jobHookahs.status,
       flavourLabel: jobHookahs.flavourLabel,
       guestToken: jobHookahs.guestToken,
+      unitQrToken: hookahs.qrToken,
       guestPayTier: jobHookahs.guestPayTier,
       displayQrAt: jobHookahs.displayQrAt,
       modelNumber: hookahs.modelNumber,
@@ -241,7 +243,7 @@ export async function loadJobDisplayBoard(
 
   let takeover: JobDisplayTakeover | null = null;
   if (recentQr?.guestToken && recentQr.displayQrAt) {
-    const serveUrl = guestServeUrl(recentQr.guestToken);
+    const serveUrl = unitServeUrl(getSiteUrl(), recentQr.unitQrToken);
     const shownMs = recentQr.displayQrAt.getTime();
     const shownAt = recentQr.displayQrAt.toISOString();
     takeover = {
