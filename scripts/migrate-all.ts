@@ -12,6 +12,9 @@ async function main() {
   const sql = neon(process.env.DATABASE_URL);
   console.log("Running migrations…");
 
+  await sql`ALTER TABLE hookahs ADD COLUMN IF NOT EXISTS qr_token uuid NOT NULL DEFAULT gen_random_uuid()`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS hookahs_qr_token_unique ON hookahs(qr_token)`;
+
   // --- guest service ---
   await sql`ALTER TABLE job_hookahs ADD COLUMN IF NOT EXISTS guest_token text`;
   await sql`

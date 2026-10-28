@@ -7,6 +7,7 @@ import {
   boolean,
   pgEnum,
   jsonb,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -64,6 +65,7 @@ export const eventTypeEnum = pgEnum("event_type", [
 ]);
 
 export const hookahs = pgTable("hookahs", {
+  qrToken: uuid("qr_token").defaultRandom().notNull().unique(),
   id: serial("id").primaryKey(),
   modelNumber: integer("model_number").notNull().unique(),
   label: text("label"),

@@ -154,8 +154,14 @@ export default function FleetPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Fleet</h1>
-          <p className="page-sub">Hookah inventory and status</p>
+          <p className="page-sub">Hookah inventory and permanent guest QR stickers</p>
         </div>
+      </div>
+
+      <div className="panel" style={{ marginBottom: "0.75rem" }}>
+        <h2 className="panel-title">Reusable unit stickers</h2>
+        <p>Each unit keeps its QR code across jobs, returns, resets, and label changes. Scanning opens its current guest service page once it is sent out. Retire a unit to disable its sticker; add a new unit for a replacement.</p>
+        <a className="btn btn-primary" href="/admin/fleet/stickers">Choose units &amp; print 1″ stickers</a>
       </div>
 
       <form className="form panel" onSubmit={addHookah} style={{ marginBottom: "0.75rem" }}>
@@ -205,6 +211,7 @@ export default function FleetPage() {
                 >
                   Edit
                 </button>
+                <a className="btn btn-sm" href={`/api/hookahs/stickers?id=${h.id}`}>Download QR sticker</a>
                 <button
                   type="button"
                   className="btn btn-sm btn-danger-ghost"
