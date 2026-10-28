@@ -2697,3 +2697,93 @@ body.modal-open {
     font-size: 3rem;
   }
 }
+
+/* Hosted packages: total first, per-hookah comparison second. */
+.hosted-packages .rate-row {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.15fr) minmax(0, 0.75fr);
+  gap: 1.5rem;
+}
+
+.hosted-packages .rate-row > [role="cell"] {
+  min-width: 0;
+}
+
+.hosted-packages .rate-row__amount {
+  margin: 0;
+  color: var(--ink);
+  font: inherit;
+  white-space: nowrap;
+}
+
+.hosted-packages .rate-row__unit {
+  margin-top: 0.55rem;
+  color: #f07b70;
+  font-family: "Outfit", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.hosted-packages .rate-row__quote {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  max-width: 100%;
+  color: #f07b70;
+  font-family: "Outfit", sans-serif;
+  font-size: clamp(0.95rem, 1.8vw, 1.35rem);
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}
+
+.hosted-packages .rate-row__quote span {
+  display: inline;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.hosted-packages .rate-row__quote:hover {
+  color: var(--ink);
+}
+
+.hosted-packages .rate-row__quote:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 5px;
+}
+
+@media (max-width: 700px) {
+  .hosted-packages .rate-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "pkg" "price" "refill";
+    gap: 0.8rem;
+    padding-block: 1.4rem;
+  }
+
+  .hosted-packages .rate-row--head {
+    display: none;
+  }
+
+  .hosted-packages .rate-row__price {
+    text-align: left;
+    font-size: clamp(2rem, 7vw, 2.6rem);
+  }
+
+  .hosted-packages .rate-row__unit {
+    margin-top: 0.3rem;
+  }
+
+  .hosted-packages .rate-row > [role="cell"]:last-child::before {
+    content: "Refills: ";
+    color: var(--ink-mute);
+  }
+
+  .hosted-packages .rate-row__quote {
+    font-size: clamp(0.95rem, 4vw, 1.2rem);
+  }
+}
